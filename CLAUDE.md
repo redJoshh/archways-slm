@@ -14,4 +14,10 @@ The model runs via Ollama and emits a `search_announcements` tool call; the Spri
 - Announcements are fetched at query time via the tool. Never train on them as facts.
 - Only PUBLISHED, non-archived announcements may reach the model. Filter with an allowlist in the Spring query, never in the prompt.
 - Spring applies tool-argument defaults; the schema only documents them.
+
+## Devlog
+- After finishing a task, add a dated entry to docs/devlog.md following its format.
+- Never rewrite or delete past entries; correct mistakes with a new entry. Never edit entries I wrote by hand.
+- Never put secrets, credentials, or real user data in the devlog.
+- Don't read the whole devlog; read only the latest entries when you need context.
 - Small commits, Conventional Commits (`feat:`, `fix:`, `docs:`).
