@@ -67,6 +67,14 @@ def test_arguments_have_no_refs():
     assert "$ref" not in set(keys(SCHEMA["$defs"]["arguments"]))
 
 
+def test_result_max_items_matches_limit_maximum():
+    defs = SCHEMA["$defs"]
+    assert (
+        defs["result"]["maxItems"]
+        == defs["arguments"]["properties"]["limit"]["maximum"]
+    )
+
+
 @pytest.mark.parametrize(
     "payload",
     [
