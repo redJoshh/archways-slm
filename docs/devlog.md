@@ -19,6 +19,20 @@ Template:
 
 ---
 
+## 2026-10-06: Document posted_at offset and result ordering
+
+- **Date:** 2026-10-06
+- **What changed:**
+  - `contracts/search_announcements.schema.json`: added a `$comment` to `posted_at` saying it must include a UTC offset, which Spring attaches because the DB column has no time zone. Added a `$comment` to `$defs/result` saying results are ordered newest first by `posted_at`, Spring guarantees the order, and `maxItems` must equal `arguments.limit.maximum`.
+  - `tests/test_search_announcements_schema.py`: added `test_result_max_items_matches_limit_maximum`.
+- **Why:** To record the time-zone and ordering guarantees in the contract, and to stop `result.maxItems` and the `limit` maximum from drifting apart.
+- **How it was verified:**
+  - `uv run pytest -q` → `45 passed in 0.15s`
+  - `uv run ruff check .` → `All checks passed!`
+  - `uv run ruff format --check .` → `5 files already formatted`
+- **Commits:** `0349027`, `16910a1`
+- **Open questions / next:** The schema can't check the ordering or that the offset comes from Spring. Both need to be tested on the Spring side.
+
 ## 2026-10-06: Devlog and logging rules
 
 - **Date:** 2026-10-06
