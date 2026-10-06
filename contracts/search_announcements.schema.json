@@ -48,7 +48,11 @@
         "office": { "type": "string" },
         "priority": { "type": "string" },
         "year_level": { "type": ["integer", "null"] },
-        "posted_at": { "type": "string", "format": "date-time" }
+        "posted_at": {
+          "type": "string",
+          "format": "date-time",
+          "$comment": "Must include a UTC offset (e.g. +08:00). The DB column has no time zone, so Spring attaches it."
+        }
       },
       "required": [
         "id",
@@ -63,6 +67,7 @@
     },
     "result": {
       "type": "array",
+      "$comment": "Ordered newest first by posted_at. Spring guarantees the order. maxItems must equal arguments.limit.maximum.",
       "items": { "$ref": "#/$defs/announcement" },
       "maxItems": 10
     }
