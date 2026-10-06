@@ -18,6 +18,8 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "jsonschema>=4.26.0",
     "pytest>=9.1.1",
+    "rfc3339-validator>=0.1.4",
     "ruff>=0.16.10",
 ]
