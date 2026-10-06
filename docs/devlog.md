@@ -19,6 +19,19 @@ Template:
 
 ---
 
+## 2026-10-06: Document year_level semantics
+
+- **Date:** 2026-10-06
+- **What changed:** In `contracts/search_announcements.schema.json`, `year_level` now has a model-facing `description`: 1 = first year, 2 = second year, and so on; null = all students. It also has a `$comment`: Spring sends the raw column value, and the future per-student filter is `year_level IS NULL OR year_level = :studentYear`. No `minimum` or `maximum` was added.
+- **Why:** The team's Spring repo confirms the semantics: null = all students, a number = that year level. This comes from the user; it wasn't checked from this repo, because the Spring repo is separate.
+- **How it was verified:**
+  - `uv run pytest` → `45 passed in 0.12s`
+  - `uv run ruff check .` → `All checks passed!`
+- **Commits:** the commit that adds this entry (`docs: document year_level semantics in contract`)
+- **Open questions / next:**
+  - The valid range of `year_level` is still unverified, so the schema has no bounds yet.
+  - Next step: add an eval case where a result has `year_level: null`, and check that the model says the announcement applies to all students rather than treating the value as missing or unknown.
+
 ## 2026-10-06: Document posted_at offset and result ordering
 
 - **Date:** 2026-10-06

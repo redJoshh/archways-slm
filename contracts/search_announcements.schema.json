@@ -47,7 +47,11 @@
         },
         "office": { "type": "string" },
         "priority": { "type": "string" },
-        "year_level": { "type": ["integer", "null"] },
+        "year_level": {
+          "type": ["integer", "null"],
+          "description": "Which year level the announcement is for (1 = first year, 2 = second year, and so on). null means it applies to all students.",
+          "$comment": "Spring sends the raw column value. When filtering for a specific student later, the rule is year_level IS NULL OR year_level = :studentYear."
+        },
         "posted_at": {
           "type": "string",
           "format": "date-time",
