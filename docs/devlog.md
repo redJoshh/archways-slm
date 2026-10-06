@@ -19,6 +19,28 @@ Template:
 
 ---
 
+## 2026-10-06: Generate Ollama tool definition from the contract
+
+- **Date:** 2026-10-06
+- **What changed:**
+  - Added `src/archways_assistant/tooldef.py`. `build_tool_definition(schema)` builds an Ollama function-tool dict from the schema's `title`, `description` and `$defs/arguments`. Each property keeps only `type` and `description`.
+  - Constraint keywords (`minimum`/`maximum`, `minLength`/`maxLength`, `pattern`, `format`, `default`) are turned into description sentences using the schema's values. `$comment` and `additionalProperties` are dropped without a sentence.
+  - Any keyword, pattern or format without a rendering rule raises `ValueError`, so a constraint can't be lost silently.
+  - Running `uv run python -m archways_assistant.tooldef` writes `generated/search_announcements.tool.json`: 2-space indent, fixed key order, LF line endings and a trailing newline.
+  - Added `tests/test_tooldef.py` (9 cases): the committed file is up to date; no dropped keywords or `$ref` appear in it; `required == ["query"]`; the property names match the schema; every property has a description; golden description strings; sentences follow a changed schema value; and `multipleOf` and `$ref` raise `ValueError`.
+  - Added a `generated/` rule to `CLAUDE.md`.
+- **Why:** To keep the schema as the single source of truth for the tool definition the model sees.
+- **How it was verified:**
+  - `uv run python -m archways_assistant.tooldef` → `Wrote generated\search_announcements.tool.json`
+  - `uv run pytest -v` → `54 passed in 0.30s`
+  - `uv run ruff check .` → `All checks passed!`
+  - `uv run ruff format .` → `7 files left unchanged`
+- **Commits:** `44025cb`, `5729145`, and the commit that adds this entry (`docs: add generated/ rule to CLAUDE.md and devlog entry`)
+- **Open questions / next:**
+  - The generator finds the schema through `__file__`. This only works with the editable install that `uv sync` sets up, not with a built wheel.
+  - The `query` description has two overlapping sentences ("Must not be empty" and the non-whitespace one). They are kept on purpose; nothing is special-cased.
+  - Not yet tested against a running Ollama model.
+
 ## 2026-10-06: Document year_level semantics
 
 - **Date:** 2026-10-06
