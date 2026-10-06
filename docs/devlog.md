@@ -19,6 +19,15 @@ Template:
 
 ---
 
+## 2026-10-06: Add how-it-works explainer
+
+- **Date:** 2026-10-06
+- **What changed:** Added `docs/how-it-works.md`. It explains the request flow between the student, Spring, Ollama and Postgres, maps each folder, and walks through the contract, `tooldef.py`, `scripts/probe_tool_call.py` and both test files. It ends with what isn't built yet.
+- **Why:** The user asked for a written breakdown of how the code in the repo works.
+- **How it was verified:** Docs-only change; nothing to run. Its content was checked against the current repo files.
+- **Commits:** not committed yet.
+- **Open questions / next:** A stray file `s` (saved `git log` output with ANSI color codes) is staged in the index. It looks accidental and should probably be unstaged and deleted.
+
 ## 2026-10-06: Generate Ollama tool definition from the contract
 
 - **Date:** 2026-10-06
