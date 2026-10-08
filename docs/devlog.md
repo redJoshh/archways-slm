@@ -19,6 +19,29 @@ Template:
 
 ---
 
+## 2026-10-08: Make the probe data-driven
+
+- **Date:** 2026-10-08 (23:38–23:44 +08:00)
+- **What changed:**
+  - Moved the system prompt into `prompts/system_v1.txt`, with a `{today}` placeholder for the Manila date. Added `--prompt` (default `prompts/system_v1.txt`).
+  - Moved the questions into `evals/dev_questions.jsonl` (`id`, `question`, `expects_tool`, `category`). The original 10 questions are kept as `dev-001`–`dev-010`, and 20 new ones (`dev-011`–`dev-030`) bring it to 30 in 11 categories: 18 should trigger the tool and 12 should not. Added `--questions` (default `evals/dev_questions.jsonl`). The loader rejects bad lines and duplicate ids with the file and line number, and ignores extra keys.
+  - Each run now starts with a header line: model, prompt file, questions file, Ollama version, short git commit (`-dirty` if the tree has changes) and today's date. The summary adds correct decisions per category, with the ids of the wrong ones.
+  - Per-question output, checks, schema validation and the request payload are unchanged. No new dependencies.
+  - Added two rules to `CLAUDE.md`: never copy eval questions into prompts or training data, the held-out file is only for final comparisons, and prompt versions are new files that are never edited. Updated `docs/how-it-works.md` to match.
+  - No held-out file was created; it will be written by hand from real student questions.
+- **Why:** So experiments are comparable and reproducible. A run is defined by its inputs (model, prompt file, question file, commit), and the header records them.
+- **How it was verified:**
+  - Rendered `system_v1.txt` for two fixed dates, with LF and CRLF line endings, and compared it with `system_prompt()` from `87ffc56` → identical.
+  - Ran the old script and the new one with the original 10 questions (`qwen3:1.7b`, Ollama 0.40.1). Apart from latency/tokens and the new header and per-category lines, the output was identical to a second old run. The first old run differed in one reply's wording and in argument key order, and so did old run vs. old run, so this is run-to-run noise from Ollama, not the change. Prompt token counts matched (329/330/334).
+  - Loader edge cases: a duplicate id, a non-bool `expects_tool` and a missing file each exit with a clear message; a CRLF line with an extra key loads.
+  - `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `9 files already formatted`; `uv run pytest -q` → `54 passed in 0.25s`
+  - Baseline: `uv run python scripts/probe_tool_call.py` at `commit=4073ae0` (clean), `qwen3:1.7b`, `today=2026-10-08` → correct decisions 23/30, valid arguments 14/15, sentence-like queries 0/15. Misses: class_suspension 0/3 (`dev-001`, `dev-011`, `dev-012`), deadlines 1/3 (`dev-004`, `dev-013`), prompt_injection 1/3 (`dev-010` called with `"draft"`, `dev-028` called with `"*"`). The one invalid call was `days: 60` (max 30) for `dev-006`.
+- **Commits:** `90db5de`, `4073ae0`, `e9576f1`
+- **Open questions / next:**
+  - Vague messages (`dev-021`, `dev-022`) expect no tool because each run is a single turn with no history. Revisit if multi-turn evals are added.
+  - The model ignores the tool for class-suspension questions, which matter most to students. This is a candidate for `system_v2.txt`.
+  - Tool calls on injection prompts are harmless only if Spring's PUBLISHED/non-archived allowlist holds. That is still unverified from this repo.
+
 ## 2026-10-06: Add how-it-works explainer
 
 - **Date:** 2026-10-06
