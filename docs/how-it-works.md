@@ -32,6 +32,8 @@ The model never touches the database and never "knows" announcements from traini
 | `src/archways_assistant/tooldef.py` | Generator that turns the contract into the tool definition Ollama understands. |
 | `generated/search_announcements.tool.json` | Output of the generator. Never edit by hand. |
 | `scripts/probe_tool_call.py` | Sends test questions to a local Ollama model and checks whether it calls the tool correctly. |
+| `prompts/system_v1.txt` | The system prompt the probe sends, with a `{today}` placeholder. New versions are new files. |
+| `evals/dev_questions.jsonl` | The 30 development questions the probe asks by default, one JSON object per line. |
 | `tests/test_search_announcements_schema.py` | Tests that the contract accepts good data and rejects bad data. |
 | `tests/test_tooldef.py` | Tests that the generated file is up to date and correct. |
 | `src/archways_assistant/__init__.py` | Placeholder `main()` from `uv init`; prints a hello message. Not used yet. |
@@ -110,25 +112,49 @@ Paths are found relative to `__file__`, so this works with the editable install 
 
 ## 3. The probe script (`scripts/probe_tool_call.py`)
 
-An experiment harness: *does a small local model actually use the tool well?*
+An experiment harness: *does a small local model actually use the tool well?* The prompt and the questions live in files, so two runs can be compared just by their inputs.
 
 ```bash
-uv run python scripts/probe_tool_call.py --model qwen3:1.7b
+uv run python scripts/probe_tool_call.py --model qwen3:1.7b \
+    --prompt prompts/system_v1.txt --questions evals/dev_questions.jsonl
 ```
+
+All three flags are optional; the values above are the defaults. Paths you pass are relative to the current directory.
 
 What it does:
 
 1. Loads the generated tool and the contract's `arguments` schema (for validation).
-2. Builds a short system prompt that includes today's date in Manila time (fixed `+08:00`; the Philippines has no DST) and tells the model to call the tool with short keywords, not full sentences, and never to invent announcements.
-3. Sends 10 questions to `http://localhost:11434/api/chat`, one at a time, with `temperature: 0` and `think: false`:
-   - 6 **should** trigger the tool (including Taglish ones like "May pasok ba bukas?").
-   - 4 **should not** (a greeting, math, a poem, and a prompt-injection attempt asking for drafts).
-4. For each answer it reports:
+2. Reads the system prompt from `--prompt` and replaces `{today}` with today's date in Manila time, e.g. `Thursday, 2026-10-08` (fixed `+08:00`; the Philippines has no DST). The file must contain `{today}`. `system_v1.txt` tells the model to call the tool with short keywords, not full sentences, and never to invent announcements.
+3. Reads the questions from `--questions` (format below) and stops with the file and line number if a line is invalid or an `id` repeats.
+4. Prints one header line that pins down the run:
+   ```
+   model=qwen3:1.7b prompt=prompts/system_v1.txt questions=evals/dev_questions.jsonl ollama=0.40.1 commit=4073ae0 today=2026-10-08
+   ```
+   `commit` is the short git hash, with `-dirty` added if the work tree has any uncommitted or untracked changes, because then the hash doesn't fully describe the code or prompt that ran.
+5. Sends each question to `http://localhost:11434/api/chat`, one at a time, with `temperature: 0` and `think: false`. For each answer it reports:
    - whether the tool was called, and whether that was the right decision,
    - whether the arguments pass the contract (`jsonschema` validator),
    - whether `query` looks like a sentence (more than 6 words or ends with `?`) instead of keywords,
    - latency, prompt tokens and tokens/second from Ollama's timing fields.
-5. Prints a summary: correct decisions, valid arguments and sentence-like queries.
+6. Prints a summary: correct decisions, valid arguments and sentence-like queries, then correct decisions per category with the ids of the wrong ones.
+
+Even at `temperature: 0`, two runs of the same inputs can differ slightly (reply wording, argument key order). Compare the decision and validity counts, not exact text.
+
+### Question files
+
+One JSON object per line; blank lines are skipped and extra keys are ignored:
+
+```json
+{"id": "dev-001", "question": "May pasok ba bukas?", "expects_tool": true, "category": "class_suspension"}
+```
+
+`evals/dev_questions.jsonl` has 30 questions in 11 categories: 18 should trigger the tool (class suspensions, deadlines, offices, year levels, relative dates, typos and slang) and 12 should not (small talk, math and poems, prompt injection, vague messages with no context, and requests for data the model must never see, like drafts or admin notes). Use this file while iterating on prompts.
+
+A **held-out** file, written by hand from real student questions, will be used only for final comparisons. Any file in the same format works with `--questions`. Eval questions must never be copied into a system prompt or training data, or the scores stop meaning anything.
+
+### Prompt versions
+
+Prompts are versioned by file name. To try a change, copy `system_v1.txt` to `system_v2.txt` and edit the copy; never edit an old version. Then every old header line still points at the prompt that actually ran.
 
 It only talks to localhost (`trust_env=False` ignores proxy env vars), never reads `.env` and never touches a database. It doesn't execute the tool; it only inspects what the model *asks for*.
 
@@ -152,7 +178,7 @@ Run them with `uv run pytest`.
 1. Edit `contracts/search_announcements.schema.json`.
 2. Run `uv run python -m archways_assistant.tooldef` to regenerate `generated/`.
 3. Run `uv run pytest` (schema tests plus the up-to-date check).
-4. Optionally run the probe against Ollama to see how the model reacts.
+4. Optionally run the probe against Ollama to see how the model reacts. Commit first so the header shows a clean hash.
 5. Mirror the change in the Spring app (defaults, allowlist, result shape).
 
 ## Key rules behind the design (from `CLAUDE.md`)
@@ -162,10 +188,13 @@ Run them with `uv run pytest`.
 - **Defaults live in Spring:** the schema only documents them.
 - **No real data:** never connect to the team DB; use seed data in `data/seed/` (not created yet).
 - **No training on announcements:** they're fetched live, so the model can't repeat stale or made-up news.
+- **Clean evals:** eval questions never go into prompts or training data, and the held-out file is only for final comparisons.
+- **Immutable prompt versions:** a prompt change is a new file in `prompts/`.
 
 ## Not built yet
 
 - `data/seed/` and any seed data.
+- The held-out question file (to be written by hand from real student questions).
 - An actual app entry point (`main()` is still the `uv init` placeholder).
 - Eval cases checking how the model *describes* results, e.g. that `year_level: null` means "all students".
 - `priority` is a free string; it could become an `enum` once the allowed values are known.

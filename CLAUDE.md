@@ -15,6 +15,8 @@ The model runs via Ollama and emits a `search_announcements` tool call; the Spri
 - Only PUBLISHED, non-archived announcements may reach the model. Filter with an allowlist in the Spring query, never in the prompt.
 - Spring applies tool-argument defaults; the schema only documents them.
 - generated/ is produced by tooldef.py; never hand-edit it, re-run the generator.
+- Never copy eval questions into system prompts or training data. The held-out file is only for final comparisons.
+- Prompt versions are new files in prompts/; never edit an old version.
 
 ## Devlog
 - After finishing a task, add a dated entry to docs/devlog.md following its format.
