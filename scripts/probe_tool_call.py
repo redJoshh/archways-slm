@@ -1,6 +1,7 @@
 """Probe whether a local Ollama model calls search_announcements correctly.
 
 Usage: uv run python scripts/probe_tool_call.py [--model qwen3:1.7b]
+    [--prompt prompts/system_v1.txt]
 
 Talks only to Ollama on localhost. Never reads .env or touches a database.
 """
@@ -20,6 +21,8 @@ TOOL_PATH = ROOT / "generated" / "search_announcements.tool.json"
 SCHEMA_PATH = ROOT / "contracts" / "search_announcements.schema.json"
 OLLAMA_URL = "http://localhost:11434"
 TOOL_NAME = "search_announcements"
+DEFAULT_PROMPT = ROOT / "prompts" / "system_v1.txt"
+TODAY_PLACEHOLDER = "{today}"
 
 # Manila has no daylight saving time, so a fixed offset is exact.
 MANILA = timezone(timedelta(hours=8), "Asia/Manila")
@@ -41,15 +44,16 @@ QUESTIONS = [
 ]
 
 
-def system_prompt(now: datetime) -> str:
-    return (
-        "You are the UST Archways assistant.\n"
-        f"Today is {now:%A}, {now:%Y-%m-%d} (Asia/Manila).\n"
-        "For any question about announcements, notices or news, call "
-        f"{TOOL_NAME} with a few short keywords, not a full sentence.\n"
-        "For anything else, answer briefly without the tool.\n"
-        "Never invent announcements."
-    )
+def load_prompt(path: Path, now: datetime) -> str:
+    """Read a prompt file and fill its {today} placeholder with the Manila date."""
+    try:
+        template = path.read_text(encoding="utf-8").removesuffix("\n")
+    except OSError as error:
+        sys.exit(f"Cannot read prompt file {path}: {error}")
+    if TODAY_PLACEHOLDER not in template:
+        sys.exit(f"Prompt file {path} has no {TODAY_PLACEHOLDER} placeholder")
+    # str.replace, not str.format, so prompts may contain other braces.
+    return template.replace(TODAY_PLACEHOLDER, f"{now:%A}, {now:%Y-%m-%d}")
 
 
 def tokens_per_second(body: dict) -> str:
@@ -87,6 +91,7 @@ def chat(client: httpx.Client, payload: dict) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", default="qwen3:1.7b")
+    parser.add_argument("--prompt", type=Path, default=DEFAULT_PROMPT)
     args = parser.parse_args()
 
     tool = json.loads(TOOL_PATH.read_text(encoding="utf-8"))
@@ -94,7 +99,7 @@ def main() -> None:
     validator = Draft202012Validator(
         schema["$defs"]["arguments"], format_checker=FormatChecker()
     )
-    system = system_prompt(datetime.now(MANILA))
+    system = load_prompt(args.prompt, datetime.now(MANILA))
 
     correct_decisions = 0
     tool_calls_total = 0
