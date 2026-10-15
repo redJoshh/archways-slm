@@ -125,6 +125,19 @@ uv run python scripts/probe_tool_call.py --model qwen3:1.7b --tool-mode native \
 
 All four flags are optional; the values above are the defaults. Paths you pass are relative to the current directory. With `--tool-mode prompt`, the default prompt is `prompts/system_v1_prompt_mode.txt` (see [Tool modes](#tool-modes)).
 
+To run only some questions, add `--ids` with comma-separated IDs. They run in file order, and an unknown ID stops the run with its name:
+
+```bash
+uv run python scripts/probe_tool_call.py --ids dev-001,dev-004,dev-011
+```
+
+To save a run (PowerShell), write it to `runs/`. That folder is gitignored, so saving output doesn't make the tree `-dirty`, and run outputs are never committed:
+
+```powershell
+New-Item -ItemType Directory runs -Force
+uv run python scripts/probe_tool_call.py --model qwen3:1.7b | Tee-Object runs/<name>.txt
+```
+
 What it does:
 
 1. Loads the generated tool and the contract's `arguments` schema (for validation).
@@ -134,13 +147,13 @@ What it does:
    ```
    model=qwen3:1.7b tool_mode=native capabilities=completion,tools,thinking prompt=prompts/system_v1.txt questions=evals/dev_questions.jsonl ollama=0.40.4 commit=a0ea9c3 today=2026-10-15
    ```
-   `capabilities` comes from Ollama's `/api/show` (`unknown` if Ollama doesn't report them). `commit` is the short git hash, with `-dirty` added if the work tree has any uncommitted or untracked changes, because then the hash doesn't fully describe the code or prompt that ran.
-5. Sends each question to `http://localhost:11434/api/chat`, one at a time, with `temperature: 0`. It adds `think: false` only if the model's capabilities include `thinking` (or are unknown), because models without thinking, like `gemma3`, reject it. For each answer it reports:
+   `capabilities` comes from Ollama's `/api/show` (`unknown` if Ollama doesn't report them). With `--ids`, an `ids=...` field follows `questions=`; full runs don't have it. `commit` is the short git hash, with `-dirty` added if the work tree has any uncommitted or untracked changes, because then the hash doesn't fully describe the code or prompt that ran.
+5. Sends each question to `http://localhost:11434/api/chat`, one at a time, with `temperature: 0`. It adds `think: false` only if the model's capabilities include `thinking` (or are unknown), because models without thinking, like `gemma3`, reject it. Each answer's block starts with its position and question ID, e.g. `[3/30] dev-004: When is the enrollment deadline?`. Outputs from before commit `4ce37b4` have no ID there. For each answer it reports:
    - whether the tool was called, and whether that was the right decision,
    - whether the arguments pass the contract (`jsonschema` validator),
    - whether `query` looks like a sentence (more than 6 words or ends with `?`) instead of keywords,
    - latency, prompt tokens and tokens/second from Ollama's timing fields.
-6. Prints a summary: correct decisions, valid arguments and sentence-like queries, then correct decisions per category with the ids of the wrong ones.
+6. Prints a summary: correct decisions, valid arguments and sentence-like queries, then correct decisions per category with the ids of the wrong ones. With `--ids`, it counts only the selected questions.
 
 Even at `temperature: 0`, two runs of the same inputs can differ slightly (reply wording, argument key order). Compare the decision and validity counts, not exact text.
 

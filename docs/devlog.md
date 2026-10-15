@@ -19,6 +19,20 @@ Template:
 
 ---
 
+## 2026-10-15: Run selected questions with --ids; question IDs in probe output
+
+- **Date:** 2026-10-15 (09:04–09:08 +08:00)
+- **What changed:**
+  - Added `--ids` to `scripts/probe_tool_call.py`, a comma-separated list of question IDs. Only those questions run, in file order. The header adds `ids=...` only when the flag is used. The summary and per-category lines cover only the selected questions. An unknown or empty ID list exits with a message naming the bad IDs.
+  - **One-time output format change:** every per-question block now starts with the question ID, e.g. `[3/30] dev-004: When is the enrollment deadline?`. Full runs have it too. Raw outputs from commit `4ce37b4` onward include IDs; earlier ones start with `[3/30] <question>`. This is deliberate: matching results by position in the file is fragile, and per-ID output lets runs be compared question by question. Everything else in the output is unchanged.
+  - `docs/how-it-works.md` documents `--ids`, the ID in each block and how to save a run to `runs/` with `Tee-Object`. `runs/` is gitignored in the next commit (`chore: gitignore runs/`), so run outputs are never committed and saving one doesn't mark the tree `-dirty`.
+- **Why:** To inspect specific questions from the 2026-10-15 baselines without rerunning all 30, and to make outputs comparable by ID.
+- **How it was verified:**
+  - `uv run ruff check .` → `All checks passed!`; `uv run pytest -q` → `88 passed in 0.14s`
+  - `--ids dev-001,dev-999,nope` → `Unknown question id(s) in evals/dev_questions.jsonl: dev-999, nope` (exit 1); `--ids " , "` → `--ids is empty` (exit 1)
+- **Commits:** `4ce37b4`, plus this docs commit
+- **Open questions / next:** none.
+
 ## 2026-10-15: Probe baselines for qwen3 and gemma3
 
 - **Date:** 2026-10-15 (09:03 +08:00)
