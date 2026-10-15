@@ -1,11 +1,17 @@
 """Probe whether a local Ollama model calls search_announcements correctly.
 
 Usage: uv run python scripts/probe_tool_call.py [--model qwen3:1.7b]
-    [--prompt prompts/system_v1.txt] [--questions evals/dev_questions.jsonl]
+    [--tool-mode native|prompt] [--prompt prompts/system_v1.txt]
+    [--questions evals/dev_questions.jsonl]
 
-Prints a header line (model, prompt, questions, Ollama version, git commit,
-date) so runs can be compared, then one block per question and a summary
-with per-category results.
+--tool-mode native (default) sends the tool in Ollama's tools field.
+--tool-mode prompt is for models without tool support: the tool definition
+goes into the system prompt and the reply text is parsed with toolparse.
+Its default prompt is prompts/system_v1_prompt_mode.txt.
+
+Prints a header line (model, tool mode, model capabilities, prompt,
+questions, Ollama version, git commit, date) so runs can be compared, then
+one block per question and a summary with per-category results.
 
 Talks only to Ollama on localhost. Never reads .env or touches a database.
 """
@@ -21,14 +27,20 @@ from pathlib import Path
 import httpx
 from jsonschema import Draft202012Validator, FormatChecker
 
+from archways_assistant.toolparse import Malformed, ToolCall, parse_reply
+
 ROOT = Path(__file__).resolve().parent.parent
 TOOL_PATH = ROOT / "generated" / "search_announcements.tool.json"
 SCHEMA_PATH = ROOT / "contracts" / "search_announcements.schema.json"
 OLLAMA_URL = "http://localhost:11434"
 TOOL_NAME = "search_announcements"
-DEFAULT_PROMPT = ROOT / "prompts" / "system_v1.txt"
+DEFAULT_PROMPTS = {
+    "native": ROOT / "prompts" / "system_v1.txt",
+    "prompt": ROOT / "prompts" / "system_v1_prompt_mode.txt",
+}
 DEFAULT_QUESTIONS = ROOT / "evals" / "dev_questions.jsonl"
 TODAY_PLACEHOLDER = "{today}"
+TOOL_PLACEHOLDER = "{tool_definition}"
 
 # Manila has no daylight saving time, so a fixed offset is exact.
 MANILA = timezone(timedelta(hours=8), "Asia/Manila")
@@ -39,16 +51,29 @@ CONTENT_PREVIEW_CHARS = 200
 QUESTION_FIELDS = {"id": str, "question": str, "expects_tool": bool, "category": str}
 
 
-def load_prompt(path: Path, now: datetime) -> str:
-    """Read a prompt file and fill its {today} placeholder with the Manila date."""
+def load_prompt(path: Path, now: datetime, tool_definition: str | None) -> str:
+    """Read a prompt file and fill its {today} placeholder with the Manila date.
+
+    In prompt mode (tool_definition given) the file must have a
+    {tool_definition} placeholder, which is filled with it. In native mode it
+    must not, so a prompt can't silently run in the wrong mode.
+    """
     try:
         template = path.read_text(encoding="utf-8").removesuffix("\n")
     except OSError as error:
         sys.exit(f"Cannot read prompt file {path}: {error}")
     if TODAY_PLACEHOLDER not in template:
         sys.exit(f"Prompt file {path} has no {TODAY_PLACEHOLDER} placeholder")
+    has_tool_placeholder = TOOL_PLACEHOLDER in template
+    if tool_definition is not None and not has_tool_placeholder:
+        sys.exit(f"Prompt file {path} has no {TOOL_PLACEHOLDER} placeholder")
+    if tool_definition is None and has_tool_placeholder:
+        sys.exit(f"Prompt file {path} is for --tool-mode prompt")
     # str.replace, not str.format, so prompts may contain other braces.
-    return template.replace(TODAY_PLACEHOLDER, f"{now:%A}, {now:%Y-%m-%d}")
+    prompt = template.replace(TODAY_PLACEHOLDER, f"{now:%A}, {now:%Y-%m-%d}")
+    if tool_definition is not None:
+        prompt = prompt.replace(TOOL_PLACEHOLDER, tool_definition)
+    return prompt
 
 
 def load_questions(path: Path) -> list[dict]:
@@ -125,6 +150,25 @@ def ollama_version(client: httpx.Client) -> str:
         return "unknown"
 
 
+def model_capabilities(client: httpx.Client, model: str) -> list[str] | None:
+    """The model's capabilities from /api/show, or None if Ollama doesn't list them."""
+    try:
+        response = client.post(f"{OLLAMA_URL}/api/show", json={"model": model})
+    except httpx.ConnectError:
+        sys.exit("Ollama not reachable at localhost:11434")
+    try:
+        body = response.json()
+    except ValueError:
+        body = {"error": response.text}
+    if response.status_code != 200 or "error" in body:
+        sys.exit(
+            f"Cannot read model {model!r} (HTTP {response.status_code}): "
+            f"{body.get('error', body)}"
+        )
+    capabilities = body.get("capabilities")
+    return capabilities if isinstance(capabilities, list) else None
+
+
 def tokens_per_second(body: dict) -> str:
     count, duration = body.get("eval_count"), body.get("eval_duration")
     if not count or not duration:
@@ -160,29 +204,43 @@ def chat(client: httpx.Client, payload: dict) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", default="qwen3:1.7b")
-    parser.add_argument("--prompt", type=Path, default=DEFAULT_PROMPT)
+    parser.add_argument("--tool-mode", choices=["native", "prompt"], default="native")
+    parser.add_argument("--prompt", type=Path)
     parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
     args = parser.parse_args()
+    prompt_mode = args.tool_mode == "prompt"
+    prompt_path = args.prompt or DEFAULT_PROMPTS[args.tool_mode]
 
-    tool = json.loads(TOOL_PATH.read_text(encoding="utf-8"))
+    tool_text = TOOL_PATH.read_text(encoding="utf-8")
+    tool = json.loads(tool_text)
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     validator = Draft202012Validator(
         schema["$defs"]["arguments"], format_checker=FormatChecker()
     )
     now = datetime.now(MANILA)
-    system = load_prompt(args.prompt, now)
+    tool_definition = tool_text.removesuffix("\n") if prompt_mode else None
+    system = load_prompt(prompt_path, now, tool_definition)
     questions = load_questions(args.questions)
 
     correct_decisions = 0
     tool_calls_total = 0
     valid_calls = 0
     sentence_like_total = 0
+    malformed_total = 0
     # category -> {"correct": int, "total": int, "wrong": [ids]}, in file order.
     categories: dict[str, dict] = {}
 
     with httpx.Client(timeout=300, trust_env=False) as client:
+        capabilities = model_capabilities(client, args.model)
+        # Models without thinking (e.g. gemma3) reject the think option. If
+        # Ollama doesn't report capabilities, keep sending it as before.
+        send_think = capabilities is None or "thinking" in capabilities
+        shown_capabilities = (
+            "unknown" if capabilities is None else ",".join(capabilities) or "none"
+        )
         print(
-            f"model={args.model} prompt={display_path(args.prompt)} "
+            f"model={args.model} tool_mode={args.tool_mode} "
+            f"capabilities={shown_capabilities} prompt={display_path(prompt_path)} "
             f"questions={display_path(args.questions)} "
             f"ollama={ollama_version(client)} commit={git_commit()} "
             f"today={now:%Y-%m-%d}"
@@ -190,25 +248,38 @@ def main() -> None:
         print()
         for number, item in enumerate(questions, start=1):
             question, expects_tool = item["question"], item["expects_tool"]
-            payload = {
-                "model": args.model,
-                "stream": False,
-                "think": False,
-                "options": {"temperature": 0},
-                "tools": [tool],
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": question},
-                ],
-            }
+            payload = {"model": args.model, "stream": False}
+            if send_think:
+                payload["think"] = False
+            payload["options"] = {"temperature": 0}
+            if not prompt_mode:
+                payload["tools"] = [tool]
+            payload["messages"] = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": question},
+            ]
             started = time.perf_counter()
             body = chat(client, payload)
             latency = time.perf_counter() - started
 
             message = body.get("message", {})
-            calls = message.get("tool_calls") or []
+            # (name, arguments) pairs, so both modes share the checks below.
+            calls = []
+            malformed = None
+            if prompt_mode:
+                parsed = parse_reply(message.get("content") or "", TOOL_NAME)
+                if isinstance(parsed, ToolCall):
+                    calls.append((parsed.name, parsed.arguments))
+                elif isinstance(parsed, Malformed):
+                    malformed = parsed.reason
+                    malformed_total += 1
+            else:
+                for call in message.get("tool_calls") or []:
+                    function = call.get("function", {})
+                    calls.append((function.get("name"), function.get("arguments")))
             called = bool(calls)
-            decision_ok = called == expects_tool
+            # A malformed attempt is a wrong decision whatever was expected.
+            decision_ok = malformed is None and called == expects_tool
             correct_decisions += decision_ok
             stats = categories.setdefault(
                 item["category"], {"correct": 0, "total": 0, "wrong": []}
@@ -220,16 +291,16 @@ def main() -> None:
                 stats["wrong"].append(item["id"])
 
             print(f"[{number}/{len(questions)}] {question}")
+            shown_called = "malformed" if malformed else "yes" if called else "no"
             print(
-                f"  tool called: {'yes' if called else 'no'} | "
+                f"  tool called: {shown_called} | "
                 f"expected: {'yes' if expects_tool else 'no'} | "
                 f"{'OK' if decision_ok else 'WRONG'}"
             )
-            for call in calls:
+            if malformed:
+                print(f"  parse error: {malformed}")
+            for name, arguments in calls:
                 tool_calls_total += 1
-                function = call.get("function", {})
-                name = function.get("name")
-                arguments = function.get("arguments")
                 print(f"  call: {name} {json.dumps(arguments, ensure_ascii=False)}")
 
                 errors = []
@@ -271,6 +342,8 @@ def main() -> None:
     print(f"  correct tool decisions: {correct_decisions}/{len(questions)}")
     print(f"  valid arguments: {valid_calls}/{tool_calls_total} tool calls")
     print(f"  sentence-like queries: {sentence_like_total}/{tool_calls_total}")
+    if prompt_mode:
+        print(f"  malformed: {malformed_total}/{len(questions)}")
     print("Per category (correct tool decisions)")
     for category, stats in categories.items():
         wrong = f" (wrong: {', '.join(stats['wrong'])})" if stats["wrong"] else ""
