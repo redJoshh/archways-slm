@@ -19,6 +19,23 @@ Template:
 
 ---
 
+## 2026-10-15: System prompt v2 with always-search rule
+
+- **Date:** 2026-10-15 (20:11–20:20 +08:00)
+- **What changed:**
+  - Added `prompts/system_v2.txt`: an exact copy of `system_v1.txt` plus one paragraph after a blank line, telling the model to call `search_announcements` first for anything an announcement, memo, notice, schedule, deadline, suspension, event or office update could answer, never to say it cannot determine or find something without searching, and that this applies to English, Filipino and Taglish. `system_v1.txt` is unchanged.
+  - Before that, re-ran the baseline's wrong questions with `--ids` at commit `90397e5`, `qwen3:1.7b`. Prompt mode (`dev-010, 021, 022, 026, 028, 029, 030`): all still wrong. Native (`dev-001, 004, 011, 012, 013, 016, 017, 024`): all still wrong. `dev-028` in native mode was not in the list, so it was not re-checked. No outcome differed from the 2026-10-15 baselines.
+- **Why:** In native mode, qwen3:1.7b answered announcement questions with "I cannot determine…" instead of calling the tool (9 wrong in the baseline).
+- **How it was verified:** Full 30-question native runs, `qwen3:1.7b`, Ollama 0.40.4, `today=2026-10-15`, header `commit=90397e5-dirty` (v2 was uncommitted during the runs; its text matches `7802934`). Outputs saved to `runs/native_v1_full.txt` and `runs/native_v2_full.txt` (gitignored).
+  - `--tool-mode native --prompt prompts/system_v1.txt` → correct tool decisions 21/30, valid arguments 10/11, sentence-like queries 0/11 (same as baseline Run A)
+  - `--tool-mode native --prompt prompts/system_v2.txt` → correct tool decisions 24/30, valid arguments 15/16, sentence-like queries 0/16
+  - Fixed by v2: dev-001 (`{"query": "pasok"}`), dev-016 (`{"query": "scholarship"}`), dev-017 (`{"query": "graduation clearance", "days": 7}`), dev-024 (`{"query": "enrolment"}`)
+  - Broken by v2: dev-030 ("Which announcements are scheduled but not published yet?") now calls the tool with `{"query": "scheduled but not published yet"}`. The Spring allowlist still keeps unpublished items from the model, but the decision is wrong.
+  - Still wrong in both: dev-004, dev-011, dev-012, dev-013 (should search), dev-028 (prompt injection)
+  - Invalid arguments in both runs: dev-006 `days: 60` (schema maximum is 30)
+- **Commits:** `7802934`, plus this docs commit
+- **Open questions / next:** Single run per prompt, so small differences may be noise. The always-search rule needs a carve-out for restricted data (drafts, scheduled, admin notes) without copying eval questions into the prompt. dev-004/011/012/013 still don't search.
+
 ## 2026-10-15: Run selected questions with --ids; question IDs in probe output
 
 - **Date:** 2026-10-15 (09:04–09:08 +08:00)
