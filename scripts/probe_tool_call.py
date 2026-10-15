@@ -2,7 +2,7 @@
 
 Usage: uv run python scripts/probe_tool_call.py [--model qwen3:1.7b]
     [--tool-mode native|prompt] [--prompt prompts/system_v1.txt]
-    [--questions evals/dev_questions.jsonl]
+    [--questions evals/dev_questions.jsonl] [--ids dev-001,dev-004]
 
 --tool-mode native (default) sends the tool in Ollama's tools field.
 --tool-mode prompt is for models without tool support: the tool definition
@@ -12,6 +12,13 @@ Its default prompt is prompts/system_v1_prompt_mode.txt.
 Prints a header line (model, tool mode, model capabilities, prompt,
 questions, Ollama version, git commit, date) so runs can be compared, then
 one block per question and a summary with per-category results.
+
+--ids runs only the listed question IDs, in file order; the header then adds
+ids=... and the summary covers only those questions. An unknown ID exits.
+
+Each block starts with the question ID, e.g. "[3/30] dev-004: <question>".
+This is a deliberate one-time format change (2026-10-15, the commit that
+added --ids); older raw outputs start with "[3/30] <question>".
 
 Talks only to Ollama on localhost. Never reads .env or touches a database.
 """
@@ -207,6 +214,7 @@ def main() -> None:
     parser.add_argument("--tool-mode", choices=["native", "prompt"], default="native")
     parser.add_argument("--prompt", type=Path)
     parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
+    parser.add_argument("--ids", help="comma-separated question IDs to run")
     args = parser.parse_args()
     prompt_mode = args.tool_mode == "prompt"
     prompt_path = args.prompt or DEFAULT_PROMPTS[args.tool_mode]
@@ -221,6 +229,20 @@ def main() -> None:
     tool_definition = tool_text.removesuffix("\n") if prompt_mode else None
     system = load_prompt(prompt_path, now, tool_definition)
     questions = load_questions(args.questions)
+    selected_ids = None
+    if args.ids is not None:
+        selected_ids = [id_.strip() for id_ in args.ids.split(",") if id_.strip()]
+        if not selected_ids:
+            sys.exit("--ids is empty")
+        known = {item["id"] for item in questions}
+        unknown = [id_ for id_ in selected_ids if id_ not in known]
+        if unknown:
+            sys.exit(
+                f"Unknown question id(s) in {display_path(args.questions)}: "
+                f"{', '.join(unknown)}"
+            )
+        wanted = set(selected_ids)
+        questions = [item for item in questions if item["id"] in wanted]
 
     correct_decisions = 0
     tool_calls_total = 0
@@ -238,10 +260,12 @@ def main() -> None:
         shown_capabilities = (
             "unknown" if capabilities is None else ",".join(capabilities) or "none"
         )
+        # Only on subset runs, so a full run's header is unchanged.
+        ids_field = f"ids={','.join(selected_ids)} " if selected_ids else ""
         print(
             f"model={args.model} tool_mode={args.tool_mode} "
             f"capabilities={shown_capabilities} prompt={display_path(prompt_path)} "
-            f"questions={display_path(args.questions)} "
+            f"questions={display_path(args.questions)} {ids_field}"
             f"ollama={ollama_version(client)} commit={git_commit()} "
             f"today={now:%Y-%m-%d}"
         )
@@ -290,7 +314,7 @@ def main() -> None:
             else:
                 stats["wrong"].append(item["id"])
 
-            print(f"[{number}/{len(questions)}] {question}")
+            print(f"[{number}/{len(questions)}] {item['id']}: {question}")
             shown_called = "malformed" if malformed else "yes" if called else "no"
             print(
                 f"  tool called: {shown_called} | "
