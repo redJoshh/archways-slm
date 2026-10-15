@@ -4,4 +4,4 @@ __pycache__/
 .idea/
 .vscode/
 models/*.gguf
-data/generated/
+data/generated/runs/
