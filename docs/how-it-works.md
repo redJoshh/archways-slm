@@ -32,10 +32,14 @@ The model never touches the database and never "knows" announcements from traini
 | `src/archways_assistant/tooldef.py` | Generator that turns the contract into the tool definition Ollama understands. |
 | `generated/search_announcements.tool.json` | Output of the generator. Never edit by hand. |
 | `scripts/probe_tool_call.py` | Sends test questions to a local Ollama model and checks whether it calls the tool correctly. |
+| `src/archways_assistant/toolparse.py` | Parses a model's plain-text reply into a tool call, no tool, or malformed (used by the probe's prompt mode). |
 | `prompts/system_v1.txt` | The system prompt the probe sends, with a `{today}` placeholder. New versions are new files. |
+| `prompts/system_v1_prompt_mode.txt` | `system_v1.txt` plus a `{tool_definition}` placeholder and JSON reply instructions, for models without tool support. |
 | `evals/dev_questions.jsonl` | The 30 development questions the probe asks by default, one JSON object per line. |
 | `tests/test_search_announcements_schema.py` | Tests that the contract accepts good data and rejects bad data. |
 | `tests/test_tooldef.py` | Tests that the generated file is up to date and correct. |
+| `tests/test_toolparse.py` | Tests the reply parser on every reply shape (no Ollama needed). |
+| `tests/test_prompts.py` | Tests that the prompt-mode prompt starts with the exact text of `system_v1.txt`. |
 | `src/archways_assistant/__init__.py` | Placeholder `main()` from `uv init`; prints a hello message. Not used yet. |
 | `docs/devlog.md` | Dated development history, newest first. |
 | `CLAUDE.md` | Project rules (no secrets, no real DB, defaults live in Spring, etc.). |
@@ -115,11 +119,11 @@ Paths are found relative to `__file__`, so this works with the editable install 
 An experiment harness: *does a small local model actually use the tool well?* The prompt and the questions live in files, so two runs can be compared just by their inputs.
 
 ```bash
-uv run python scripts/probe_tool_call.py --model qwen3:1.7b \
+uv run python scripts/probe_tool_call.py --model qwen3:1.7b --tool-mode native \
     --prompt prompts/system_v1.txt --questions evals/dev_questions.jsonl
 ```
 
-All three flags are optional; the values above are the defaults. Paths you pass are relative to the current directory.
+All four flags are optional; the values above are the defaults. Paths you pass are relative to the current directory. With `--tool-mode prompt`, the default prompt is `prompts/system_v1_prompt_mode.txt` (see [Tool modes](#tool-modes)).
 
 What it does:
 
@@ -128,10 +132,10 @@ What it does:
 3. Reads the questions from `--questions` (format below) and stops with the file and line number if a line is invalid or an `id` repeats.
 4. Prints one header line that pins down the run:
    ```
-   model=qwen3:1.7b prompt=prompts/system_v1.txt questions=evals/dev_questions.jsonl ollama=0.40.1 commit=4073ae0 today=2026-10-08
+   model=qwen3:1.7b tool_mode=native capabilities=completion,tools,thinking prompt=prompts/system_v1.txt questions=evals/dev_questions.jsonl ollama=0.40.4 commit=a0ea9c3 today=2026-10-15
    ```
-   `commit` is the short git hash, with `-dirty` added if the work tree has any uncommitted or untracked changes, because then the hash doesn't fully describe the code or prompt that ran.
-5. Sends each question to `http://localhost:11434/api/chat`, one at a time, with `temperature: 0` and `think: false`. For each answer it reports:
+   `capabilities` comes from Ollama's `/api/show` (`unknown` if Ollama doesn't report them). `commit` is the short git hash, with `-dirty` added if the work tree has any uncommitted or untracked changes, because then the hash doesn't fully describe the code or prompt that ran.
+5. Sends each question to `http://localhost:11434/api/chat`, one at a time, with `temperature: 0`. It adds `think: false` only if the model's capabilities include `thinking` (or are unknown), because models without thinking, like `gemma3`, reject it. For each answer it reports:
    - whether the tool was called, and whether that was the right decision,
    - whether the arguments pass the contract (`jsonschema` validator),
    - whether `query` looks like a sentence (more than 6 words or ends with `?`) instead of keywords,
@@ -139,6 +143,16 @@ What it does:
 6. Prints a summary: correct decisions, valid arguments and sentence-like queries, then correct decisions per category with the ids of the wrong ones.
 
 Even at `temperature: 0`, two runs of the same inputs can differ slightly (reply wording, argument key order). Compare the decision and validity counts, not exact text.
+
+### Tool modes
+
+- **`native`** (default): the tool goes in Ollama's `tools` field and calls come back in `message.tool_calls`. Models without tool support (e.g. `gemma3:1b`) fail with HTTP 400 "does not support tools".
+- **`prompt`**: no `tools` field. The prompt's `{tool_definition}` placeholder is filled with `generated/search_announcements.tool.json`, and the model is told to reply with only `{"name": "search_announcements", "arguments": {...}}` to search. `toolparse.parse_reply` classifies the reply text:
+  - **tool call**: exactly one `{"name": string, "arguments": object}`, even in a code fence or with prose around it. A wrong name still counts as a call, and the usual name check marks it invalid, the same as in native mode.
+  - **malformed**: a plausible attempt that can't be parsed into that shape (the reply starts with `{` after any code fence, or names `search_announcements` next to a brace). It always scores as a WRONG decision, prints a `parse error:` line, and is counted in a `malformed: N/30` summary line.
+  - **no tool**: anything else, including prose that happens to contain braces.
+
+A prompt with a `{tool_definition}` placeholder only runs in prompt mode, and one without it only runs in native mode, so a run can't silently use the wrong prompt. The `malformed` and `parse error` lines only appear in prompt mode.
 
 ### Question files
 

@@ -19,6 +19,30 @@ Template:
 
 ---
 
+## 2026-10-15: Prompt-based tool mode for the probe
+
+- **Date:** 2026-10-15 (08:36–08:45 +08:00)
+- **What changed:**
+  - Added `--tool-mode native|prompt` to `scripts/probe_tool_call.py` (default `native`). Prompt mode sends no `tools` field. It fills a `{tool_definition}` placeholder with `generated/search_announcements.tool.json` and parses the reply text. A prompt with that placeholder only runs in prompt mode, and one without it only runs in native mode.
+  - Added `src/archways_assistant/toolparse.py`. `parse_reply` returns `ToolCall(name, arguments)`, `NoTool` or `Malformed(reason)`. It accepts bare JSON, JSON in a code fence and JSON with prose around it. A well-formed call to the wrong name is a `ToolCall`, so the existing name check marks it invalid, the same as in native mode. `Malformed` is only for plausible attempts (the reply starts with `{` after any fence, or names `search_announcements` within 20 characters of a brace). Other prose with braces is `NoTool`.
+  - Malformed always scores as a WRONG decision. In prompt mode only, it prints `parse error: <reason>` and a `malformed: N/30` summary line.
+  - `think: false` is now sent only if `/api/show` lists `thinking` in the model's capabilities, or if Ollama reports no capabilities. The header adds `tool_mode=` and `capabilities=`.
+  - Added `prompts/system_v1_prompt_mode.txt`, which is `system_v1.txt` byte-for-byte plus the tool definition and JSON format instructions. `system_v1.txt` is unchanged.
+  - Tests: `tests/test_toolparse.py` (33 cases) and `tests/test_prompts.py` (the prompt-mode file starts with `system_v1.txt`).
+  - Removed the stray tracked file `s`, which held `git log` output.
+- **Why:** `gemma3:1b` returns HTTP 400 "does not support tools", so native mode can't probe it.
+- **How it was verified:**
+  - `uv run pytest -q` → `88 passed in 0.13s`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `12 files already formatted`
+  - Native mode unchanged: on the same tree (`c032dbe-dirty`, Ollama 0.40.4, `qwen3:1.7b`), the pre-change script and the new one gave the same counts (21/30 decisions, 10/11 valid, 0/11 sentence-like), the same per-category results and the same prompt token counts. Apart from the header and timing, the only difference was the wording of one reply (`dev-001`). Header showed `capabilities=completion,tools,thinking`.
+  - `--model gemma3:1b` in native mode still fails with HTTP 400 "does not support tools", as expected. Its header shows `capabilities=completion`, so `think` is not sent.
+  - `--model gemma3:1b --tool-mode prompt` (`c032dbe-dirty`, `today=2026-10-15`) → correct decisions 19/30, valid arguments 13/19, sentence-like 0/19, malformed 1/30 (`dev-019`, missing comma). Five of the 19 calls used invented tool names (e.g. `library_news`, `finals week schedule`).
+- **Commits:** `ea932ab`, `c032dbe`, `bcaacaa`, `a0ea9c3`
+- **Open questions / next:**
+  - A call to the wrong name counts as a correct decision. For gemma3 that inflates the decision score: 5 of its 19 calls had the wrong name. The `valid arguments` count is the better signal for it.
+  - gemma3 answered `dev-013` with an invented date ("October 27, 2026") instead of searching.
+  - The 2026-10-08 baseline for `qwen3:1.7b` was 23/30 on Ollama 0.40.1. Today it is 21/30 on 0.40.4 with the old script, so the drop isn't from this change. The cause is unverified.
+  - `dev-009` on gemma3 got an empty reply and printed `tokens/s: 1000000.0`. `tokens_per_second` doesn't guard against a tiny `eval_duration`.
+
 ## 2026-10-08: Make the probe data-driven
 
 - **Date:** 2026-10-08 (23:38–23:44 +08:00)
