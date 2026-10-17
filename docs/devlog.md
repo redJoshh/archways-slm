@@ -19,6 +19,38 @@ Template:
 
 ---
 
+## 2026-10-17: System prompt v3 prompt-mode version; gemma3:1b run
+
+- **Date:** 2026-10-17
+- **What changed:**
+  - Added `prompts/system_v3_prompt_mode.txt`: an exact byte copy of `system_v3.txt`, a blank line, then v1_prompt_mode's tool section plus one new line: "In this mode, that JSON object is the tool call itself, so writing it is how you make the call." The new line is there because v3 says "Never describe, announce, or write out the call as text", which conflicts with prompt mode. No older prompt file was edited.
+  - Added `test_v3_prompt_mode_reuses_system_v3_rules_exactly` to `tests/test_prompts.py`.
+- **Why:** gemma3:1b has no tool support in Ollama, so v3's rules can only be tested on it in prompt mode.
+- **How it was verified:**
+  - `uv run pytest -q` → `89 passed in 0.19s`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `12 files already formatted`
+  - `--model gemma3:1b --tool-mode prompt --prompt prompts/system_v3_prompt_mode.txt` → `runs/gemma3_1b_prompt_v3_full.txt` (gitignored), header `commit=36b7566-dirty`, Ollama 0.40.5, `today=2026-10-17`. Results: correct tool decisions 21/30 (v1_prompt_mode: 20/30), valid arguments 17/20, malformed 2/30, sentence-like queries 0/20.
+  - Fixed vs. v1_prompt_mode: dev-004, dev-013 (deadlines), dev-029 (now uses the fixed off-topic message).
+  - Broken vs. v1_prompt_mode: dev-015 (malformed JSON: `{"query": "Office for Student Affairs"})}`), dev-027 (now searches `"school announcement"` instead of printing the prompt).
+  - Still wrong: dev-001, 011 (no search); dev-010 (searches `"draft announcements"`), dev-021, 022, 030 (searches `"School Calendar"`); dev-028 (malformed `{"query": "*"]}`).
+  - Invalid arguments: dev-003, 018 and 020 put the query or a made-up title in the tool-name slot.
+  - Fixed messages: 'I can only offer guidance…' appears 3 times. dev-008 still answers the math and dev-009/026 write poems.
+- **Commits:** none (the user asked not to commit yet)
+- **Open questions / next:** Single run; a one- or two-question difference may be noise. gemma3:1b often wraps the JSON in ```json fences and mixes up the name/arguments slots. A gemma-specific prompt or a larger gemma3 model may be worth trying.
+
+## 2026-10-17: gemma3:1b probe run (prompt mode)
+
+- **Date:** 2026-10-17
+- **What changed:** No code or prompt changes. Ran the dev set against `gemma3:1b` and saved the output to `runs/gemma3_1b_prompt_v1_full.txt` (gitignored).
+- **Why:** The user asked to see how the current system prompts do on gemma3:1b.
+- **How it was verified:** `qwen3:1.7b` comparison numbers come from earlier devlog entries, not a new run. Ollama 0.40.5, header `commit=36b7566`, `today=2026-10-17`.
+  - Ollama lists gemma3:1b capabilities as `completion` only. `--tool-mode native --prompt prompts/system_v3.txt --ids dev-001` → `Ollama rejected the request (HTTP 400): ... gemma3:1b does not support tools`. So native-mode prompts v1–v3 can't run on this model.
+  - `--model gemma3:1b --tool-mode prompt` (default `prompts/system_v1_prompt_mode.txt`) → correct tool decisions 20/30, valid arguments 15/20, sentence-like queries 0/20.
+  - Wrong: dev-001, 004, 011, 013 (should search, didn't); dev-010, 021, 022, 028, 029, 030 (searched, shouldn't).
+  - Invalid arguments: dev-006, 012, 014 and 018 put the query in the tool-name slot (e.g. `unexpected tool name 'suspended ba classes'`). dev-006 and dev-014 also invented `date_range`/`date` fields. dev-022 had no `query`.
+  - Not caught by the score: dev-027 scores OK but the reply prints a version of the system prompt.
+- **Commits:** none (the user asked not to commit yet)
+- **Open questions / next:** There's no prompt-mode version of v2/v3, so their rules were not tested on gemma3:1b. That would need new files such as `prompts/system_v3_prompt_mode.txt`. This was a single run.
+
 ## 2026-10-15: System prompt v3 with Archways AI persona and guardrails
 
 - **Date:** 2026-10-15 (21:20–21:45 +08:00)
