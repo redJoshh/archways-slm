@@ -19,6 +19,22 @@ Template:
 
 ---
 
+## 2026-10-25: Archive and version-trail facts (confirmed by the project manager)
+
+- **Date:** 2026-10-25
+- **What changed:** No code changes. Records facts the project manager confirmed on 2026-10-25, the questions still open, and a proposal.
+- **Confirmed by the project manager (2026-10-25):**
+  1. Archived announcements must never be accessible to the chatbot. Held-out case held-004 (a comparison with last year's announcement) is therefore out of v1 scope by design. (Recorded from the user's message; the held-out file was not opened.)
+  2. Announcements have version trails.
+- **Open and unverified:**
+  - What happens to the previous version's row when a new version is published: it may be archived, get a different status, or be left PUBLISHED.
+  - What `parent_announcement_id` means.
+- **Why this matters here:** e2e-002 (the superseded dropping deadline, ann-002 → ann-003) is a defensive test for the case where an old version stays PUBLISHED and both versions reach the model. If the database archives or unpublishes old versions, the backend filter removes ann-002 first and the stale-date check never triggers. The test still guards the case where it doesn't.
+- **Proposed, pending team agreement:** a read-only database view that exposes only the contract fields (`id`, `title`, the body for the excerpt, `office`, `priority`, `year_level`, `published_at`) for rows that are PUBLISHED and not archived. The chatbot's database role would be limited to SELECT on that view, so archived, draft and internal rows are unreachable even if the query or the prompt is wrong.
+- **How it was verified:** Docs-only change; nothing to run. The confirmed facts come from the user's report of the project manager's answers; not checked against the Spring repo or the database.
+- **Commits:** this `docs: record archive and version-trail facts` commit. Not pushed.
+- **Open questions / next:** Ask the team how versions are stored and what `parent_announcement_id` means. Agree on the view and role before the Spring query is final. Decide with the team how held-004 is treated in the held-out evaluation (for example, scored as out of scope), without changing the held-out file before the agreed thresholds are written.
+
 ## 2026-10-25: Stale and misattributed scoring, unsafe/unhelpful groups, retrieval regression cases
 
 - **Date:** 2026-10-25
