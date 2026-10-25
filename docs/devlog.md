@@ -19,6 +19,24 @@ Template:
 
 ---
 
+## 2026-10-25: v4 results across three models (recorded)
+
+- **Date:** 2026-10-25
+- **What changed:** No code or prompt changes. This entry records the v4 results table and what can and can't be concluded from it. This commit also adds the earlier "Plan for a gemma3:1b prompt (v4)" entry, which had been left uncommitted.
+- **Why:** The user asked to record the v4 results with their limits before the next steps.
+- **How it was verified:** Commit `98147f6`, `--format-mode schema`, seed 42, temperature 0, Ollama 0.40.10, dev set (30 questions). The three runs per model were byte-identical (`runs/*_prompt_v4_format-schema_run{1,2,3}.txt`, gitignored).
+
+  | Model | Decisions | Lookup recall | Unnecessary-call rate | Valid arguments | Malformed |
+  |---|---|---|---|---|---|
+  | gemma3:1b | 9/30 | 5/18 | 8/12 | 13/13 | 0/30 |
+  | qwen3:0.6b | 22/30 | 16/18 | 6/12 | 22/22 | 0/30 |
+  | qwen3:1.7b | 22/30 | 18/18 | 8/12 | 26/26 | 0/30 |
+
+  - Trivial baselines on this set: never-search scores 12/30 (the 12 questions expecting no tool) and always-search scores 18/30. gemma3:1b with v4 scores below both.
+  - v4 changed several things at once compared with v3: the tool-definition block was removed, examples were added, the rules were rewritten, and the reply shape is shown. So gemma3:1b's drop (18/30 with v3 in schema mode to 9/30 with v4) can't be attributed to any one change. **The cause is unknown.**
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** A full (not summary-only) gemma3:1b v4 run would show its replies. Isolating the cause would need one-change-at-a-time prompt versions; v4 itself stays frozen.
+
 ## 2026-10-25: Seed 42, system prompt v4 (schema mode), three-model runs
 
 - **Date:** 2026-10-25
@@ -88,6 +106,15 @@ Template:
   - gemma sometimes uses the `{today}` line as the query (`"Sunday, 2026-10-25 (Asia/Manila)"` on dev-021, 022, 025).
 - **Commits:** `efa090c`, `1b73829`, and the `docs:` commit with this entry. Not pushed.
 - **Open questions / next:** v4 must describe the `{"reply": "..."}` form if schema mode is used. Whether putting the reply branch first in `anyOf` changes anything is untested. Spring must still reject `*` and over-length queries itself.
+
+## 2026-10-25: Plan for a gemma3:1b prompt (v4)
+
+- **Date:** 2026-10-25
+- **What changed:** No code or prompt changes. Read `runs/gemma3_1b_prompt_v3_full.txt` and wrote a plan for a gemma-specific prompt-mode v4.
+- **Why:** The user asked what a v4 needs in order to raise gemma3:1b's scores (v3: 21/30 decisions, 17/20 valid arguments, 2/30 malformed).
+- **How it was verified:** Nothing was run. The failure groups come from the v3 run file: name-slot errors (dev-003, 018, 020); broken JSON (dev-015, 028); no search on class-suspension questions, which got the off-topic message instead (dev-001, 011); searching on vague, restricted or injection messages (dev-010, 021, 022, 027, 030). v3 has no rule for vague messages or for revealing the prompt, and its "never write out the call as text" line contradicts prompt mode.
+- **Commits:** none (the user asked not to commit yet)
+- **Open questions / next:** The plan waits on the user: whether to use few-shot examples, whether to create the held-out file before tuning, and whether to try Ollama structured output (`format`) as a separate experiment.
 
 ## 2026-10-17: System prompt v3 prompt-mode version; gemma3:1b run
 
