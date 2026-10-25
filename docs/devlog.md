@@ -19,6 +19,39 @@ Template:
 
 ---
 
+## 2026-10-25: End-to-end harness and first three-model runs
+
+- **Date:** 2026-10-25
+- **What changed:**
+  - `268e2ec`: `data/seed/announcements.json` (25 made-up rows, naive `published_at`, with draft, archived, future-scheduled, superseded, year-level, long-body and injected-instruction traps); `src/archways_assistant/fakebackend.py` (contract validation and defaults; PUBLISHED, not archived, `published_at` ≤ now and inside the days window; AND across non-stopword words as literal case-insensitive substrings of title or body, mirroring `ILIKE '%word%' ESCAPE '\'`; newest first, ties by id; limit; 500-character excerpt; `posted_at` gets `STORED_ZONE` +08:00, marked UNVERIFIED); `tests/vectors/search_vectors.json` (23 vectors with rows, arguments, expected ids and ILIKE patterns, for reuse by Spring); `tests/test_fakebackend.py`.
+  - `72e1c0e`: `evals/e2e_cases.jsonl` (24 dev cases, fixed now Monday 2026-11-02 10:00 +08:00, `source_ids`, any-of `must_include`, `must_not_include`, `expects_not_found`); `src/archways_assistant/e2escore.py` (dates checked as month-day pairs and numbers as integers against retrieved titles and excerpts, the question and today, never timestamps; guard fallback built only from retrieved titles and posted dates); tests.
+  - `cb1190f`: `scripts/probe_end_to_end.py`, `prompts/e2e_query_v1.txt`, `prompts/e2e_answer_v1.txt`, `tests/test_e2e_harness.py` (no system-clock calls in the harness or its helpers; no code reads the held-out file; results can't close the data tag), and e2e questions added to the prompt-leak test. CLAUDE.md gains "e2e prompts are frozen before any held-out run." No new dependencies.
+  - **Prompt tuning before the freeze, on e2e dev cases only:** the paraphrase test rejected a query-prompt example close to dev-002, so it was replaced. Smoke runs on e2e-001 and e2e-005 showed qwen3:1.7b adding the not-found sentence after a correct answer, so the answer prompt now says to use that sentence only when nothing answers and never otherwise. No changes after `cb1190f`.
+- **Why:** The user asked for a harness scored on the final reply, with retrieval, guards and fabrication measured separately.
+- **How it was verified:**
+  - `uv run pytest -q` → `300 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `22 files already formatted`
+  - Six runs, `--summary-only`, header `commit=cb1190f`, seed 42, num_ctx 4096, Ollama 0.40.10 → `runs/e2e_{gemma3_1b,qwen3_0_6b,qwen3_1_7b}_run{1,2}.txt` (gitignored).
+
+  | Model / run | Retrieval hit | Guard fired | Failed before guards | Failed after guards | Fabrication before / after | Max prompt tokens (query / answer) |
+  |---|---|---|---|---|---|---|
+  | gemma3:1b run 1 | 22/24 | 0/15 | 5/24 | 5/24 | 1 / 1 | 281 / 631 |
+  | gemma3:1b run 2 | 22/24 | 1/15 | 5/24 | 5/24 | 2 / 1 | 281 / 631 |
+  | qwen3:0.6b run 1 | 19/24 | 1/18 | 6/24 | 6/24 | 1 / 0 | 279 / 605 |
+  | qwen3:0.6b run 2 | 19/24 | 1/18 | 6/24 | 6/24 | 1 / 0 | 279 / 605 |
+  | qwen3:1.7b run 1 | 22/24 | 0/17 | 2/24 | 2/24 | 1 / 1 | 279 / 668 |
+  | qwen3:1.7b run 2 | 22/24 | 0/17 | 2/24 | 2/24 | 1 / 1 | 279 / 668 |
+
+  - No invalid search arguments and no near-limit cases in any run.
+  - The qwen3 run pairs match line for line apart from latency. **gemma3:1b's two runs differ**, even with seed 42: the guard fired on e2e-003 (an unsupported claim) in run 2 only. The pass/fail lists are the same.
+  - Failures: gemma3:1b e2e-002, 003, 005, 008, 014; qwen3:0.6b e2e-001, 003, 005, 012, 014, 023; qwen3:1.7b e2e-002, 014.
+  - Retrieval misses: gemma3:1b e2e-008, 014; qwen3:0.6b e2e-014, 016, 018, 021, 023; qwen3:1.7b e2e-014, 021.
+  - Fabrication after guards: e2e-002 for gemma3:1b and qwen3:1.7b, a `contains` failure (the superseded date November 6). The guard can't catch it: that date is in the retrieved text of the older row.
+  - The guard never lowered a failure count: when it fired (e2e-003), the fallback still failed the case's not-found expectation.
+  - Mean latency: gemma3:1b query about 1.0–1.3 s, answer about 1.9 s; qwen3:0.6b 0.4–0.5 s and 0.8 s; qwen3:1.7b 1.1–1.4 s and 3.1 s. The first call of each run includes model load (max 4–8 s).
+  - Summary-only runs keep no replies, so the cause of each failure is unverified. e2e-014 is missed by every model; a likely but unchecked cause is a query word such as "deadline" that ann-017 lacks.
+- **Commits:** `268e2ec`, `72e1c0e`, `cb1190f`, and this `docs:` commit. Not pushed.
+- **Open questions / next:** The Spring team still has to confirm the stored zone of `published_at`, the stopword list, and that its query passes `tests/vectors/search_vectors.json`. A full (not summary-only) run would show the failing replies. The guard doesn't catch a superseded date that is in the retrieved text. `evals/heldout_questions.jsonl` was not read or touched.
+
 ## 2026-10-25: Fabrication finding and gate added to the model decision
 
 - **Date:** 2026-10-25
