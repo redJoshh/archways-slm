@@ -45,9 +45,12 @@ def visible_text(row_id: str) -> str:
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c["id"])
 def test_case_shape(case):
-    assert set(case) - {"note"} == set(CASE_FIELDS)
+    assert set(case) - {"note", "exclusion"} == set(CASE_FIELDS)
     for field, kind in CASE_FIELDS.items():
         assert isinstance(case[field], kind), field
+    assert case.get("exclusion") in (None, "outdated", "injection")
+    if "exclusion" in case:
+        assert case["must_not_include"]
     assert all(isinstance(group, list) and group for group in case["must_include"])
 
 
@@ -99,6 +102,14 @@ def test_seed_traps_hold_at_the_fixed_now():
         is_visible(row, NOW) and published_at(row) < NOW - timedelta(days=30)
         for row in rows
     )
+
+
+def test_labelled_exclusions_are_in_the_source_excerpts():
+    # A stale or injected phrase is one the model can see in what it retrieves.
+    for case in CASES:
+        if "exclusion" in case:
+            text = "\n".join(visible_text(row_id) for row_id in SEED)
+            assert any(p.lower() in text for p in case["must_not_include"]), case["id"]
 
 
 def test_late_deadline_is_only_after_the_excerpt():

@@ -19,7 +19,10 @@ For each case:
    built only from the retrieved titles and posted dates.
 5. Scoring, on the reply before and after the guard (see e2escore).
    Replies built by code (not-found message, fallback) are not checked
-   for unsupported claims.
+   for unsupported claims. Each failed reply gets failure categories
+   (e2escore.categorize); the first is its primary category, which the
+   summary counts. A case's optional "exclusion" ("outdated" or
+   "injection") says why its must_not_include phrases are wrong.
 
 Retrieval hit is scored apart from the reply: a case with source_ids hits
 if all of them were retrieved; a case without source_ids hits if nothing
@@ -59,7 +62,9 @@ from probe_tool_call import (
 )
 
 from archways_assistant.e2escore import (
+    CATEGORIES,
     NOT_FOUND_MESSAGE,
+    categorize,
     failures,
     guard,
     is_fabrication,
@@ -89,6 +94,8 @@ CASE_FIELDS = {
     "must_not_include": list,
     "expects_not_found": bool,
 }
+# Optional: why a case's must_not_include phrases are wrong (None: not said).
+EXCLUSIONS = {None, "outdated", "injection"}
 
 
 def load_cases(path: Path) -> list[dict]:
@@ -118,6 +125,10 @@ def load_cases(path: Path) -> list[dict]:
             sys.exit(f"{where}: 'now' is not an ISO date-time ({error})")
         if case["now"].tzinfo is None:
             sys.exit(f"{where}: 'now' needs a UTC offset")
+        if case.get("exclusion") not in EXCLUSIONS:
+            sys.exit(
+                f"{where}: 'exclusion' must be one of {sorted(EXCLUSIONS - {None})}"
+            )
         if case["id"] in seen_ids:
             sys.exit(f"{where}: duplicate id {case['id']!r}")
         seen_ids.add(case["id"])
@@ -190,6 +201,9 @@ def main() -> None:
     }
     kinds = ("unsupported", "contains", "filtered text")
     kind_counts = {stage: dict.fromkeys(kinds, 0) for stage in ("before", "after")}
+    category_counts = {stage: dict.fromkeys(CATEGORIES, 0) for stage in kind_counts}
+    # stage -> case id -> primary failure category, for the summary's id lists.
+    primary = {stage: {} for stage in kind_counts}
     latency = {"query": [], "search": [], "answer": []}
     max_tokens = {"query": 0, "answer": 0}
 
@@ -299,6 +313,7 @@ def main() -> None:
                 # 4. Guard.
                 guarded = guard(raw, results, question, today, forbidden)
                 final = guarded.text
+                fired = guarded.fired
                 final_unsupported = [] if guarded.fired else raw_unsupported
                 if guarded.fired:
                     stats["guard_fired"] += 1
@@ -312,6 +327,7 @@ def main() -> None:
                 show("  answer: not called (no results)")
                 raw = final = NOT_FOUND_MESSAGE
                 raw_unsupported = final_unsupported = []
+                fired = False
                 guard_line = "not run"
             show(f"  reply: {raw.replace(chr(10), ' | ')[:REPLY_PREVIEW_CHARS]}")
             show(f"  guard: {guard_line}")
@@ -325,14 +341,27 @@ def main() -> None:
                 "expects_not_found": case["expects_not_found"],
                 "forbidden": forbidden,
             }
-            for stage, reply, unsupported in (
-                ("before", raw, raw_unsupported),
-                ("after", final, final_unsupported),
+            retrieved_text = "\n".join(f"{r['title']}\n{r['excerpt']}" for r in results)
+            for stage, reply, unsupported, code_built in (
+                ("before", raw, raw_unsupported, not results),
+                ("after", final, final_unsupported, not results or fired),
             ):
                 problems = failures(reply, **expected, unsupported=unsupported)
                 problems += context_problems
+                categories = categorize(
+                    reply,
+                    problems,
+                    retrieval_hit=hit,
+                    expects_not_found=case["expects_not_found"],
+                    must_not_include=case["must_not_include"],
+                    exclusion=case.get("exclusion"),
+                    retrieved_text=retrieved_text,
+                    code_built=code_built,
+                )
                 if problems:
                     stats[f"failed_{stage}"].append(case["id"])
+                    category_counts[stage][categories[0]] += 1
+                    primary[stage][case["id"]] = categories[0]
                 fabricated = [p for p in problems if is_fabrication(p)]
                 if fabricated:
                     stats[f"fabricated_{stage}"].append(case["id"])
@@ -340,7 +369,11 @@ def main() -> None:
                     kind_counts[stage][kind] += any(
                         p.startswith(f"{kind} ") for p in fabricated
                     )
-                verdict = f"FAIL ({'; '.join(problems)})" if problems else "PASS"
+                verdict = (
+                    f"FAIL [{', '.join(categories)}] ({'; '.join(problems)})"
+                    if problems
+                    else "PASS"
+                )
                 show(f"  {stage} guard: {verdict}")
             if context_problems:
                 stats["near_limit"].append(case["id"])
@@ -354,6 +387,13 @@ def main() -> None:
 
     def kinds_text(stage: str) -> str:
         return ", ".join(f"{kind} {kind_counts[stage][kind]}" for kind in kinds)
+
+    def categories_text(stage: str) -> str:
+        counts = category_counts[stage]
+        return ", ".join(f"{category} {counts[category]}" for category in CATEGORIES)
+
+    def with_category(stage: str) -> list[str]:
+        return [f"{id_} ({primary[stage][id_]})" for id_ in stats[f"failed_{stage}"]]
 
     print("Summary")
     print(f"  cases: {total}")
@@ -374,6 +414,8 @@ def main() -> None:
         f"  fabrication after guards: {len(stats['fabricated_after'])}/{total} "
         f"cases ({kinds_text('after')})"
     )
+    print(f"  primary failure category before guards: {categories_text('before')}")
+    print(f"  primary failure category after guards: {categories_text('after')}")
     print(
         f"  max prompt tokens: query {max_tokens['query']}/{NUM_CTX}, "
         f"answer {max_tokens['answer']}/{NUM_CTX}; "
@@ -386,8 +428,8 @@ def main() -> None:
     )
     ids_line("retrieval misses", stats["misses"])
     ids_line("guard fired", stats["fired"])
-    ids_line("failed before guards", stats["failed_before"])
-    ids_line("failed after guards", stats["failed_after"])
+    ids_line("failed before guards", with_category("before"))
+    ids_line("failed after guards", with_category("after"))
     ids_line("fabrication after guards", stats["fabricated_after"])
 
 
