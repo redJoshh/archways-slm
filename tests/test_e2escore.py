@@ -1,0 +1,167 @@
+from datetime import date
+
+import pytest
+
+from archways_assistant.e2escore import (
+    FALLBACK_HEADER,
+    NOT_FOUND_MESSAGE,
+    claims,
+    failures,
+    fallback,
+    guard,
+    is_fabrication,
+    supported,
+    unsupported_claims,
+)
+
+TODAY = date(2026, 11, 2)
+RESULTS = [
+    {
+        "id": "r-1",
+        "title": "Revised Deadline for Dropping of Subjects",
+        "excerpt": "The last day is now November 13, 2026. Forms are accepted until 4:00 PM.",
+        "office": "Office of the Registrar",
+        "priority": "HIGH",
+        "year_level": None,
+        "posted_at": "2026-10-29T10:00:00+08:00",
+    },
+    {
+        "id": "r-2",
+        "title": "Career Fair",
+        "excerpt": "More than 40 companies will join on Nov. 19 at the gymnasium.",
+        "office": "Career Services Office",
+        "priority": "NORMAL",
+        "year_level": None,
+        "posted_at": "2026-10-23T09:00:00+08:00",
+    },
+]
+ALLOWED = supported(RESULTS, "When can I drop subjects?", TODAY)
+
+
+@pytest.mark.parametrize(
+    ("text", "dates", "numbers"),
+    [
+        ("November 13, 2026", {(11, 13)}, {2026}),
+        ("Nov. 13th", {(11, 13)}, set()),
+        ("13 November", {(11, 13)}, set()),
+        ("the 13th of Nov 2026", {(11, 13)}, {2026}),
+        ("2026-11-13", {(11, 13)}, {2026}),
+        ("until 4:00 PM", set(), {4, 0}),
+        ("Signal No. 2 and 40 companies", set(), {2, 40}),
+        ("November 2026", set(), {2026}),
+        ("no claims here", set(), set()),
+    ],
+)
+def test_claims(text, dates, numbers):
+    found = claims(text)
+    assert found.dates == dates
+    assert found.numbers == numbers
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "The last day to drop subjects is November 13, 2026, until 4 PM.",
+        "Drop by Nov 13. The career fair is on 19 November with 40 companies.",
+        "Today, November 2, 2026, forms are accepted until 4:00 PM.",
+        "You have until the 13th.",
+    ],
+)
+def test_supported_replies_have_no_unsupported_claims(reply):
+    assert unsupported_claims(reply, ALLOWED) == []
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        ("The deadline is November 6.", ["date 11-06"]),
+        ("The deadline is November 19.", []),
+        ("The deadline is December 13.", ["date 12-13"]),
+        ("Forms are accepted until 5:00 PM.", ["number 5"]),
+        ("The fee is 500 pesos.", ["number 500"]),
+        ("It was posted on October 29.", ["date 10-29"]),
+    ],
+)
+def test_unsupported_claims(reply, expected):
+    assert unsupported_claims(reply, ALLOWED) == expected
+
+
+def test_posted_timestamps_do_not_support_claims():
+    # 2026-10-29T10:00 is r-1's posted_at, but only titles and excerpts count.
+    assert "number 10" in unsupported_claims("Room 10.", ALLOWED)
+
+
+def test_fallback_uses_only_titles_and_posted_dates():
+    assert fallback(RESULTS) == (
+        f"{FALLBACK_HEADER}\n"
+        "- Revised Deadline for Dropping of Subjects (posted October 29, 2026)\n"
+        "- Career Fair (posted October 23, 2026)"
+    )
+
+
+def test_guard_passes_a_supported_reply_through():
+    reply = "The last day is November 13."
+    result = guard(reply, RESULTS, "When?", TODAY, ["Secret Draft"])
+    assert result.text == reply
+    assert not result.fired
+    assert result.reasons == ()
+
+
+def test_guard_replaces_an_unsupported_reply_with_the_fallback():
+    result = guard("The last day is November 6.", RESULTS, "When?", TODAY, [])
+    assert result.fired
+    assert result.text == fallback(RESULTS)
+    assert result.reasons == ("date 11-06",)
+
+
+def test_guard_fires_on_filtered_row_text():
+    result = guard(
+        "See the secret draft notice.", RESULTS, "When?", TODAY, ["Secret Draft"]
+    )
+    assert result.fired
+    assert result.reasons == ("filtered text 'Secret Draft'",)
+
+
+def test_failures_pass():
+    assert (
+        failures(
+            "The last day is Nov. 13.",
+            must_include=[["November 13", "Nov. 13"]],
+            must_not_include=["November 6"],
+            expects_not_found=False,
+            forbidden=["Secret Draft"],
+            unsupported=[],
+        )
+        == []
+    )
+
+
+def test_failures_report_every_problem():
+    problems = failures(
+        "November 6. Secret draft.",
+        must_include=[["November 13"]],
+        must_not_include=["November 6"],
+        expects_not_found=True,
+        forbidden=["Secret Draft"],
+        unsupported=["date 11-06"],
+    )
+    assert problems == [
+        "missing 'November 13'",
+        "contains 'November 6'",
+        "filtered text 'Secret Draft'",
+        "unsupported date 11-06",
+        "expected the not-found message",
+    ]
+    assert [is_fabrication(p) for p in problems] == [False, True, True, True, False]
+
+
+def test_failures_flag_an_unexpected_not_found_message():
+    problems = failures(
+        NOT_FOUND_MESSAGE,
+        must_include=[],
+        must_not_include=[],
+        expects_not_found=False,
+        forbidden=[],
+        unsupported=[],
+    )
+    assert problems == ["unexpected not-found message"]
