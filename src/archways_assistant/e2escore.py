@@ -1,8 +1,9 @@
 """Deterministic checks, guard and scoring for end-to-end replies.
 
 A reply's dates and numbers are claims. Each must be supported by the
-retrieved titles and excerpts, the question, or today's date. Posted
-timestamps don't count as support. Dates are compared as (month, day)
+retrieved titles and excerpts or the question. Posted timestamps and
+today's date don't count as support, so an invented "today" deadline is
+caught. Dates are compared as (month, day)
 pairs, so "November 6" is unsupported even if the text has "November 16"
 and "6". Other numbers, including years and the parts of times like 4:00,
 are compared as whole integers.
@@ -16,7 +17,7 @@ Pure: no I/O, no clock, standard library only.
 
 import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 
 NOT_FOUND_MESSAGE = "No official announcement was found for your question."
 FALLBACK_HEADER = "I found these announcements:"
@@ -97,16 +98,14 @@ def claims(text: str) -> Claims:
     return Claims(frozenset(dates), frozenset(numbers))
 
 
-def supported(results: list[dict], question: str, today: date) -> Claims:
-    """What a reply may claim: retrieved titles and excerpts, the question, today."""
+def supported(results: list[dict], question: str) -> Claims:
+    """What a reply may claim: retrieved titles and excerpts, and the question."""
     found = [claims(f"{r['title']}\n{r['excerpt']}") for r in results]
     found.append(claims(question))
     dates = {pair for c in found for pair in c.dates}
     numbers = {n for c in found for n in c.numbers}
     # Text dates also support their bare day and year numbers in a reply.
     numbers |= {day for _, day in dates}
-    dates.add((today.month, today.day))
-    numbers |= {today.day, today.month, today.year}
     return Claims(frozenset(dates), frozenset(numbers))
 
 
@@ -143,13 +142,13 @@ def fallback(results: list[dict]) -> str:
 
 
 def guard(
-    reply: str, results: list[dict], question: str, today: date, forbidden: list[str]
+    reply: str, results: list[dict], question: str, forbidden: list[str]
 ) -> GuardResult:
     """Replace the reply with fallback(results) if it has unsupported claims or forbidden text.
 
     forbidden is the titles of rows that must never reach the model.
     """
-    reasons = unsupported_claims(reply, supported(results, question, today))
+    reasons = unsupported_claims(reply, supported(results, question))
     reasons += [f"filtered text {title!r}" for title in present(reply, forbidden)]
     if not reasons:
         return GuardResult(reply, False, ())

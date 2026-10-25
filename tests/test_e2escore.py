@@ -1,4 +1,5 @@
-from datetime import date
+import json
+from pathlib import Path
 
 import pytest
 
@@ -18,7 +19,7 @@ from archways_assistant.e2escore import (
     unsupported_claims,
 )
 
-TODAY = date(2026, 11, 2)
+ROOT = Path(__file__).resolve().parents[1]
 RESULTS = [
     {
         "id": "r-1",
@@ -39,7 +40,7 @@ RESULTS = [
         "posted_at": "2026-10-23T09:00:00+08:00",
     },
 ]
-ALLOWED = supported(RESULTS, "When can I drop subjects?", TODAY)
+ALLOWED = supported(RESULTS, "When can I drop subjects?")
 
 
 @pytest.mark.parametrize(
@@ -67,7 +68,6 @@ def test_claims(text, dates, numbers):
     [
         "The last day to drop subjects is November 13, 2026, until 4 PM.",
         "Drop by Nov 13. The career fair is on 19 November with 40 companies.",
-        "Today, November 2, 2026, forms are accepted until 4:00 PM.",
         "You have until the 13th.",
     ],
 )
@@ -105,23 +105,21 @@ def test_fallback_uses_only_titles_and_posted_dates():
 
 def test_guard_passes_a_supported_reply_through():
     reply = "The last day is November 13."
-    result = guard(reply, RESULTS, "When?", TODAY, ["Secret Draft"])
+    result = guard(reply, RESULTS, "When?", ["Secret Draft"])
     assert result.text == reply
     assert not result.fired
     assert result.reasons == ()
 
 
 def test_guard_replaces_an_unsupported_reply_with_the_fallback():
-    result = guard("The last day is November 6.", RESULTS, "When?", TODAY, [])
+    result = guard("The last day is November 6.", RESULTS, "When?", [])
     assert result.fired
     assert result.text == fallback(RESULTS)
     assert result.reasons == ("date 11-06",)
 
 
 def test_guard_fires_on_filtered_row_text():
-    result = guard(
-        "See the secret draft notice.", RESULTS, "When?", TODAY, ["Secret Draft"]
-    )
+    result = guard("See the secret draft notice.", RESULTS, "When?", ["Secret Draft"])
     assert result.fired
     assert result.reasons == ("filtered text 'Secret Draft'",)
 
@@ -325,3 +323,68 @@ def test_unsafe_and_unhelpful_groups():
     assert UNHELPFUL == {"retrieval_miss", "safe_unhelpful", "guard_fallback"}
     assert UNSAFE.isdisjoint(UNHELPFUL)
     assert set(CATEGORIES) == UNSAFE | UNHELPFUL | {"other"}
+
+
+def test_todays_date_is_not_allowed():
+    # The fixed now in the e2e cases is 2026-11-02; it is not in RESULTS.
+    reply = "Today, November 2, forms are accepted until 4:00 PM."
+    assert unsupported_claims(reply, ALLOWED) == ["date 11-02"]
+
+
+def test_dates_and_numbers_in_the_question_are_allowed():
+    allowed = supported(RESULTS, "Is the office open on November 2 at 8?")
+    assert unsupported_claims("Yes, on November 2 at 8.", allowed) == []
+
+
+@pytest.mark.parametrize("claim", ["unsupported date 11-02", "unsupported number 5"])
+def test_unsupported_claims_are_invented_never_other(claim):
+    categories = categories_for("A reply.", [claim, "expected the not-found message"])
+    assert "invented" in categories
+    assert "other" not in categories
+
+
+def test_rescore_gemma_e2e_003_reply():
+    # gemma3:1b's e2e-003 reply in runs/e2e34_gemma3_1b.txt (commit 041cb82),
+    # scored "other" while today's date was allowed.
+    seed = json.loads(
+        (ROOT / "data" / "seed" / "announcements.json").read_text(encoding="utf-8")
+    )
+    row = next(row for row in seed if row["id"] == "ann-004")
+    results = [{**RESULTS[0], "title": row["title"], "excerpt": row["body"][:500]}]
+    question = "When is the deadline for submitting org accreditation documents?"
+    reply = (
+        "The deadline for submitting accreditation documents is November 2nd.  "
+        "Complete all required documents before then.  The required documents "
+        "include a constitution, by-laws, officer signatures, adviser's letter, "
+        "financial report, proposed calendar, and certificate of good standing."
+    )
+    unsupported = unsupported_claims(reply, supported(results, question))
+    assert unsupported == ["date 11-02"]
+    problems = failures(
+        reply,
+        must_include=[],
+        must_not_include=["December 4", "Dec 4", "Dec. 4", "4 December"],
+        expects_not_found=True,
+        forbidden=[],
+        unsupported=unsupported,
+    )
+    before = categories_for(reply, problems, expects_not_found=True)
+    assert before == ["invented"]
+    guarded = guard(reply, results, question, [])
+    assert guarded.fired
+    after_problems = failures(
+        guarded.text,
+        must_include=[],
+        must_not_include=[],
+        expects_not_found=True,
+        forbidden=[],
+        unsupported=[],
+    )
+    after = categories_for(
+        guarded.text,
+        after_problems,
+        expects_not_found=True,
+        code_built=True,
+        fallback_used=True,
+    )
+    assert after == ["guard_fallback"]

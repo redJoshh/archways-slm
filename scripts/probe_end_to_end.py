@@ -15,7 +15,7 @@ For each case:
    and the model is not called. Otherwise prompts/e2e_answer_v1.txt gets
    the question and the results as JSON between <announcements> tags.
 4. Guard. A model reply with a date or number that the retrieved titles
-   and excerpts, the question and today don't support, or with the title
+   and excerpts and the question don't support, or with the title
    of a row that must never reach the model, is replaced by a fallback
    built only from the retrieved titles and posted dates.
 5. Scoring, on the reply before and after the guard (see e2escore).
@@ -278,7 +278,6 @@ def main() -> None:
 
         for number, case in enumerate(cases, start=1):
             now, question = case["now"], case["question"]
-            today = now.date()
             forbidden = [row["title"] for row in rows if not is_visible(row, now)]
             context_problems = []
 
@@ -343,11 +342,9 @@ def main() -> None:
                     max_tokens["answer"] = max(max_tokens["answer"], tokens)
                 context_problems += context_problem(case["id"], "answer", tokens)
                 show(f"  answer: prompt tokens {tokens}/{NUM_CTX} | {elapsed:.2f}s")
-                raw_unsupported = unsupported_claims(
-                    raw, supported(results, question, today)
-                )
+                raw_unsupported = unsupported_claims(raw, supported(results, question))
                 # 4. Guard.
-                guarded = guard(raw, results, question, today, forbidden)
+                guarded = guard(raw, results, question, forbidden)
                 final = guarded.text
                 fired = guarded.fired
                 final_unsupported = [] if guarded.fired else raw_unsupported
