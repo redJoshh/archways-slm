@@ -2,7 +2,7 @@
 
 Usage: uv run python scripts/probe_tool_call.py [--model qwen3:1.7b]
     [--tool-mode native|prompt] [--prompt prompts/system_v1.txt]
-    [--format-mode none|schema]
+    [--format-mode none|schema] [--summary-only]
     [--questions evals/dev_questions.jsonl] [--ids dev-001,dev-004]
 
 --tool-mode native (default) sends the tool in Ollama's tools field.
@@ -18,8 +18,15 @@ the run stops with its error; there is no fallback. Default none sends no
 format option.
 
 Prints a header line (model, tool mode, format mode, model capabilities,
-prompt, questions, Ollama version, git commit, date) so runs can be compared, then
-one block per question and a summary with per-category results.
+prompt, questions, Ollama version, git commit, date) so runs can be
+compared, then one block per question and a summary with per-category
+results.
+--summary-only skips the per-question blocks.
+
+In the summary, lookup recall is the share of questions expecting a tool
+that got a parsed tool call, and the unnecessary-call rate is the share of
+questions expecting no tool that got one. Malformed attempts count as no
+call in both; they are counted separately.
 
 --ids runs only the listed question IDs, in file order; the header then adds
 ids=... and the summary covers only those questions. An unknown ID exits.
@@ -200,6 +207,11 @@ def is_sentence_like(query: str) -> bool:
     return len(query.split()) > MAX_QUERY_WORDS or query.rstrip().endswith("?")
 
 
+def ratio(part: int, whole: int) -> str:
+    percent = "n/a" if whole == 0 else f"{part / whole:.0%}"
+    return f"{part}/{whole} ({percent})"
+
+
 def chat(client: httpx.Client, payload: dict) -> dict:
     try:
         response = client.post(f"{OLLAMA_URL}/api/chat", json=payload)
@@ -225,6 +237,9 @@ def main() -> None:
     parser.add_argument("--format-mode", choices=["none", "schema"], default="none")
     parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
     parser.add_argument("--ids", help="comma-separated question IDs to run")
+    parser.add_argument(
+        "--summary-only", action="store_true", help="skip per-question blocks"
+    )
     args = parser.parse_args()
     prompt_mode = args.tool_mode == "prompt"
     if args.format_mode == "schema" and not prompt_mode:
@@ -259,7 +274,13 @@ def main() -> None:
         wanted = set(selected_ids)
         questions = [item for item in questions if item["id"] in wanted]
 
+    # Per-question output; the header and summary always print.
+    show = (lambda *_: None) if args.summary_only else print
     correct_decisions = 0
+    expects_tool_total = 0
+    lookups = 0
+    expects_none_total = 0
+    unnecessary_calls = 0
     tool_calls_total = 0
     valid_calls = 0
     sentence_like_total = 0
@@ -325,6 +346,12 @@ def main() -> None:
             # A malformed attempt is a wrong decision whatever was expected.
             decision_ok = malformed is None and called == expects_tool
             correct_decisions += decision_ok
+            if expects_tool:
+                expects_tool_total += 1
+                lookups += called
+            else:
+                expects_none_total += 1
+                unnecessary_calls += called
             stats = categories.setdefault(
                 item["category"], {"correct": 0, "total": 0, "wrong": []}
             )
@@ -334,18 +361,18 @@ def main() -> None:
             else:
                 stats["wrong"].append(item["id"])
 
-            print(f"[{number}/{len(questions)}] {item['id']}: {question}")
+            show(f"[{number}/{len(questions)}] {item['id']}: {question}")
             shown_called = "malformed" if malformed else "yes" if called else "no"
-            print(
+            show(
                 f"  tool called: {shown_called} | "
                 f"expected: {'yes' if expects_tool else 'no'} | "
                 f"{'OK' if decision_ok else 'WRONG'}"
             )
             if malformed:
-                print(f"  parse error: {malformed}")
+                show(f"  parse error: {malformed}")
             for name, arguments in calls:
                 tool_calls_total += 1
-                print(f"  call: {name} {json.dumps(arguments, ensure_ascii=False)}")
+                show(f"  call: {name} {json.dumps(arguments, ensure_ascii=False)}")
 
                 errors = []
                 if name != TOOL_NAME:
@@ -355,10 +382,10 @@ def main() -> None:
                     for e in validator.iter_errors(arguments)
                 ]
                 if errors:
-                    print(f"  arguments valid: no ({'; '.join(errors)})")
+                    show(f"  arguments valid: no ({'; '.join(errors)})")
                 else:
                     valid_calls += 1
-                    print("  arguments valid: yes")
+                    show("  arguments valid: yes")
 
                 query = arguments.get("query") if isinstance(arguments, dict) else None
                 if isinstance(query, str):
@@ -366,28 +393,29 @@ def main() -> None:
                     if is_sentence_like(query):
                         sentence_like_total += 1
                         flag = " (sentence-like)"
-                    print(f"  query words: {len(query.split())}{flag}")
+                    show(f"  query words: {len(query.split())}{flag}")
 
-            print(
+            show(
                 f"  latency: {latency:.2f}s "
                 f"(ollama total {seconds(body.get('total_duration'))}, "
                 f"load {seconds(body.get('load_duration'))})"
             )
-            print(
+            show(
                 f"  prompt tokens: {body.get('prompt_eval_count', 'n/a')} | "
                 f"tokens/s: {tokens_per_second(body)}"
             )
             content = (message.get("content") or "").strip().replace("\n", " ")
             if content:
-                print(f"  reply: {content[:CONTENT_PREVIEW_CHARS]}")
-            print()
+                show(f"  reply: {content[:CONTENT_PREVIEW_CHARS]}")
+            show()
 
     print("Summary")
     print(f"  correct tool decisions: {correct_decisions}/{len(questions)}")
-    print(f"  valid arguments: {valid_calls}/{tool_calls_total} tool calls")
+    print(f"  lookup recall: {ratio(lookups, expects_tool_total)}")
+    print(f"  unnecessary-call rate: {ratio(unnecessary_calls, expects_none_total)}")
+    print(f"  valid arguments: {ratio(valid_calls, tool_calls_total)} tool calls")
     print(f"  sentence-like queries: {sentence_like_total}/{tool_calls_total}")
-    if prompt_mode:
-        print(f"  malformed: {malformed_total}/{len(questions)}")
+    print(f"  malformed: {malformed_total}/{len(questions)}")
     print("Per category (correct tool decisions)")
     for category, stats in categories.items():
         wrong = f" (wrong: {', '.join(stats['wrong'])})" if stats["wrong"] else ""
