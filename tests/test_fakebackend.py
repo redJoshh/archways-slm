@@ -7,10 +7,12 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
 from archways_assistant.fakebackend import (
+    DEFAULT_MATCHER,
     EXCERPT_CHARS,
     STOPWORDS,
     InvalidArguments,
     ilike_pattern,
+    prefix_stems,
     query_words,
     search_announcements,
 )
@@ -134,3 +136,49 @@ def test_seed_has_each_trap():
     assert any("ignore your rules" in row["body"].lower() for row in SEED)
     assert any("replaces the earlier notice" in row["body"] for row in SEED)
     assert any(len(row["body"]) > EXCERPT_CHARS for row in SEED)
+
+
+# prefix_v2 matcher (tests/vectors/search_vectors_v2.json).
+
+VECTORS_V2 = json.loads(
+    (ROOT / "tests" / "vectors" / "search_vectors_v2.json").read_text(encoding="utf-8")
+)
+
+
+@pytest.mark.parametrize("vector", VECTORS_V2["vectors"], ids=lambda v: v["name"])
+def test_search_vector_prefix_v2(vector):
+    def run():
+        return search_announcements(
+            VECTORS_V2["rows"],
+            vector["arguments"],
+            datetime.fromisoformat(VECTORS_V2["now"]),
+            CONTRACT,
+            matcher="prefix_v2",
+        )
+
+    if vector.get("expected_error"):
+        with pytest.raises(InvalidArguments):
+            run()
+        return
+    assert [result["id"] for result in run()] == vector["expected_ids"]
+    if "expected_stems" in vector:
+        assert prefix_stems(vector["arguments"]["query"]) == vector["expected_stems"]
+
+
+def test_v2_vectors_share_the_stopwords_and_v1_rows():
+    assert VECTORS_V2["matcher"] == "prefix_v2"
+    assert VECTORS_V2["stopwords"] == sorted(STOPWORDS)
+    assert VECTORS_V2["rows"][: len(VECTORS["rows"])] == VECTORS["rows"]
+
+
+def test_default_matcher_is_and_v1():
+    assert DEFAULT_MATCHER == "and_v1"
+    arguments = {"query": "enrolment"}
+    assert [r["id"] for r in search(arguments, rows=VECTORS_V2["rows"])] == ["v-12"]
+
+
+def test_unknown_matcher_is_rejected():
+    with pytest.raises(ValueError, match="unknown matcher"):
+        search_announcements(
+            VECTORS["rows"], {"query": "library"}, VECTOR_NOW, CONTRACT, matcher="x"
+        )

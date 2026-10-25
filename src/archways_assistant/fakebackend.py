@@ -11,11 +11,21 @@ Rules, in order:
 2. A row is visible only if its status is PUBLISHED, it is not archived, and
    its published_at is not after now. It must also be within the last
    `days` days: now - days <= published_at <= now.
-3. The query is lowercased and split on whitespace, and STOPWORDS are
-   dropped. Every remaining word must appear in the title or in the body as
-   a plain substring (AND across words), like ILIKE '%word%' ESCAPE '\\'
-   per word. No words left means no results.
-4. Newest first by published_at, ties by id ascending, then limit.
+3. Matching depends on the matcher (default DEFAULT_MATCHER):
+   - and_v1: the query is lowercased and split on whitespace, and STOPWORDS
+     are dropped. Every remaining word must appear in the title or in the
+     body as a plain substring (AND across words), like
+     ILIKE '%word%' ESCAPE '\\' per word.
+   - prefix_v2: query, title and body are lowercased and split into words
+     (runs of letters and digits; anything else separates words), and
+     STOPWORDS are dropped from the query. Each query word of 5 or more
+     characters becomes its first 4 characters (its stem); shorter words
+     stay whole. A row matches if at least ceil(n/2) of the n stems each
+     start some word of the title or body. A stem that starts a title word
+     scores 2, otherwise one that starts a body word scores 1.
+   No query words left means no results.
+4. Highest score first (and_v1 scores every match 0), then newest
+   published_at, then id ascending; then limit.
 5. Each row is returned in the contract's announcement shape: published_at
    gets STORED_ZONE and becomes posted_at, and the body is cut to
    EXCERPT_CHARS characters and becomes excerpt.
@@ -27,6 +37,8 @@ for some non-ASCII letters.
 Pure: no I/O and no clock; `now` is always passed in.
 """
 
+import math
+import re
 from datetime import datetime, timedelta, timezone
 
 from jsonschema import Draft202012Validator
@@ -82,6 +94,14 @@ STOPWORDS = frozenset(
 )
 
 
+MATCHERS = ("and_v1", "prefix_v2")
+DEFAULT_MATCHER = "and_v1"
+# prefix_v2: words this long or longer are cut to their first STEM_CHARS.
+STEM_MIN_CHARS = 5
+STEM_CHARS = 4
+WORD = re.compile(r"[^\W_]+")
+
+
 class InvalidArguments(ValueError):
     pass
 
@@ -94,6 +114,29 @@ def ilike_pattern(word: str) -> str:
 
 def query_words(query: str) -> list[str]:
     return [word for word in query.lower().split() if word not in STOPWORDS]
+
+
+def prefix_stems(query: str) -> list[str]:
+    """prefix_v2 query stems, in query order."""
+    words = [word for word in WORD.findall(query.lower()) if word not in STOPWORDS]
+    return [
+        word[:STEM_CHARS] if len(word) >= STEM_MIN_CHARS else word for word in words
+    ]
+
+
+def prefix_score(stems: list[str], title: str, body: str) -> int | None:
+    """prefix_v2 score of a row, or None if too few stems match."""
+    title_words = WORD.findall(title.lower())
+    body_words = WORD.findall(body.lower())
+    matched = score = 0
+    for stem in stems:
+        if any(word.startswith(stem) for word in title_words):
+            matched += 1
+            score += 2
+        elif any(word.startswith(stem) for word in body_words):
+            matched += 1
+            score += 1
+    return score if matched >= math.ceil(len(stems) / 2) else None
 
 
 def published_at(row: dict) -> datetime:
@@ -126,11 +169,17 @@ def to_announcement(row: dict) -> dict:
 
 
 def search_announcements(
-    rows: list[dict], arguments: dict, now: datetime, contract: dict
+    rows: list[dict],
+    arguments: dict,
+    now: datetime,
+    contract: dict,
+    matcher: str = DEFAULT_MATCHER,
 ) -> list[dict]:
     """Run one search over seed rows at now. See the module docstring for the rules."""
     if now.tzinfo is None:
         raise ValueError("now must have a time zone")
+    if matcher not in MATCHERS:
+        raise ValueError(f"unknown matcher {matcher!r}")
     schema = contract["$defs"]["arguments"]
     errors = [
         error.message for error in Draft202012Validator(schema).iter_errors(arguments)
@@ -140,18 +189,31 @@ def search_announcements(
     properties = schema["properties"]
     days = arguments.get("days", properties["days"]["default"])
     limit = arguments.get("limit", properties["limit"]["default"])
-    words = query_words(arguments["query"])
+    if matcher == "and_v1":
+        words = query_words(arguments["query"])
+    else:
+        words = prefix_stems(arguments["query"])
     if not words:
         return []
 
     since = now - timedelta(days=days)
-    matches = []
-    for row in sorted(rows, key=lambda row: row["id"]):
+    matches = []  # (score, row)
+    for row in rows:
         if not is_visible(row, now) or published_at(row) < since:
             continue
-        title, body = row["title"].lower(), row["body"].lower()
-        if all(word in title or word in body for word in words):
-            matches.append(row)
-    # Stable sort: equal timestamps keep id order.
-    matches.sort(key=published_at, reverse=True)
-    return [to_announcement(row) for row in matches[:limit]]
+        if matcher == "and_v1":
+            title, body = row["title"].lower(), row["body"].lower()
+            if all(word in title or word in body for word in words):
+                matches.append((0, row))
+        else:
+            score = prefix_score(words, row["title"], row["body"])
+            if score is not None:
+                matches.append((score, row))
+    matches.sort(
+        key=lambda match: (
+            -match[0],
+            -published_at(match[1]).timestamp(),
+            match[1]["id"],
+        )
+    )
+    return [to_announcement(row) for _, row in matches[:limit]]

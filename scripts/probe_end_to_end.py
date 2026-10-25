@@ -2,14 +2,14 @@
 
 Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
     [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--summary-only]
-    [--num-gpu 0]
+    [--num-gpu 0] [--matcher and_v1|prefix_v2]
 
 For each case:
 1. Query call. The model writes only the search arguments: Ollama's format
    option is the contract's arguments schema, and the prompt is
    prompts/e2e_query_v1.txt. Every case searches.
 2. Search. fakebackend runs it over data/seed/announcements.json at the
-   case's fixed now. Arguments the contract rejects count as no results,
+   case's fixed now, with --matcher (default and_v1). Arguments the contract rejects count as no results,
    as Spring rejects them.
 3. Answer call. With no results the reply is the fixed not-found message
    and the model is not called. Otherwise prompts/e2e_answer_v1.txt gets
@@ -77,6 +77,8 @@ from archways_assistant.e2escore import (
     unsupported_claims,
 )
 from archways_assistant.fakebackend import (
+    DEFAULT_MATCHER,
+    MATCHERS,
     InvalidArguments,
     is_visible,
     search_announcements,
@@ -188,6 +190,7 @@ def main() -> None:
     parser.add_argument(
         "--summary-only", action="store_true", help="skip per-case blocks"
     )
+    parser.add_argument("--matcher", choices=MATCHERS, default=DEFAULT_MATCHER)
     parser.add_argument(
         "--num-gpu",
         type=int,
@@ -270,6 +273,7 @@ def main() -> None:
             f"query_prompt={display_path(QUERY_PROMPT)} "
             f"answer_prompt={display_path(ANSWER_PROMPT)} "
             f"cases={display_path(args.cases)} seed_data={display_path(SEED_DATA)} "
+            f"matcher={args.matcher} "
             f"{ids_field}now={','.join(nows)} seed={SEED} num_ctx={NUM_CTX} "
             f"num_gpu={'default' if args.num_gpu is None else args.num_gpu} "
             f"ollama={ollama_version(client)} commit={git_commit()}"
@@ -307,7 +311,9 @@ def main() -> None:
                 invalid = "reply is not a JSON object"
             else:
                 try:
-                    results = search_announcements(rows, arguments, now, contract)
+                    results = search_announcements(
+                        rows, arguments, now, contract, matcher=args.matcher
+                    )
                 except InvalidArguments as error:
                     invalid = str(error)
             latency["search"].append(time.perf_counter() - started)
