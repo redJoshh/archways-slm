@@ -19,6 +19,29 @@ Template:
 
 ---
 
+## 2026-10-25: Schema-mode experiment results (gemma3:1b, v3)
+
+- **Date:** 2026-10-25
+- **What changed:** No code or prompt changes. This entry records the four runs from `1b73829` together in one place. The entry below ("Probe --format-mode and --summary-only") already covers part of this.
+- **Why:** The user asked for the exact per-run numbers and findings before seeds and v4 change the setup.
+- **How it was verified:** `--model gemma3:1b --tool-mode prompt --prompt prompts/system_v3_prompt_mode.txt`, Ollama 0.40.10, header `commit=1b73829`, `today=2026-10-25`, temperature 0, no seed. Files: `runs/gemma3_1b_prompt_v3_format-{none,schema}_run{1,2}.txt` (gitignored).
+
+  | Run | Decisions | Lookup recall | Unnecessary-call rate | Valid arguments | Malformed |
+  |---|---|---|---|---|---|
+  | none, run 1 | 19/30 | 14/18 (78%) | 6/12 (50%) | 16/20 (80%) | 4/30 |
+  | none, run 2 | 21/30 | 16/18 (89%) | 5/12 (42%) | 17/21 (81%) | 3/30 |
+  | schema, run 1 | 18/30 | 18/18 (100%) | 12/12 (100%) | 29/30 (97%) | 0/30 |
+  | schema, run 2 | 18/30 | 18/18 (100%) | 12/12 (100%) | 29/30 (97%) | 0/30 |
+
+  - **Finding:** schema mode removed malformed JSON and wrong tool names, but it searched on every message, including greetings, math, poems, prompt injections and restricted-data requests.
+  - **Finding:** Ollama did not enforce the schema's `maxLength`. dev-007 sent a 39-word query over 200 characters, the only invalid schema-mode call.
+  - **Finding:** `"*"` passes the contract's `\S` pattern (dev-028 sent `{"query": "*"}` in schema mode).
+  - **Finding:** in mode none the two runs had the same settings but differed on dev-006, 008, 010 and 023. The two schema runs were identical.
+  - **Finding:** gemma sometimes used the prompt's date line as the query (`"Sunday, 2026-10-25 (Asia/Manila)"`) for vague messages (dev-021, 022) and "thanks" (dev-025).
+  - **Hypothesis (not tested):** the over-searching happens because v3 never describes the `{"reply": "..."}` form and says "answer in plain text", which the schema doesn't allow.
+- **Commits:** this `docs:` commit only.
+- **Open questions / next:** Add a fixed seed and check whether mode none becomes reproducible. Write a schema-mode prompt that shows the reply form.
+
 ## 2026-10-25: Probe --format-mode and --summary-only; gemma3:1b v3 runs
 
 - **Date:** 2026-10-25
