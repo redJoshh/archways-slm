@@ -18,7 +18,7 @@ the run stops with its error; there is no fallback. Default none sends no
 format option.
 
 Prints a header line (model, tool mode, format mode, model capabilities,
-prompt, questions, Ollama version, git commit, date) so runs can be
+prompt, questions, seed, Ollama version, git commit, date) so runs can be
 compared, then one block per question and a summary with per-category
 results.
 --summary-only skips the per-question blocks.
@@ -68,6 +68,8 @@ TOOL_PLACEHOLDER = "{tool_definition}"
 # Manila has no daylight saving time, so a fixed offset is exact.
 MANILA = timezone(timedelta(hours=8), "Asia/Manila")
 
+# Fixed sampling seed, sent with temperature 0, so repeated runs can match.
+SEED = 42
 MAX_QUERY_WORDS = 6
 CONTENT_PREVIEW_CHARS = 200
 
@@ -303,6 +305,7 @@ def main() -> None:
             f"format={args.format_mode} "
             f"capabilities={shown_capabilities} prompt={display_path(prompt_path)} "
             f"questions={display_path(args.questions)} {ids_field}"
+            f"seed={SEED} "
             f"ollama={ollama_version(client)} commit={git_commit()} "
             f"today={now:%Y-%m-%d}"
         )
@@ -312,7 +315,7 @@ def main() -> None:
             payload = {"model": args.model, "stream": False}
             if send_think:
                 payload["think"] = False
-            payload["options"] = {"temperature": 0}
+            payload["options"] = {"temperature": 0, "seed": SEED}
             if not prompt_mode:
                 payload["tools"] = [tool]
             if format_schema is not None:
