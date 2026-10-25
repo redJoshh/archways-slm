@@ -19,6 +19,15 @@ Template:
 
 ---
 
+## 2026-10-25: Provisional model choice recorded
+
+- **Date:** 2026-10-25
+- **What changed:** Added `docs/decisions/0001-model-choice.md`, the first decision record (no earlier records existed, so it uses a standard ADR layout). Status PROVISIONAL: gemma3:1b is the primary on-device target and qwen3:0.6b the control and fallback. It sets two gates (phone feasibility in a throwaway app; one held-out evaluation after identical fine-tuning, against pre-written thresholds of recall ≥ 85%, valid arguments ≥ 95%, malformed 0, still to be confirmed by the team). Fallbacks are qwen3:0.6b on-device or qwen3:1.7b server-side.
+- **Why:** The user asked to record the model choice and the conditions it depends on before fine-tuning or phone work.
+- **How it was verified:** Docs-only change; nothing to run. The record's Context contains only the facts the user gave. The size (about 529 MB for Gemma 3 1B int4) comes from Google's documentation as the user reported it; not checked here.
+- **Commits:** this `docs: record provisional model choice` commit. Not pushed.
+- **Open questions / next:** Unverified: Expo integration, iOS, Gemma license terms for the project, and which phones the testers use. The team has to confirm the Gate 2 thresholds before the held-out evaluation.
+
 ## 2026-10-25: Score field, baselines in the probe summary, full gemma3:1b v4 run
 
 - **Date:** 2026-10-25
