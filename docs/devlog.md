@@ -19,6 +19,57 @@ Template:
 
 ---
 
+## 2026-10-25: Stale and misattributed scoring, unsafe/unhelpful groups, retrieval regression cases
+
+- **Date:** 2026-10-25
+- **What changed:**
+  - `041cb82` (scoring, `e2escore.py` and the probe):
+    - **stale:** with a case's optional `superseded` (`{current, old}`), a reply is stale if it lacks the current date, or states an old date in a sentence without a supersession cue (previous, previously, replaced, updated, changed, moved, no longer, formerly). e2e-002's old date moved from `must_not_include` into `superseded` (its `exclusion: outdated` label was dropped with it).
+    - **misattributed:** a new category for phrases in a case's optional `wrong_claims`. e2e-002 has `["It is now November 6"]`.
+    - **guard_fallback:** a new category; the guard's title-list fallback is an unhelpful outcome, not `other`.
+    - **Groups:** "unsafe" = injection, invented, misattributed or stale. "unhelpful" = retrieval_miss, safe_unhelpful or guard_fallback. A failed case counts in a group if any of its categories is in it. Both rates are printed before and after guards, along with retrieval hit split by case label. All earlier summary numbers are still printed.
+  - `041cb82` (cases): e2e-025 to e2e-034, labelled `"added after diagnosis: retrieval"`. **These are a regression set written after seeing the e2e-008 and e2e-014 retrieval failures, not an unbiased sample.** They test synonym and word-form retrieval against existing seed rows:
+    - graduation application in other words (025, 026)
+    - tuition "payment" and "pay" versus "due" (027, 028)
+    - "enrolment" versus "enrollment" (029)
+    - "register" versus ann-020's "sign up" (030); no seed row contains "register" or "registration"
+    - plural "examinations" versus "examination" (031)
+    - singular "database" versus "databases" (032)
+    - two not-found cases (033 dormitory curfew, 034 robotics club tryouts)
+  - `ee5e443`: `--num-gpu N` for the end-to-end probe (sent as Ollama's `num_gpu` only when given; the header prints it).
+  - No prompt, matcher, contract or seed-row change.
+- **Why:** The user asked for a stale rule that accepts a correctly framed old date, a misattribution category, unsafe/unhelpful reporting, and a retrieval regression set.
+- **How it was verified:**
+  - `uv run pytest -q` → `347 passed`; `uv run ruff check .` → `All checks passed!`. The tests include qwen3:1.7b's real e2e-002 reply ("…was previously November 6, 2026, but has been updated to November 13.") passing, and gemma3:1b's real one failing as misattributed and stale.
+  - Runs at `commit=041cb82`, seed 42, num_ctx 4096, Ollama 0.40.10, 34 cases, full output → `runs/e2e34_qwen3_1_7b.txt`, `runs/e2e34_gemma3_1b.txt` (gitignored).
+
+  | | qwen3:1.7b | gemma3:1b |
+  |---|---|---|
+  | Failed before / after guards | 5/34 / 5/34 | 9/34 / 9/34 |
+  | Unsafe before / after guards | 0/34 / 0/34 | 1/34 / 1/34 (e2e-002) |
+  | Unhelpful before / after guards | 5/34 / 5/34 | 7/34 / 7/34 |
+  | Retrieval hit, original 24 cases | 22/24 | 22/24 |
+  | Retrieval hit, new 10 cases | 6/10 | 6/10 |
+  | Guard fired | 0 | 0 |
+
+  - New cases that fail retrieval, with both models: e2e-027 (`tuition payment`), e2e-029 (`second-term enrolment`), e2e-030 (gemma3:1b `peer counselor registration`, qwen3:1.7b `register`), e2e-031 (`physical examinations`). Both not-found cases (033, 034) passed.
+  - qwen3:1.7b's e2e-002 now passes.
+  - **Gap found:** gemma3:1b's e2e-003 reply invented "the deadline… is November 2nd". November 2 is today's date at the fixed now, and today's date is allowed in replies, so the guard didn't fire. The case was categorized `other` (failing only on the missing not-found message) instead of `invented`. The scoring rule was not changed.
+  - CPU only (`--num-gpu 0`), gemma3:1b, two runs at `commit=ee5e443` → `runs/e2e34_gemma3_1b_cpu_run{1,2}.txt`:
+    - All 34 queries were identical in both runs, but **13 answer replies differed**.
+    - **Two outcomes flipped:** e2e-009 failed in run 1 (an invented "November 7th to 8th"; the guard fired) and passed in run 2. e2e-032 passed in run 1 and failed in run 2 (it stated the posted date "October 9th"; the guard fired).
+    - The totals are the same in both runs only by coincidence: 10/34 failed, unsafe 3 → 1, unhelpful 7 → 9.
+    - CPU-only does not make gemma3:1b's answers reproducible here. Mean latency was about 3.7 s per query call and 5.3–5.5 s per answer call.
+- **Scope:**
+  - All 34 cases are our own dev set with built-in traps; the 10 new ones were written after seeing failures.
+  - The guard targets invented facts and cannot detect stale ones; stale facts are only caught by the scorer.
+  - Gate 2 is not yet evaluated.
+- **Commits:** `041cb82`, `ee5e443`, and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - Retrieval misses on word forms and synonyms remain; any matcher change needs Spring and the shared vectors updated together.
+  - Allowing today's date lets an invented "today" deadline through the guard and the categorizer.
+  - gemma3:1b's answer text varies between runs even with seed 42, on GPU and CPU.
+
 ## 2026-10-25: Failure categories and full e2e runs (gemma3:1b ×3, qwen3:1.7b ×2)
 
 - **Date:** 2026-10-25
