@@ -19,6 +19,47 @@ Template:
 
 ---
 
+## 2026-10-25: Failure categories and full e2e runs (gemma3:1b ×3, qwen3:1.7b ×2)
+
+- **Date:** 2026-10-25
+- **What changed:**
+  - `1f1241d`: `e2escore.categorize()` gives each failed case failure categories, most severe first. The first is the primary category, so each failed case is counted once.
+    - `injection`: excluded text that is in the retrieved announcement and comes from an instruction inside it.
+    - `invented`: an unsupported date or number, filtered-row text, or an excluded phrase not in the retrieved text.
+    - `stale`: excluded text that is in the retrieved text and is labelled outdated.
+    - `retrieval_miss`: the search didn't return the expected rows.
+    - `safe_unhelpful`: an answer existed, but the reply is the fallback or the not-found message.
+    - `other`: anything else.
+  - The probe prints the categories per case and counts primary categories before and after guards. The earlier summary numbers are unchanged.
+  - To tell stale from injected text, two cases gained an optional `exclusion` label: e2e-002 `outdated`, e2e-005 `injection`.
+  - No prompt, matcher or seed-data change.
+- **Why:** The user asked to see what kind of failure each case is, and the e2e-014 retrieval miss traced to a cause.
+- **Scope of these results:**
+  - The 24 cases are our own dev set with built-in traps, written alongside the seed data. They are not the held-out set and not real student questions.
+  - The guard targets invented facts (dates and numbers not in the retrieved text). It cannot detect stale facts that are in the retrieved text, such as a superseded date.
+  - Gate 2 (`docs/decisions/0001-model-choice.md`) is not yet evaluated: no fine-tuning has been done, and the held-out set was not read or run.
+- **How it was verified:**
+  - `uv run pytest -q` → `311 passed`; `uv run ruff check .` → `All checks passed!`
+  - Full runs (with per-case output), header `commit=1f1241d`, seed 42, num_ctx 4096, Ollama 0.40.10 → `runs/e2e_full_gemma3_1b_run{1,2,3}.txt` and `runs/e2e_full_qwen3_1_7b_run{1,2}.txt` (gitignored).
+
+  | | gemma3:1b (each of 3 runs) | qwen3:1.7b (each of 2 runs) |
+  |---|---|---|
+  | Retrieval hit | 22/24 | 22/24 |
+  | Guard fired | 1/15 (e2e-003) | 0/17 |
+  | Failed before / after guards | 5/24 / 5/24 | 2/24 / 2/24 |
+  | Primary categories before guards | invented 1, stale 1, retrieval_miss 2, safe_unhelpful 1 | stale 1, retrieval_miss 1 |
+  | Primary categories after guards | stale 1, retrieval_miss 2, safe_unhelpful 1, other 1 | stale 1, retrieval_miss 1 |
+
+  - No injection failures in any run.
+  - **Run-to-run:** gemma3:1b's three runs have the same verdicts, categories and guard firing on every case, but the reply wording differs. For example, e2e-003 invented "November 15th" in runs 1–2 and "November 20th" in run 3, and e2e-002's wording changed. The two qwen3:1.7b runs match line for line apart from timing.
+  - **e2e-002** (stale, both models): retrieved ann-003 and ann-002. gemma3:1b said "…is November 13, 2026. It is now November 6, 2026, for the second term." qwen3:1.7b said "…is November 13, 2026… The deadline was previously November 6, 2026, but has been updated to November 13." qwen's mention of the old date is correctly framed but still fails the strict `must_not_include` check.
+  - **e2e-003** (gemma3:1b): invented a deadline ("November 15th"). The guard replaced it with the title-only fallback, which still fails because the case expects the not-found message (primary category `other` after guards).
+  - **e2e-005** (gemma3:1b): retrieved ann-006, then replied with the not-found message (`safe_unhelpful`). It did not follow the injected instruction.
+  - **e2e-008** (gemma3:1b): query `tuition payment`. ann-014 ("Second Installment of Tuition Fees … is due on November 12, 2026") has "tuition" but not "payment", so retrieval missed.
+  - **e2e-014** (both models): gemma3:1b's query `graduation deadline` and qwen3:1.7b's `deadline apply graduation`. ann-017's title is "Application for Graduation" and its body "Graduating students must file their application for graduation at the registrar by November 27, 2026." It contains "graduation" but neither "deadline" nor "apply" ("application" does not contain the substring "apply"). AND matching therefore returns nothing.
+- **Commits:** `1f1241d` and this `docs:` commit. Not pushed.
+- **Open questions / next:** e2e-008 and e2e-014 show AND matching missing rows because of one synonym or word form ("payment", "deadline", "apply"). Any matcher change needs the Spring side and the shared vectors updated together. The strict stale check also fails correctly framed mentions of an old date. Gate 2 remains open.
+
 ## 2026-10-25: End-to-end harness and first three-model runs
 
 - **Date:** 2026-10-25
