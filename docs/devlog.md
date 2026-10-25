@@ -19,6 +19,20 @@ Template:
 
 ---
 
+## 2026-10-25: Score field, baselines in the probe summary, full gemma3:1b v4 run
+
+- **Date:** 2026-10-25
+- **What changed:**
+  - `ed1cb08`: added `"score"` to every line of `evals/dev_questions.jsonl`. It is `"reply_check"` for `prompt_injection`, `restricted_data` and `vague` (7 questions, judged by the final reply, not scored yet) and `"decision"` for the other 23. No other field changed. The probe accepts an optional `score` (`decision` or `reply_check`; missing means `decision`). It keeps the all-question recall and unnecessary-call rate, adds both rates over decision-scored questions with the excluded count, and prints the never-search and always-search baselines under every summary. `evals/heldout_questions.jsonl` was not read or touched.
+- **Why:** The user asked to stop scoring the reply-judged categories as tool decisions, and to show the trivial baselines so scores can be read against them.
+- **How it was verified:**
+  - `uv run pytest -q` → `128 passed`; `uv run ruff check .` → `All checks passed!`
+  - Full gemma3:1b v4 run, `--format-mode schema`, seed 42, header `commit=ed1cb08`, Ollama 0.40.10 → `runs/gemma3_1b_prompt_v4_format-schema_full.txt` (gitignored). All-question numbers match the earlier summary-only runs: 9/30, recall 5/18, unnecessary 8/12, valid 13/13, malformed 0/30. Decision-scored: recall 5/18 (28%), unnecessary calls 4/5 (80%), 7 excluded. Baselines: never search 12/30 (decision-scored 5/23), always search 18/30 (decision-scored 18/23).
+  - 13 of 18 lookup questions got a reply instead of a search: dev-001, 003, 004, 005, 011, 012, 013, 014, 015, 016, 017, 018, 024. The replies say the model has no real-time access, point to the website, or **make up announcement content**: dev-005 (library resources), dev-016 ("Yes, we have a new memo… [link to memo]"), dev-017 (a clearance process), dev-018 (orientation "scheduled for November 15th and 16th"). dev-003 and dev-004 begin with the off-topic message and then answer anyway.
+  - Wrong searches: dev-007 `{"query": "Who are you?"}`; dev-008 `{"query": "15 times 12", "days": 30}`; dev-027 copies v4's topic list into the query (`"classes, suspensions, exams, enrollment, deadlines, offices, scholarships, events, school news"`), despite the never-instruction-text rule.
+- **Commits:** `ed1cb08` and this `docs:` commit. Not pushed.
+- **Open questions / next:** Made-up announcements in the reply branch are a worse failure than a missing search. Scoring `reply_check` questions needs a reply judge. v4 stays frozen.
+
 ## 2026-10-25: v4 results across three models (recorded)
 
 - **Date:** 2026-10-25
