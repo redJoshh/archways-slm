@@ -2,6 +2,7 @@
 
 Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
     [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--summary-only]
+    [--num-gpu 0]
 
 For each case:
 1. Query call. The model writes only the search arguments: Ollama's format
@@ -187,6 +188,12 @@ def main() -> None:
     parser.add_argument(
         "--summary-only", action="store_true", help="skip per-case blocks"
     )
+    parser.add_argument(
+        "--num-gpu",
+        type=int,
+        help="Ollama num_gpu option (layers on the GPU; 0 = CPU only). "
+        "Not sent unless given.",
+    )
     args = parser.parse_args()
     show = (lambda *_, **__: None) if args.summary_only else print
 
@@ -239,6 +246,8 @@ def main() -> None:
             if send_think:
                 payload["think"] = False
             payload["options"] = {"temperature": 0, "seed": SEED, "num_ctx": NUM_CTX}
+            if args.num_gpu is not None:
+                payload["options"]["num_gpu"] = args.num_gpu
             if fmt is not None:
                 payload["format"] = fmt
             payload["messages"] = [
@@ -262,6 +271,7 @@ def main() -> None:
             f"answer_prompt={display_path(ANSWER_PROMPT)} "
             f"cases={display_path(args.cases)} seed_data={display_path(SEED_DATA)} "
             f"{ids_field}now={','.join(nows)} seed={SEED} num_ctx={NUM_CTX} "
+            f"num_gpu={'default' if args.num_gpu is None else args.num_gpu} "
             f"ollama={ollama_version(client)} commit={git_commit()}"
         )
         print()
