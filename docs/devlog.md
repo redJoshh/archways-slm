@@ -19,6 +19,24 @@ Template:
 
 ---
 
+## 2026-10-25: Probe --format-mode and --summary-only; gemma3:1b v3 runs
+
+- **Date:** 2026-10-25
+- **What changed:**
+  - `efa090c`: added `src/archways_assistant/formatschema.py` and `tests/test_formatschema.py`, plus `--format-mode none|schema` in `scripts/probe_tool_call.py` (default `none`, requests unchanged). `schema` (prompt mode only) sends Ollama's `format` option with `anyOf` of `{"name": <contract title as const>, "arguments": <contract $defs/arguments, deep-copied>}` and `{"reply": string}`. A `{"reply": ...}` reply counts as no tool call. A rejected option stops the run with Ollama's error; no fallback. The header now always prints `format=...`.
+  - `1b73829`: added `--summary-only` and new summary lines: lookup recall, unnecessary-call rate, valid-argument rate (percent added to the existing line), and the malformed count, now printed in both tool modes. Malformed attempts count as no call in recall and in the unnecessary-call rate.
+  - Task 1 (commit v3 prompt mode, its test and its devlog entry) needed no commit: all three were already in `d161660`.
+- **Why:** The user asked to test whether constrained JSON output fixes gemma3:1b's malformed JSON and wrong tool names, and for summary-only output with recall and over-calling rates.
+- **How it was verified:**
+  - `uv run pytest -q` → `112 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `14 files already formatted`
+  - Four runs, `--model gemma3:1b --tool-mode prompt --prompt prompts/system_v3_prompt_mode.txt`, Ollama 0.40.10, header `commit=1b73829` (clean: the uncommitted v4 planning entry was stashed during the runs), `today=2026-10-25`. Files: `runs/gemma3_1b_prompt_v3_format-{none,schema}_run{1,2}.txt` (gitignored).
+  - `none` run 1 / run 2: decisions 19/30 and 21/30; recall 14/18 and 16/18; unnecessary calls 6/12 and 5/12; valid arguments 16/20 and 17/21; malformed 4/30 and 3/30. The two runs differ on dev-006, 008, 010 and 023, so temperature 0 isn't deterministic here either.
+  - `schema` runs 1 and 2 are identical: decisions 18/30; recall 18/18; unnecessary calls 12/12; valid arguments 29/30; malformed 0/30. **Every question gets a tool call**, including small talk, math, poems, prompt injection and restricted requests. The one invalid call (dev-007) is a 39-word query over 200 characters, so **Ollama doesn't enforce `maxLength`** from the schema. dev-028 sends `{"query": "*"}`, which passes the `\S` pattern.
+  - Likely cause of the over-calling (not verified): v3's prompt never mentions the `{"reply": ...}` form and says "Otherwise, answer in plain text", which the schema doesn't allow.
+  - gemma sometimes uses the `{today}` line as the query (`"Sunday, 2026-10-25 (Asia/Manila)"` on dev-021, 022, 025).
+- **Commits:** `efa090c`, `1b73829`, and the `docs:` commit with this entry. Not pushed.
+- **Open questions / next:** v4 must describe the `{"reply": "..."}` form if schema mode is used. Whether putting the reply branch first in `anyOf` changes anything is untested. Spring must still reject `*` and over-length queries itself.
+
 ## 2026-10-17: System prompt v3 prompt-mode version; gemma3:1b run
 
 - **Date:** 2026-10-17
