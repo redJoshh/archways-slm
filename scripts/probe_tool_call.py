@@ -2,6 +2,7 @@
 
 Usage: uv run python scripts/probe_tool_call.py [--model qwen3:1.7b]
     [--tool-mode native|prompt] [--prompt prompts/system_v1.txt]
+    [--format-mode none|schema]
     [--questions evals/dev_questions.jsonl] [--ids dev-001,dev-004]
 
 --tool-mode native (default) sends the tool in Ollama's tools field.
@@ -9,8 +10,15 @@ Usage: uv run python scripts/probe_tool_call.py [--model qwen3:1.7b]
 goes into the system prompt and the reply text is parsed with toolparse.
 Its default prompt is prompts/system_v1_prompt_mode.txt.
 
-Prints a header line (model, tool mode, model capabilities, prompt,
-questions, Ollama version, git commit, date) so runs can be compared, then
+--format-mode schema (prompt mode only) sends Ollama's format option with a
+JSON schema built from the contract: the reply must be either
+{"name": "search_announcements", "arguments": {...}} or {"reply": "..."}.
+A {"reply": ...} object counts as no tool call. If Ollama rejects the option
+the run stops with its error; there is no fallback. Default none sends no
+format option.
+
+Prints a header line (model, tool mode, format mode, model capabilities,
+prompt, questions, Ollama version, git commit, date) so runs can be compared, then
 one block per question and a summary with per-category results.
 
 --ids runs only the listed question IDs, in file order; the header then adds
@@ -34,7 +42,8 @@ from pathlib import Path
 import httpx
 from jsonschema import Draft202012Validator, FormatChecker
 
-from archways_assistant.toolparse import Malformed, ToolCall, parse_reply
+from archways_assistant.formatschema import build_format_schema, unwrap_reply
+from archways_assistant.toolparse import Malformed, NoTool, ToolCall, parse_reply
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOL_PATH = ROOT / "generated" / "search_announcements.tool.json"
@@ -213,10 +222,13 @@ def main() -> None:
     parser.add_argument("--model", default="qwen3:1.7b")
     parser.add_argument("--tool-mode", choices=["native", "prompt"], default="native")
     parser.add_argument("--prompt", type=Path)
+    parser.add_argument("--format-mode", choices=["none", "schema"], default="none")
     parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
     parser.add_argument("--ids", help="comma-separated question IDs to run")
     args = parser.parse_args()
     prompt_mode = args.tool_mode == "prompt"
+    if args.format_mode == "schema" and not prompt_mode:
+        sys.exit("--format-mode schema needs --tool-mode prompt")
     prompt_path = args.prompt or DEFAULT_PROMPTS[args.tool_mode]
 
     tool_text = TOOL_PATH.read_text(encoding="utf-8")
@@ -224,6 +236,9 @@ def main() -> None:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     validator = Draft202012Validator(
         schema["$defs"]["arguments"], format_checker=FormatChecker()
+    )
+    format_schema = (
+        build_format_schema(schema) if args.format_mode == "schema" else None
     )
     now = datetime.now(MANILA)
     tool_definition = tool_text.removesuffix("\n") if prompt_mode else None
@@ -264,6 +279,7 @@ def main() -> None:
         ids_field = f"ids={','.join(selected_ids)} " if selected_ids else ""
         print(
             f"model={args.model} tool_mode={args.tool_mode} "
+            f"format={args.format_mode} "
             f"capabilities={shown_capabilities} prompt={display_path(prompt_path)} "
             f"questions={display_path(args.questions)} {ids_field}"
             f"ollama={ollama_version(client)} commit={git_commit()} "
@@ -278,6 +294,8 @@ def main() -> None:
             payload["options"] = {"temperature": 0}
             if not prompt_mode:
                 payload["tools"] = [tool]
+            if format_schema is not None:
+                payload["format"] = format_schema
             payload["messages"] = [
                 {"role": "system", "content": system},
                 {"role": "user", "content": question},
@@ -291,7 +309,9 @@ def main() -> None:
             calls = []
             malformed = None
             if prompt_mode:
-                parsed = parse_reply(message.get("content") or "", TOOL_NAME)
+                text = message.get("content") or ""
+                reply = unwrap_reply(text) if format_schema is not None else None
+                parsed = NoTool() if reply is not None else parse_reply(text, TOOL_NAME)
                 if isinstance(parsed, ToolCall):
                     calls.append((parsed.name, parsed.arguments))
                 elif isinstance(parsed, Malformed):
