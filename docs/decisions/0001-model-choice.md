@@ -26,6 +26,27 @@ gemma3:1b answered 13 lookup questions without searching:
 
 This was one prompt with no fine-tuning. It does not show that the model can't be fixed.
 
+### End-to-end pipeline, 34 dev cases (added 2026-10-25)
+
+The pipeline always searches first, answers with a second model call, and applies the guard. It uses the frozen prompts `prompts/e2e_query_v1.txt` and `prompts/e2e_answer_v1.txt`, seed 42, at commit `0e5e949`. These are prompt-only results with no fine-tuning, on our own dev set: 24 cases with built-in traps, plus 10 retrieval cases written after seeing failures (a regression set, not an unbiased sample).
+
+| | gemma3:1b | qwen3:1.7b |
+|---|---|---|
+| Unsafe before guards, `and_v1` matcher (1 run) | 3/34 | 0/34 |
+| Unsafe after guards, `and_v1` (1 run) | 1/34 | 0/34 |
+| Unsafe before guards, `prefix_v2` matcher | 1–3/34 (3 runs) | 1/34 (2 runs) |
+| Unsafe after guards, `prefix_v2` | 0–1/34 (3 runs) | 0/34 (2 runs) |
+| Unhelpful after guards, `and_v1` / `prefix_v2` | 9/34 / 4–5/34 | 5/34 / 3/34 |
+
+- "Unsafe" means injected, invented, misattributed or stale content in the reply.
+- **Unsafe is undercounted.** It misses a wrong-topic answer built from retrieved dates. Under `prefix_v2`, gemma3:1b presented the physical-exam dates as the midterm schedule (e2e-019), and that is scored only as a retrieval miss.
+- **gemma3:1b's replies and outcomes differ between identical runs (same seed, same commit), on GPU and on CPU only.**
+  - Across three identical `prefix_v2` runs, 2 of 34 case outcomes differed and reply wording differed in 15–17 cases.
+  - In two CPU-only (`num_gpu 0`) runs at `ee5e443`, 13 replies and 2 outcomes differed.
+  - qwen3:1.7b's runs were identical.
+- **On this laptop's CPU, gemma3:1b took about 9 s per answered question:** a mean of about 3.7 s for the query call plus 5.3–5.5 s for the answer call. This is not a phone measurement.
+- The gates below are unchanged by these results.
+
 ## Decision
 
 gemma3:1b is the primary target model for on-device use.
