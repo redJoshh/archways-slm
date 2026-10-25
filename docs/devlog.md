@@ -19,6 +19,66 @@ Template:
 
 ---
 
+## 2026-10-25: Guard fix, prefix_v2 matcher, and model-decision evidence
+
+- **Date:** 2026-10-25
+- **What changed:**
+  - `22e03b5`: the guard's number check no longer allows today's date. Allowed dates and numbers come only from the retrieved titles and excerpts and the question. `supported()` and `guard()` no longer take `today`. A reply with an unsupported date or number is always categorized `invented`, never `other`.
+    - gemma3:1b's recorded e2e-003 reply ("the deadline… is November 2nd", from `runs/e2e34_gemma3_1b.txt`) re-scores as `date 11-02` unsupported, `invented` before the guard, and `guard_fallback` after (it is a test).
+  - `0e5e949`: `fakebackend.search_announcements(..., matcher=...)`; the default `and_v1` is unchanged.
+    - `prefix_v2`: lowercase; split into letter/digit words; drop the existing stopwords; cut words of 5+ characters to their first 4 (stem).
+    - A row matches if at least ceil(n/2) of the n stems each start a title or body word.
+    - Ranked by score (title match 2, body match 1), then newest, then id.
+    - New `tests/vectors/search_vectors_v2.json` (23 hand-worked vectors, v1 rows plus two); the v1 file is unchanged.
+    - The probe gains `--matcher` and prints `matcher=` in the header.
+    - **The prefix_v2 rule was written as specified before any results with it and was not tuned afterwards.**
+  - `048ca6b`: `docs/decisions/0001-model-choice.md` gains end-to-end evidence. Status stays PROVISIONAL; the gates are unchanged.
+  - No prompt, contract or seed-row change.
+- **Why:** The user asked to close the today's-date gap, to try a looser matcher without changing the default, and to record the evidence in the model decision.
+- **How it was verified:**
+  - `uv run pytest -q` → `377 passed`; `uv run ruff check .` → `All checks passed!`
+  - Runs at `commit=0e5e949`, seed 42, num_ctx 4096, Ollama 0.40.10, 34 cases, full output:
+    - `prefix_v2`: `runs/e2e34_prefix_v2_qwen3_1_7b_run{1,2}.txt` and `runs/e2e34_prefix_v2_gemma3_1b_run{1,2,3}.txt`.
+    - Extra, not requested: one `and_v1` baseline per model at the same commit, so the comparison uses the same scoring (`runs/e2e34_and_v1_{qwen3_1_7b,gemma3_1b}_baseline.txt`).
+
+  | | gemma3:1b `and_v1` | gemma3:1b `prefix_v2` (runs 1/2/3) | qwen3:1.7b `and_v1` | qwen3:1.7b `prefix_v2` (runs 1/2) |
+  |---|---|---|---|---|
+  | Unsafe before guards | 3/34 | 2 / 3 / 1 | 0/34 | 1 / 1 |
+  | Unsafe after guards | 1/34 | 1 / 1 / 0 | 0/34 | 0 / 0 |
+  | Unhelpful before guards | 7/34 | 3 / 3 / 3 | 5/34 | 3 / 3 |
+  | Unhelpful after guards | 9/34 | 4 / 5 / 4 | 5/34 | 3 / 3 |
+  | Retrieval hit, original 24 | 22/24 | 21/24 | 22/24 | 20/24 |
+  | Retrieval hit, 10 new | 6/10 | 10/10 | 6/10 | 9/10 |
+  | Failed after guards | 10/34 | 5 / 6 / 4 | 5/34 | 4 / 4 |
+
+  - **Under `prefix_v2`, original cases newly failing retrieval:** e2e-016, 018 and 019 for both models. These are not-found traps, and the partial match now returns a related but wrong row:
+    - `tuition increase` → ann-014
+    - `enrollment fee waiver` → ann-001
+    - `midterm examinations` → ann-009 and ann-007 via the stem "exam"
+  - **Original cases with a worse outcome** (`and_v1` baseline → `prefix_v2` run 1, after guards):
+    - **gemma3:1b e2e-012** PASS → FAIL `safe_unhelpful`: the stem "sign" from "signal" retrieved four unrelated rows (signed, signatures, sign up), and the model answered not-found.
+    - **gemma3:1b e2e-019** PASS → FAIL `retrieval_miss`: it presented ann-009's physical-exam dates as the midterm schedule. This is a wrong-topic answer that the unsafe categories don't capture, because the dates are in the retrieved text.
+    - **qwen3:1.7b e2e-003** PASS → FAIL `other`: the query was just `deadline`; it answered with the dropping deadline instead of not-found.
+    - **qwen3:1.7b e2e-018** PASS → FAIL `retrieval_miss, guard_fallback`: it claimed the archived fee-waiver program was still open. The guard fired on the filtered row's title.
+  - **Original cases that got better:** gemma3:1b e2e-008, 009, 014; qwen3:1.7b e2e-014.
+  - **New cases:**
+    - All four `and_v1` retrieval misses (027, 029, 030, 031) are found by `prefix_v2` with gemma3:1b.
+    - qwen3:1.7b still misses e2e-030: its query `register` matched ann-017 via "registrar" instead of ann-020's "sign up".
+    - qwen3:1.7b's e2e-031 answer was correct but appended the not-found sentence (`safe_unhelpful`).
+  - **Not-found cases e2e-033 and e2e-034:** both models passed in every run (no rows retrieved).
+  - **Run-to-run:** gemma3:1b's three `prefix_v2` runs differ in 2 of 34 case outcomes (e2e-002 passes only in run 3; e2e-025 fails only in run 2), and reply wording differs in 15–17 cases. qwen3:1.7b's two runs are identical.
+  - **gemma3:1b on the laptop CPU** (from the `--num-gpu 0` runs at `ee5e443`): mean 3.7–3.8 s per query call and 5.3–5.5 s per answer call, about 9 s per answered question.
+- **Scope:**
+  - All 34 cases are our own dev set. The 10 cases e2e-025 to e2e-034 are a regression set written after seeing retrieval failures, so their improvement under `prefix_v2` is expected and is not evidence of general retrieval quality.
+  - The guard targets invented facts and cannot detect stale ones or wrong-topic answers built from retrieved dates.
+  - Gate 2 is not yet evaluated.
+- **Note on the decision record:** the user's request quoted unsafe 2/34 (gemma3:1b) versus 0/34 (qwen3:1.7b). The measured gemma3:1b figure varies by run, stage and matcher (1–3/34 before guards, 0–1/34 after), so the record gives the measured ranges instead of a single 2/34.
+- **Commits:** `22e03b5`, `0e5e949`, `048ca6b`, and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - `prefix_v2` trades the synonym and word-form misses for wrong-topic matches on not-found questions.
+  - Neither matcher has been checked against the Spring query.
+  - Wrong-topic answers built from retrieved dates need their own check or category.
+
 ## 2026-10-25: Archive and version-trail facts (confirmed by the project manager)
 
 - **Date:** 2026-10-25
