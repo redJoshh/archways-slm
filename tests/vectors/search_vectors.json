@@ -1,0 +1,412 @@
+{
+  "$comment": "Shared search vectors for search_announcements. src/archways_assistant/fakebackend.py must pass them, and so should the Spring query. rows use the database shape (naive published_at, zone UNVERIFIED +08:00). expected_patterns are the ILIKE patterns (escape char backslash) per query word after stopwords. expected_error means the arguments are invalid under the contract.",
+  "now": "2026-11-02T10:00:00+08:00",
+  "stopwords": [
+    "a",
+    "about",
+    "an",
+    "and",
+    "ang",
+    "announcement",
+    "announcements",
+    "ano",
+    "any",
+    "are",
+    "at",
+    "ba",
+    "for",
+    "from",
+    "how",
+    "in",
+    "is",
+    "kailan",
+    "mga",
+    "ng",
+    "of",
+    "on",
+    "or",
+    "po",
+    "sa",
+    "the",
+    "there",
+    "to",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "with",
+    "yung"
+  ],
+  "rows": [
+    {
+      "id": "v-01",
+      "title": "Library Hours Extended",
+      "body": "The library will stay open until 9 PM.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-11-01T09:00:00",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": false
+    },
+    {
+      "id": "v-02",
+      "title": "Enrollment Reminder",
+      "body": "Enrollment closes Friday. Visit the registrar.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-30T08:00:00",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": false
+    },
+    {
+      "id": "v-03",
+      "title": "Registrar Advisory",
+      "body": "Document requests resume Monday.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-30T08:00:00",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": false
+    },
+    {
+      "id": "v-04",
+      "title": "Bookstore Sale",
+      "body": "Get 50% off selected items.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-28T10:00:00",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": false
+    },
+    {
+      "id": "v-05",
+      "title": "Parking Update",
+      "body": "Use the off_peak lane after 6 PM.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-27T10:00:00",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": false
+    },
+    {
+      "id": "v-06",
+      "title": "Path Notice",
+      "body": "Forms are stored under C:\\shared\\forms.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-26T10:00:00",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": false
+    },
+    {
+      "id": "v-07",
+      "title": "Library Draft Notice",
+      "body": "A library notice that is still a draft.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-31T09:00:00",
+      "status": "DRAFT",
+      "is_archived": false,
+      "scheduled": false
+    },
+    {
+      "id": "v-08",
+      "title": "Library Archive Notice",
+      "body": "An archived library notice.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-31T09:00:00",
+      "status": "PUBLISHED",
+      "is_archived": true,
+      "scheduled": false
+    },
+    {
+      "id": "v-09",
+      "title": "Library Future Notice",
+      "body": "A library notice scheduled for later.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-11-05T09:00:00",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": true
+    },
+    {
+      "id": "v-10",
+      "title": "Library Old Notice",
+      "body": "Posted exactly seven days before now.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-26T10:00:00",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": false
+    },
+    {
+      "id": "v-11",
+      "title": "Library Older Notice",
+      "body": "Posted one second before the seven-day window.",
+      "office": "Test Office",
+      "priority": "NORMAL",
+      "year_level": null,
+      "published_at": "2026-10-26T09:59:59",
+      "status": "PUBLISHED",
+      "is_archived": false,
+      "scheduled": false
+    }
+  ],
+  "vectors": [
+    {
+      "name": "one word, default days 7: draft, archived and future rows excluded; v-10 is exactly on the window edge",
+      "arguments": {
+        "query": "library"
+      },
+      "expected_ids": [
+        "v-01",
+        "v-10"
+      ],
+      "expected_patterns": [
+        "%library%"
+      ]
+    },
+    {
+      "name": "days 30 brings in v-11",
+      "arguments": {
+        "query": "library",
+        "days": 30
+      },
+      "expected_ids": [
+        "v-01",
+        "v-10",
+        "v-11"
+      ]
+    },
+    {
+      "name": "case-insensitive",
+      "arguments": {
+        "query": "LIBRARY"
+      },
+      "expected_ids": [
+        "v-01",
+        "v-10"
+      ],
+      "expected_patterns": [
+        "%library%"
+      ]
+    },
+    {
+      "name": "stopwords dropped",
+      "arguments": {
+        "query": "the library"
+      },
+      "expected_ids": [
+        "v-01",
+        "v-10"
+      ],
+      "expected_patterns": [
+        "%library%"
+      ]
+    },
+    {
+      "name": "only stopwords: no results",
+      "arguments": {
+        "query": "the of"
+      },
+      "expected_ids": [],
+      "expected_patterns": []
+    },
+    {
+      "name": "AND across words; each word may match title or body",
+      "arguments": {
+        "query": "enrollment registrar"
+      },
+      "expected_ids": [
+        "v-02"
+      ],
+      "expected_patterns": [
+        "%enrollment%",
+        "%registrar%"
+      ]
+    },
+    {
+      "name": "equal timestamps ordered by id",
+      "arguments": {
+        "query": "registrar"
+      },
+      "expected_ids": [
+        "v-02",
+        "v-03"
+      ]
+    },
+    {
+      "name": "limit",
+      "arguments": {
+        "query": "library",
+        "days": 30,
+        "limit": 2
+      },
+      "expected_ids": [
+        "v-01",
+        "v-10"
+      ]
+    },
+    {
+      "name": "percent is literal",
+      "arguments": {
+        "query": "%"
+      },
+      "expected_ids": [
+        "v-04"
+      ],
+      "expected_patterns": [
+        "%\\%%"
+      ]
+    },
+    {
+      "name": "percent inside a word",
+      "arguments": {
+        "query": "50%"
+      },
+      "expected_ids": [
+        "v-04"
+      ],
+      "expected_patterns": [
+        "%50\\%%"
+      ]
+    },
+    {
+      "name": "underscore is literal",
+      "arguments": {
+        "query": "off_peak"
+      },
+      "expected_ids": [
+        "v-05"
+      ],
+      "expected_patterns": [
+        "%off\\_peak%"
+      ]
+    },
+    {
+      "name": "lone underscore is literal",
+      "arguments": {
+        "query": "_"
+      },
+      "expected_ids": [
+        "v-05"
+      ],
+      "expected_patterns": [
+        "%\\_%"
+      ]
+    },
+    {
+      "name": "asterisk is literal and matches nothing",
+      "arguments": {
+        "query": "*"
+      },
+      "expected_ids": [],
+      "expected_patterns": [
+        "%*%"
+      ]
+    },
+    {
+      "name": "backslash is literal",
+      "arguments": {
+        "query": "c:\\shared"
+      },
+      "expected_ids": [
+        "v-06"
+      ],
+      "expected_patterns": [
+        "%c:\\\\shared%"
+      ]
+    },
+    {
+      "name": "a word only in a draft row: no results",
+      "arguments": {
+        "query": "library draft"
+      },
+      "expected_ids": []
+    },
+    {
+      "name": "ties by id across the window",
+      "arguments": {
+        "query": "notice",
+        "days": 30
+      },
+      "expected_ids": [
+        "v-06",
+        "v-10",
+        "v-11"
+      ]
+    },
+    {
+      "name": "empty query",
+      "arguments": {
+        "query": ""
+      },
+      "expected_error": true
+    },
+    {
+      "name": "whitespace-only query",
+      "arguments": {
+        "query": "   "
+      },
+      "expected_error": true
+    },
+    {
+      "name": "query over 200 characters",
+      "arguments": {
+        "query": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected_error": true
+    },
+    {
+      "name": "days above 30",
+      "arguments": {
+        "query": "library",
+        "days": 31
+      },
+      "expected_error": true
+    },
+    {
+      "name": "limit below 1",
+      "arguments": {
+        "query": "library",
+        "limit": 0
+      },
+      "expected_error": true
+    },
+    {
+      "name": "unknown argument",
+      "arguments": {
+        "query": "library",
+        "extra": 1
+      },
+      "expected_error": true
+    },
+    {
+      "name": "missing query",
+      "arguments": {
+        "days": 7
+      },
+      "expected_error": true
+    }
+  ]
+}
