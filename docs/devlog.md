@@ -19,6 +19,18 @@ Template:
 
 ---
 
+## 2026-10-25: Fabrication finding and gate added to the model decision
+
+- **Date:** 2026-10-25
+- **What changed:** Updated `docs/decisions/0001-model-choice.md` (status still PROVISIONAL):
+  - New **Evidence** section: of the 13 lookup questions gemma3:1b answered without searching, 6 invented an announcement (dev-003, 005, 014, 016, 017, 018), 1 pointed to a placeholder link (dev-024), and 6 said it lacked the information (dev-001, 004, 011, 012, 013, 015). One prompt with no fine-tuning, so this doesn't show the model can't be fixed.
+  - **Gate 2** adds: fabricated announcements or facts in replies must be 0 on the end-to-end tests after the code-level guards, and the raw rate before the guards must be reported.
+  - New **Proposed design** section (pending team agreement): always retrieve first; on empty retrieval, return a fixed not-found message without calling the model; reject replies containing dates, times or numbers not in the retrieved text.
+- **Why:** The user asked to record the fabrication finding and make fabrication a gate condition.
+- **How it was verified:** Docs-only change; nothing to run. The 6/1/6 split was checked against the reply previews in `runs/gemma3_1b_prompt_v4_format-schema_full.txt`. The probe stores only the first 200 characters of each reply. The user's request named commit `98147f6` for the run. The run header actually shows `commit=ed1cb08`, with the v4 prompt unchanged since `98147f6`, so the record gives both.
+- **Commits:** this `docs: add fabrication finding and gate to model decision` commit. Not pushed.
+- **Open questions / next:** "Fabricated" has no written scoring rule yet; the end-to-end tests will need one. The number-check guard would belong in the Spring app (separate repo).
+
 ## 2026-10-25: Provisional model choice recorded
 
 - **Date:** 2026-10-25
