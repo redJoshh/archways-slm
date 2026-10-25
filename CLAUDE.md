@@ -17,6 +17,7 @@ The model runs via Ollama and emits a `search_announcements` tool call; the Spri
 - generated/ is produced by tooldef.py; never hand-edit it, re-run the generator.
 - Never copy eval questions into system prompts or training data. The held-out file is only for final comparisons.
 - Prompt versions are new files in prompts/; never edit an old version.
+- e2e prompts are frozen before any held-out run.
 
 ## Devlog
 - After finishing a task, add a dated entry to docs/devlog.md following its format.
