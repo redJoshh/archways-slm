@@ -13,7 +13,9 @@ Its default prompt is prompts/system_v1_prompt_mode.txt.
 --format-mode schema (prompt mode only) sends Ollama's format option with a
 JSON schema built from the contract: the reply must be either
 {"name": "search_announcements", "arguments": {...}} or {"reply": "..."}.
-A {"reply": ...} object counts as no tool call. If Ollama rejects the option
+A {"reply": ...} object counts as no tool call and its text is shown as the
+reply. The prompt may then leave out {tool_definition}, since the format
+schema already constrains the arguments. If Ollama rejects the option
 the run stops with its error; there is no fallback. Default none sends no
 format option.
 
@@ -76,12 +78,18 @@ CONTENT_PREVIEW_CHARS = 200
 QUESTION_FIELDS = {"id": str, "question": str, "expects_tool": bool, "category": str}
 
 
-def load_prompt(path: Path, now: datetime, tool_definition: str | None) -> str:
+def load_prompt(
+    path: Path,
+    now: datetime,
+    tool_definition: str | None,
+    tool_placeholder_optional: bool = False,
+) -> str:
     """Read a prompt file and fill its {today} placeholder with the Manila date.
 
     In prompt mode (tool_definition given) the file must have a
-    {tool_definition} placeholder, which is filled with it. In native mode it
-    must not, so a prompt can't silently run in the wrong mode.
+    {tool_definition} placeholder, which is filled with it, unless
+    tool_placeholder_optional (format-mode schema). In native mode it must
+    not, so a prompt can't silently run in the wrong mode.
     """
     try:
         template = path.read_text(encoding="utf-8").removesuffix("\n")
@@ -90,7 +98,11 @@ def load_prompt(path: Path, now: datetime, tool_definition: str | None) -> str:
     if TODAY_PLACEHOLDER not in template:
         sys.exit(f"Prompt file {path} has no {TODAY_PLACEHOLDER} placeholder")
     has_tool_placeholder = TOOL_PLACEHOLDER in template
-    if tool_definition is not None and not has_tool_placeholder:
+    if (
+        tool_definition is not None
+        and not has_tool_placeholder
+        and not tool_placeholder_optional
+    ):
         sys.exit(f"Prompt file {path} has no {TOOL_PLACEHOLDER} placeholder")
     if tool_definition is None and has_tool_placeholder:
         sys.exit(f"Prompt file {path} is for --tool-mode prompt")
@@ -259,7 +271,7 @@ def main() -> None:
     )
     now = datetime.now(MANILA)
     tool_definition = tool_text.removesuffix("\n") if prompt_mode else None
-    system = load_prompt(prompt_path, now, tool_definition)
+    system = load_prompt(prompt_path, now, tool_definition, format_schema is not None)
     questions = load_questions(args.questions)
     selected_ids = None
     if args.ids is not None:
@@ -332,6 +344,7 @@ def main() -> None:
             # (name, arguments) pairs, so both modes share the checks below.
             calls = []
             malformed = None
+            reply = None
             if prompt_mode:
                 text = message.get("content") or ""
                 reply = unwrap_reply(text) if format_schema is not None else None
@@ -407,7 +420,8 @@ def main() -> None:
                 f"  prompt tokens: {body.get('prompt_eval_count', 'n/a')} | "
                 f"tokens/s: {tokens_per_second(body)}"
             )
-            content = (message.get("content") or "").strip().replace("\n", " ")
+            content = reply if reply is not None else message.get("content") or ""
+            content = content.strip().replace("\n", " ")
             if content:
                 show(f"  reply: {content[:CONTENT_PREVIEW_CHARS]}")
             show()
