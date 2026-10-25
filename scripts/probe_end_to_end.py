@@ -22,7 +22,9 @@ For each case:
    for unsupported claims. Each failed reply gets failure categories
    (e2escore.categorize); the first is its primary category, which the
    summary counts. A case's optional "exclusion" ("outdated" or
-   "injection") says why its must_not_include phrases are wrong.
+   "injection") says why its must_not_include phrases are wrong. The
+   summary also reports unsafe and unhelpful rates (e2escore.UNSAFE and
+   UNHELPFUL) before and after the guard.
 
 Retrieval hit is scored apart from the reply: a case with source_ids hits
 if all of them were retrieved; a case without source_ids hits if nothing
@@ -64,6 +66,8 @@ from probe_tool_call import (
 from archways_assistant.e2escore import (
     CATEGORIES,
     NOT_FOUND_MESSAGE,
+    UNHELPFUL,
+    UNSAFE,
     categorize,
     failures,
     guard,
@@ -96,6 +100,10 @@ CASE_FIELDS = {
 }
 # Optional: why a case's must_not_include phrases are wrong (None: not said).
 EXCLUSIONS = {None, "outdated", "injection"}
+# Other optional case fields: superseded {"current": [...], "old": [...]},
+# wrong_claims [...], label (e.g. which batch of cases it was added in),
+# note. The summary splits retrieval hit by label.
+NO_LABEL = "(no label)"
 
 
 def load_cases(path: Path) -> list[dict]:
@@ -129,6 +137,17 @@ def load_cases(path: Path) -> list[dict]:
             sys.exit(
                 f"{where}: 'exclusion' must be one of {sorted(EXCLUSIONS - {None})}"
             )
+        superseded = case.get("superseded")
+        if superseded is not None and not (
+            isinstance(superseded, dict)
+            and set(superseded) == {"current", "old"}
+            and all(isinstance(superseded[key], list) for key in superseded)
+        ):
+            sys.exit(f"{where}: 'superseded' must be {{current: [...], old: [...]}}")
+        if not isinstance(case.get("wrong_claims", []), list):
+            sys.exit(f"{where}: 'wrong_claims' must be a list")
+        if not isinstance(case.get("label", NO_LABEL), str):
+            sys.exit(f"{where}: 'label' must be a string")
         if case["id"] in seen_ids:
             sys.exit(f"{where}: duplicate id {case['id']!r}")
         seen_ids.add(case["id"])
@@ -199,8 +218,12 @@ def main() -> None:
         "fired": [],
         "near_limit": [],
     }
-    kinds = ("unsupported", "contains", "filtered text")
+    kinds = ("unsupported", "contains", "filtered text", "stale", "misattributed")
     kind_counts = {stage: dict.fromkeys(kinds, 0) for stage in ("before", "after")}
+    # stage -> group -> case ids with any category in that group.
+    groups = {stage: {"unsafe": [], "unhelpful": []} for stage in kind_counts}
+    # label -> [hits, cases]
+    hits_by_label: dict[str, list[int]] = {}
     category_counts = {stage: dict.fromkeys(CATEGORIES, 0) for stage in kind_counts}
     # stage -> case id -> primary failure category, for the summary's id lists.
     primary = {stage: {} for stage in kind_counts}
@@ -285,6 +308,9 @@ def main() -> None:
             else:
                 hit = not ids
             stats["hits"] += hit
+            label_hits = hits_by_label.setdefault(case.get("label", NO_LABEL), [0, 0])
+            label_hits[0] += hit
+            label_hits[1] += 1
             if not hit:
                 stats["misses"].append(case["id"])
             if invalid:
@@ -340,11 +366,13 @@ def main() -> None:
                 "must_not_include": case["must_not_include"],
                 "expects_not_found": case["expects_not_found"],
                 "forbidden": forbidden,
+                "superseded": case.get("superseded"),
+                "wrong_claims": case.get("wrong_claims", []),
             }
             retrieved_text = "\n".join(f"{r['title']}\n{r['excerpt']}" for r in results)
-            for stage, reply, unsupported, code_built in (
-                ("before", raw, raw_unsupported, not results),
-                ("after", final, final_unsupported, not results or fired),
+            for stage, reply, unsupported, code_built, fallback_used in (
+                ("before", raw, raw_unsupported, not results, False),
+                ("after", final, final_unsupported, not results or fired, fired),
             ):
                 problems = failures(reply, **expected, unsupported=unsupported)
                 problems += context_problems
@@ -357,11 +385,16 @@ def main() -> None:
                     exclusion=case.get("exclusion"),
                     retrieved_text=retrieved_text,
                     code_built=code_built,
+                    fallback_used=fallback_used,
                 )
                 if problems:
                     stats[f"failed_{stage}"].append(case["id"])
                     category_counts[stage][categories[0]] += 1
                     primary[stage][case["id"]] = categories[0]
+                if UNSAFE & set(categories):
+                    groups[stage]["unsafe"].append(case["id"])
+                if UNHELPFUL & set(categories):
+                    groups[stage]["unhelpful"].append(case["id"])
                 fabricated = [p for p in problems if is_fabrication(p)]
                 if fabricated:
                     stats[f"fabricated_{stage}"].append(case["id"])
@@ -416,6 +449,14 @@ def main() -> None:
     )
     print(f"  primary failure category before guards: {categories_text('before')}")
     print(f"  primary failure category after guards: {categories_text('after')}")
+    for stage in ("before", "after"):
+        print(
+            f"  unsafe {stage} guards: {ratio(len(groups[stage]['unsafe']), total)}; "
+            f"unhelpful {stage} guards: "
+            f"{ratio(len(groups[stage]['unhelpful']), total)}"
+        )
+    for label, (label_hit, label_total) in hits_by_label.items():
+        print(f"  retrieval hit, {label}: {ratio(label_hit, label_total)}")
     print(
         f"  max prompt tokens: query {max_tokens['query']}/{NUM_CTX}, "
         f"answer {max_tokens['answer']}/{NUM_CTX}; "
@@ -431,6 +472,8 @@ def main() -> None:
     ids_line("failed before guards", with_category("before"))
     ids_line("failed after guards", with_category("after"))
     ids_line("fabrication after guards", stats["fabricated_after"])
+    ids_line("unsafe after guards", groups["after"]["unsafe"])
+    ids_line("unhelpful after guards", groups["after"]["unhelpful"])
 
 
 if __name__ == "__main__":

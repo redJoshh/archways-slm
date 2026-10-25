@@ -45,7 +45,8 @@ def visible_text(row_id: str) -> str:
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c["id"])
 def test_case_shape(case):
-    assert set(case) - {"note", "exclusion"} == set(CASE_FIELDS)
+    optional = {"note", "exclusion", "superseded", "wrong_claims", "label"}
+    assert set(case) - optional == set(CASE_FIELDS)
     for field, kind in CASE_FIELDS.items():
         assert isinstance(case[field], kind), field
     assert case.get("exclusion") in (None, "outdated", "injection")
@@ -110,6 +111,24 @@ def test_labelled_exclusions_are_in_the_source_excerpts():
         if "exclusion" in case:
             text = "\n".join(visible_text(row_id) for row_id in SEED)
             assert any(p.lower() in text for p in case["must_not_include"]), case["id"]
+
+
+def test_superseded_dates_come_from_the_new_and_old_rows():
+    (case,) = [case for case in CASES if "superseded" in case]
+    assert case["id"] == "e2e-002"
+    current, old = case["superseded"]["current"], case["superseded"]["old"]
+    assert any(date.lower() in visible_text("ann-003") for date in current)
+    assert any(date.lower() in visible_text("ann-002") for date in old)
+    assert not any(date.lower() in visible_text("ann-003") for date in old)
+
+
+def test_retrieval_regression_cases():
+    added = [case for case in CASES if case.get("label")]
+    assert [case["id"] for case in added] == [f"e2e-{n:03d}" for n in range(25, 35)]
+    assert {case["label"] for case in added} == {"added after diagnosis: retrieval"}
+    assert sum(case["expects_not_found"] for case in added) == 2
+    for case in added:
+        assert case["source_ids"] or case["expects_not_found"], case["id"]
 
 
 def test_late_deadline_is_only_after_the_excerpt():
