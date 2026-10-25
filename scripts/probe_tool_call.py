@@ -28,7 +28,10 @@ results.
 In the summary, lookup recall is the share of questions expecting a tool
 that got a parsed tool call, and the unnecessary-call rate is the share of
 questions expecting no tool that got one. Malformed attempts count as no
-call in both; they are counted separately.
+call in both; they are counted separately. Both are shown over all
+questions and again over "decision"-scored questions only; "reply_check"
+questions are judged by their final reply, which is not scored yet. The
+summary ends with two trivial baselines: never search and always search.
 
 --ids runs only the listed question IDs, in file order; the header then adds
 ids=... and the summary covers only those questions. An unknown ID exits.
@@ -76,6 +79,11 @@ MAX_QUERY_WORDS = 6
 CONTENT_PREVIEW_CHARS = 200
 
 QUESTION_FIELDS = {"id": str, "question": str, "expects_tool": bool, "category": str}
+# How a question is scored. "decision" questions are judged by whether the
+# tool was called; "reply_check" questions are judged by the final reply,
+# which the probe does not score yet. A missing score means "decision".
+SCORE_MODES = {"decision", "reply_check"}
+DEFAULT_SCORE = "decision"
 
 
 def load_prompt(
@@ -116,7 +124,8 @@ def load_prompt(
 def load_questions(path: Path) -> list[dict]:
     """Read a JSONL question file: one object per line, blank lines skipped.
 
-    Each object needs id, question, expects_tool and category. Extra keys
+    Each object needs id, question, expects_tool and category. An optional
+    score must be one of SCORE_MODES; it defaults to "decision". Extra keys
     (e.g. notes in a hand-written file) are ignored.
     """
     try:
@@ -138,6 +147,11 @@ def load_questions(path: Path) -> list[dict]:
         for field, kind in QUESTION_FIELDS.items():
             if not isinstance(item.get(field), kind):
                 sys.exit(f"{where}: {field!r} must be a {kind.__name__}")
+        score = item.setdefault("score", DEFAULT_SCORE)
+        if score not in SCORE_MODES:
+            sys.exit(
+                f"{where}: 'score' must be one of {', '.join(sorted(SCORE_MODES))}"
+            )
         if item["id"] in seen_ids:
             sys.exit(f"{where}: duplicate id {item['id']!r}")
         seen_ids.add(item["id"])
@@ -295,6 +309,11 @@ def main() -> None:
     lookups = 0
     expects_none_total = 0
     unnecessary_calls = 0
+    # The same two rates over "decision"-scored questions only.
+    decision_expects_tool = 0
+    decision_lookups = 0
+    decision_expects_none = 0
+    decision_unnecessary = 0
     tool_calls_total = 0
     valid_calls = 0
     sentence_like_total = 0
@@ -362,12 +381,17 @@ def main() -> None:
             # A malformed attempt is a wrong decision whatever was expected.
             decision_ok = malformed is None and called == expects_tool
             correct_decisions += decision_ok
+            scored = item["score"] == "decision"
             if expects_tool:
                 expects_tool_total += 1
                 lookups += called
+                decision_expects_tool += scored
+                decision_lookups += scored and called
             else:
                 expects_none_total += 1
                 unnecessary_calls += called
+                decision_expects_none += scored
+                decision_unnecessary += scored and called
             stats = categories.setdefault(
                 item["category"], {"correct": 0, "total": 0, "wrong": []}
             )
@@ -433,10 +457,29 @@ def main() -> None:
     print(f"  valid arguments: {ratio(valid_calls, tool_calls_total)} tool calls")
     print(f"  sentence-like queries: {sentence_like_total}/{tool_calls_total}")
     print(f"  malformed: {malformed_total}/{len(questions)}")
+    excluded = sum(item["score"] != "decision" for item in questions)
+    decision_total = len(questions) - excluded
+    print(
+        f"Decision-scored questions only ({excluded} excluded as reply_check, "
+        f"not yet scored)"
+    )
+    print(f"  lookup recall: {ratio(decision_lookups, decision_expects_tool)}")
+    print(
+        f"  unnecessary-call rate: {ratio(decision_unnecessary, decision_expects_none)}"
+    )
     print("Per category (correct tool decisions)")
     for category, stats in categories.items():
         wrong = f" (wrong: {', '.join(stats['wrong'])})" if stats["wrong"] else ""
         print(f"  {category}: {stats['correct']}/{stats['total']}{wrong}")
+    print("Baselines (correct tool decisions)")
+    print(
+        f"  never search: {expects_none_total}/{len(questions)} "
+        f"(decision-scored: {decision_expects_none}/{decision_total})"
+    )
+    print(
+        f"  always search: {expects_tool_total}/{len(questions)} "
+        f"(decision-scored: {decision_expects_tool}/{decision_total})"
+    )
 
 
 if __name__ == "__main__":
