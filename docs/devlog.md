@@ -19,6 +19,29 @@ Template:
 
 ---
 
+## 2026-10-25: In-place edit behavior and contract v2 backlog
+
+- **Date:** 2026-10-25
+- **What changed:** No code changes. Records the project manager's answer on how edits are stored, its consequences, new rules for the Spring side, open questions, and a contract v2 backlog.
+- **Confirmed by the project manager (2026-10-25):** editing an announcement updates the SAME row in place and increments its version column. There is no separate row for the old version.
+- **Consequences:**
+  - e2e-002 (two live rows, ann-002 and ann-003, with different dropping deadlines) is a defensive case, not the expected production state. It stays in the dev set to guard against two live announcements on the same matter.
+  - The earlier proposed rule to exclude rows that have a newer child is dropped. (This rule was not recorded in this devlog; the closest earlier note is the open question about `parent_announcement_id` in "Archive and version-trail facts".)
+- **New rules for the Spring side:**
+  - Never cache search results beyond a very short lifetime. An in-place edit changes the facts without a new row, so a cached result can go stale.
+  - Re-search instead of repeating facts from earlier in a conversation, for the same reason.
+- **Open and unverified:**
+  - Whether the live row changes status while an edit or a deletion is waiting for approval.
+  - What the mobile app's list query filters on. The chatbot's visibility rule (currently PUBLISHED, not archived, `published_at` not after now) must match what the app shows.
+- **Contract v2 backlog:**
+  - Add `updated_at` with a UTC offset, so a reply can show when the facts last changed.
+  - The 500-character excerpt can cut off key dates (e2e-003: the accreditation deadline is after character 500).
+  - The 30-day maximum window (`days` ≤ 30) hides older but still-valid announcements.
+  - Retrieval synonyms and word forms (e2e-008, 014, 027, 029–031 under `and_v1`).
+- **How it was verified:** Docs-only change; nothing to run. The confirmed behavior comes from the user's report of the project manager's answer; not checked against the Spring repo or the database.
+- **Commits:** this `docs: record in-place edit behavior and v2 backlog` commit. Not pushed.
+- **Open questions / next:** Confirm the approval-state behavior and the app's list filter with the team, and align the chatbot's visibility rule with the app's before the Spring query is final.
+
 ## 2026-10-25: Guard fix, prefix_v2 matcher, and model-decision evidence
 
 - **Date:** 2026-10-25
