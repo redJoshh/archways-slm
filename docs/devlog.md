@@ -19,6 +19,94 @@ Template:
 
 ---
 
+## 2026-10-29: Announcement overlap check, gemma3 renderer, and render evidence
+
+- **Date:** 2026-10-29 (ended about 22:37 +08:00; start time unverified)
+- **Decisions (user, 2026-10-29),** also recorded in `docs/plans/finetune-data-plan.md`:
+  - Train the answer call only.
+  - Overlap review rule:
+    - Flagged training items are dropped by default, and the flagged share is reported per file.
+    - If a file's share exceeds 10%, the user reviews its flagged items by hand with `--show-candidates` and records each decision (near-copy: drop; same topic only: keep).
+    - The threshold stays 0.3.
+- **What changed:**
+  - `acbf7a2`: `scripts/check_overlap.py` also reads a JSON array of objects, the smaller of the two options (no export script). The seed announcements can now be checked per field, as `--protected-field title --candidate-field title`, then `body`.
+  - `acbf7a2`: `check_overlap.py` prints one line per candidate file, `flagged items k/n (p%)`, with `(over 10%: review by hand)` above `REVIEW_SHARE` = 0.10. A bad array item is reported by item number only.
+  - `acbf7a2`: new `src/archways_assistant/render.py`. `render_gemma3(messages)` reproduces by hand the template `ollama show gemma3:1b --template` prints on Ollama 0.40.13:
+    - A system message is its own `<start_of_turn>user` turn.
+    - Content is not trimmed.
+    - Unknown roles are rejected, where the template would drop them.
+  - `acbf7a2`: new `tests/fixtures/ollama_gemma3_1b_template.txt`. It holds the template exactly: 358 bytes, no trailing newline, the same from the CLI and from `/api/show`:
+
+    ```
+    {{- range $i, $_ := .Messages }}
+    {{- $last := eq (len (slice $.Messages $i)) 1 }}
+    {{- if or (eq .Role "user") (eq .Role "system") }}<start_of_turn>user
+    {{ .Content }}<end_of_turn>
+    {{ if $last }}<start_of_turn>model
+    {{ end }}
+    {{- else if eq .Role "assistant" }}<start_of_turn>model
+    {{ .Content }}{{ if not $last }}<end_of_turn>
+    {{ end }}
+    {{- end }}
+    {{- end }}
+    ```
+
+  - `acbf7a2`: new `scripts/check_render.py`, an evidence script not run by pytest.
+    - It checks the live template against `render.OLLAMA_{{- range $i, $_ := .Messages }}
+{{- $last := eq (len (slice $.Messages $i)) 1 }}
+{{- if or (eq .Role "user") (eq .Role "system") }}<start_of_turn>user
+{{ .Content }}<end_of_turn>
+{{ if $last }}<start_of_turn>model
+{{ end }}
+{{- else if eq .Role "assistant" }}<start_of_turn>model
+{{ .Content }}{{ if not $last }}<end_of_turn>
+{{ end }}
+{{- end }}
+{{- end }}` and runs a start-of-text probe.
+    - Then, for each e2e answer call, it compares `/api/chat` with `/api/generate` `"raw": true` of the rendered text.
+    - Both calls use the cold settings: `SAMPLING_OPTIONS`, `num_ctx` 4096, `num_gpu` 0, `keep_alive` 0.
+    - It stops at the first difference.
+  - Plan updated: decisions recorded, the renderer and its evidence added to Decision 3, the seed JSONL note replaced, and the training gate reworded for recorded keep decisions.
+  - No prompt, matcher, guard, scoring, case or seed-row change.
+- **Why:** ADR 0002 and the data plan need announcement text to be checkable, and training text that matches what Ollama feeds the model at evaluation.
+- **How it was verified:**
+  - `uv run pytest -q` → `412 passed`; `uv run ruff check .` → `All checks passed!`.
+  - The new tests fail when the code is broken. Each change was reverted before the commit:
+
+    | Change | Failed tests |
+    |---|---|
+    | JSON-array input disabled | 3 |
+    | `REVIEW_SHARE` raised to 0.5 | 2 |
+    | `MAX_WORD_OVERLAP` raised to 0.99 | 7, including both near-copy tests (e2e-001's question and ann-001's body) |
+    | A system message rendered as a model turn | 2 renderer tests |
+
+  - `uv run python scripts/check_render.py` → `runs/check_render_gemma3_1b.txt` (gitignored).
+    - Header: `ollama=0.40.13 commit=acbf7a2`. The server is the same `ollama serve` as the earlier runs, with `OLLAMA_NUM_PARALLEL=1` per the user. The version was checked through `/api/version` before the run.
+    - Template: identical to `render.OLLAMA_{{- range $i, $_ := .Messages }}
+{{- $last := eq (len (slice $.Messages $i)) 1 }}
+{{- if or (eq .Role "user") (eq .Role "system") }}<start_of_turn>user
+{{ .Content }}<end_of_turn>
+{{ if $last }}<start_of_turn>model
+{{ end }}
+{{- else if eq .Role "assistant" }}<start_of_turn>model
+{{ .Content }}{{ if not $last }}<end_of_turn>
+{{ end }}
+{{- end }}
+{{- end }}`.
+    - **19/19 answer calls had identical `prompt_eval_count` and identical replies** between `/api/chat` and raw `/api/generate` (e2e-009: 631 tokens). 15 cases had no answer call (no results). 19 answer calls is the same number as in the cold baseline runs.
+  - **Start-of-text token:** raw prompt `"<start_of_turn>"` → `prompt_eval_count 2`; raw prompt `"<bos><start_of_turn>"` → `prompt_eval_count 2`.
+    - Reading: in raw mode Ollama 0.40.13 adds one start-of-text token, and doesn't add a second when the text already starts with `<bos>`.
+    - This assumes `<start_of_turn>` and `<bos>` each tokenize as one special token (unverified). If `<bos>` were plain text, it would be several tokens and the count would be higher.
+    - That `/api/chat` adds the same token is inferred from the equal counts, not observed directly.
+- **Scope:**
+  - The renderer is shown to match only for the e2e answer call's shape (one system and one user message), on Ollama 0.40.13 with this gemma3:1b template. Assistant turns are covered by unit tests only.
+  - The overlap check is still lexical.
+- **Commits:** `acbf7a2` and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The training library must give exactly one `<bos>` before the rendered text. How the chosen library does this is unverified.
+  - Where the user's keep and drop decisions are recorded is not decided (the plan proposes one JSONL file per checked file).
+  - The remaining plan questions: teacher and license, size and mix, who writes the corpus.
+
 ## 2026-10-29: Lexical overlap check and fine-tuning data plan (draft)
 
 - **Date:** 2026-10-29 (ended about 22:15 +08:00; start time unverified)

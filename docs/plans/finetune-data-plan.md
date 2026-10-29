@@ -1,6 +1,7 @@
 # Fine-tuning data plan for gemma3:1b
 
-- **Status:** DRAFT, for the user's review. Nothing here is decided until the user approves it.
+- **Status:** DRAFT, for the user's review. Nothing here is decided until the user approves it, except the decisions marked **Decided**.
+- **Decided (2026-10-29, user):** train the answer call only (Decision 1); the overlap review rule in Decision 5.
 - **Date:** 2026-10-29
 - **Context:** [ADR 0002](../decisions/0002-gemma-primary-and-gate-2.md) confirms fine-tuning, for gemma3:1b only. This plan covers the data and the export path. No training code and no data exist yet.
 
@@ -29,7 +30,7 @@ Source: the two identical cold baseline runs (devlog, 2026-10-29), `runs/e2e34_g
 | B. Query call only | Could learn the matcher's vocabulary. | The misses are a matcher problem, and Spring must match the same rule. Training toward the dev seed vocabulary risks fitting the dev set. Doesn't touch unsafe. |
 | C. Both in one LoRA | One adapter, and both prompts are covered. | Twice the data work. A query-call regression would be hidden inside one combined score. |
 
-**Recommendation: A.** Train the answer call only for the first LoRA. Fix retrieval in the matcher and Spring, where it can be tested with shared vectors. Revisit C only if query-call failures remain after the matcher decision.
+**Decided (2026-10-29, user): A.** Train the answer call only for the first LoRA. Fix retrieval in the matcher and Spring, where it can be tested with shared vectors. Revisit C only if query-call failures remain after the matcher decision.
 
 Also unverified: whether an answer-only LoRA changes the query call's outputs. The query call runs through the same weights, so Gate 2 must re-measure both calls.
 
@@ -59,7 +60,10 @@ Inputs must look exactly like evaluation inputs. Build them with the real code, 
 - `announcements_message` from `scripts/probe_end_to_end.py`: the `Question:` line, the `<announcements>` delimiters, and the `<` escaping
 - no answer-call example when retrieval returns nothing, because the pipeline sends the fixed not-found message without a model call
 
-**Chat template risk.** The `ollama show gemma3:1b --modelfile` template renders a system message as its own `<start_of_turn>user` turn. So our system prompt and user message become two consecutive user turns. A training library's own Gemma template may render this differently (for example, by merging system into the first user turn; unverified). **Recommendation:** render training text with a function that reproduces the Ollama template exactly. Add a test comparing it with a request rendered by Ollama, if that output can be obtained (unverified how).
+**Chat template risk.** The `ollama show gemma3:1b --modelfile` template renders a system message as its own `<start_of_turn>user` turn. So our system prompt and user message become two consecutive user turns. A training library's own Gemma template may render this differently (for example, by merging system into the first user turn; unverified). **Built:** `archways_assistant.render.render_gemma3()` reproduces the Ollama template exactly. Training text must be rendered with it, not with a library's own Gemma template.
+- The template is saved as `tests/fixtures/ollama_gemma3_1b_template.txt`.
+- Evidence from `scripts/check_render.py` (devlog, 2026-10-29): over the 19 e2e answer calls, raw `/api/generate` with the rendered text gave the same `prompt_eval_count` and the same reply as `/api/chat` in 19/19.
+- In raw mode, Ollama 0.40.13 adds one start-of-text token, and doesn't add a second one when the text already starts with `<bos>`. So the training tokenizer must give exactly one `<bos>` before the rendered text. How the chosen training library handles this is unverified.
 
 ## Decision 4: targets
 
@@ -101,11 +105,17 @@ Inputs must look exactly like evaluation inputs. Build them with the real code, 
   - year_level rows spread through all groups
 - **Split:** 90/10 train/validation, split by synthetic announcement (or group of related rows), not by example. The same row never appears on both sides.
 - **Overlap check, on every generated file before training,** with `scripts/check_overlap.py`:
-  - **Questions:** each generated file's `question` field against `evals/dev_questions.jsonl` and `evals/e2e_cases.jsonl`. Any flagged pair: drop the example, don't argue with the check.
+  - **Questions:** each generated file's `question` field against `evals/dev_questions.jsonl` and `evals/e2e_cases.jsonl`.
   - **Held-out:** the same check against the held-out file, run **by the user only**, who pastes the summary line. Claude Code never runs it or reads that file.
-  - **Announcements:** synthetic titles and bodies against the seed rows' titles and bodies. `check_overlap.py` reads JSONL, so this needs the seed exported to JSONL first (not built).
+  - **Announcements:** synthetic titles and bodies against the seed rows' titles and bodies. `check_overlap.py` reads the seed's JSON array directly; run it once with `--protected-field title --candidate-field title` and once with `body`.
   - **Whole inputs:** the full rendered user message also gets the exact-copy check against the eval questions, which catches a question embedded anywhere.
-  - **Gate:** training starts only when every check reports `flagged pairs: 0`.
+  - **Review rule (decided, 2026-10-29, user):**
+    - Flagged training items are dropped by default.
+    - The flagged share is reported per file (`check_overlap.py` prints `flagged items k/n (p%)`).
+    - If a file's share exceeds 10%, the user reviews its flagged items by hand with `--show-candidates`, and records a decision for each: near-copy → drop; same topic only → keep.
+    - The threshold stays 0.3.
+    - Where the decisions are recorded is not decided. A proposal: one JSONL file per checked file, with the candidate id, the decision and the date, committed next to the generator.
+  - **Gate:** training starts only when every flagged item has been dropped or has a recorded keep decision from the user's review.
   - **Expected false positives:** dev against e2e already gives 8 paraphrase-flagged pairs at the 0.3 threshold, because short campus questions share words ("When is the deadline…"). Expect to drop a share of generated questions. The threshold stays 0.3.
   - **Limit:** the check is lexical. A paraphrase in different words passes. Semantic paraphrase detection is unverified.
 - **Indirect leakage:** dev and e2e scores may be used to choose between these plan options. The generator must not be tuned case by case to make specific dev or e2e cases pass. The held-out file is only for the final comparison.
@@ -130,7 +140,7 @@ Inputs must look exactly like evaluation inputs. Build them with the real code, 
 
 ## Open questions for the user
 
-1. Approve answer-call-only (Decision 1, A)?
+1. ~~Approve answer-call-only (Decision 1, A)?~~ Decided 2026-10-29: yes.
 2. Teacher choice, once the license questions are settled.
 3. Size, mix and hand-review sample size.
 4. Who writes the synthetic corpus: generated by a script, written by hand, or both?
