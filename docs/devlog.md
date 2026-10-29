@@ -19,6 +19,18 @@ Template:
 
 ---
 
+## 2026-10-30: Keep throw-away-app/ out of git
+
+- **Date:** 2026-10-30 (ended about 00:34 +08:00; start time unverified)
+- **What changed:**
+  - `.gitignore` gains `throw-away-app/` (the line was already staged; this commit records it).
+  - `throw-away-app/gate1-llm/eas.json` was staged as a new file; it was unstaged and stays on disk, untracked. No commit ever contained `throw-away-app/`.
+  - **Correction** to the entry "Rendered answer-call prompt for Gate 1" below: its "How it was verified" line should read "The file has no `\r` and does not start with `<bos>`". The `\r` character itself was written into the entry by mistake, which split the line.
+- **Why:** The user asked that the throw-away-app folder not be part of commits or pushes.
+- **How it was verified:** `git check-ignore -v throw-away-app/gate1-llm/eas.json` → `.gitignore:9:throw-away-app/`; `git log --all -- throw-away-app` → no commits.
+- **Commits:** this `chore:` commit (`.gitignore` and devlog). Not pushed.
+- **Open questions / next:** none.
+
 ## 2026-10-29: Rendered answer-call prompt for Gate 1
 
 - **Date:** 2026-10-29 (ended about 22:58 +08:00; start time unverified)
