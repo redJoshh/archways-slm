@@ -3,7 +3,7 @@
 Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
     [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--repeat 5]
     [--summary-only]
-    [--num-gpu 0] [--matcher and_v1|prefix_v2]
+    [--num-gpu 0] [--keep-alive 0] [--matcher and_v1|prefix_v2]
 
 For each case:
 1. Query call. The model writes only the search arguments: Ollama's format
@@ -39,6 +39,9 @@ probe_tool_call.SAMPLING_OPTIONS (greedy: temperature 0, top_k 1, top_p 1,
 seed 42) and num_ctx NUM_CTX. A call whose prompt uses
 CONTEXT_LIMIT_SHARE of num_ctx or more fails its case, with a warning on
 stderr.
+
+--keep-alive sends Ollama's top-level keep_alive field on every chat call
+(0 unloads the model after each call); the header then adds keep_alive=...
 
 --repeat N runs the selected cases N times in one process, in order (all
 cases, then all again); the header then adds repeat=N and the summary
@@ -207,6 +210,11 @@ def main() -> None:
         help="Ollama num_gpu option (layers on the GPU; 0 = CPU only). "
         "Not sent unless given.",
     )
+    parser.add_argument(
+        "--keep-alive",
+        help="Ollama keep_alive field (seconds, or a duration such as 5m; "
+        "0 = unload after each call). Not sent unless given.",
+    )
     args = parser.parse_args()
     show = (lambda *_, **__: None) if args.summary_only else print
 
@@ -227,6 +235,10 @@ def main() -> None:
     if args.repeat < 1:
         sys.exit("--repeat must be at least 1")
     cases = cases * args.repeat
+    # Ollama reads a bare number as seconds and a string as a duration.
+    keep_alive = args.keep_alive
+    if keep_alive is not None and keep_alive.isdigit():
+        keep_alive = int(keep_alive)
 
     stats = {
         "hits": 0,
@@ -262,6 +274,8 @@ def main() -> None:
             if send_think:
                 payload["think"] = False
             payload["options"] = {**SAMPLING_OPTIONS, "num_ctx": NUM_CTX}
+            if args.keep_alive is not None:
+                payload["keep_alive"] = keep_alive
             if args.num_gpu is not None:
                 payload["options"]["num_gpu"] = args.num_gpu
             if fmt is not None:
@@ -283,6 +297,9 @@ def main() -> None:
         ids_field = f"ids={','.join(selected_ids)} " if selected_ids else ""
         # Only on repeated runs, so a normal run's header is unchanged.
         repeat_field = f"repeat={args.repeat} " if args.repeat > 1 else ""
+        keep_alive_field = (
+            f"keep_alive={args.keep_alive} " if args.keep_alive is not None else ""
+        )
         print(
             f"model={args.model} capabilities={shown_capabilities} "
             f"query_prompt={display_path(QUERY_PROMPT)} "
@@ -292,6 +309,7 @@ def main() -> None:
             f"{ids_field}{repeat_field}now={','.join(nows)} "
             f"{sampling_header()} num_ctx={NUM_CTX} "
             f"num_gpu={'default' if args.num_gpu is None else args.num_gpu} "
+            f"{keep_alive_field}"
             f"ollama={ollama_version(client)} commit={git_commit()}"
         )
         print()

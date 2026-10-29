@@ -192,3 +192,22 @@ def test_tool_call_probe_sends_greedy_options_on_every_call(monkeypatch, capsys)
         assert payload["options"] == GREEDY
     header = capsys.readouterr().out.splitlines()[0]
     assert f" {GREEDY_HEADER} " in header
+
+
+def test_e2e_probe_sends_keep_alive_on_every_call_when_given(monkeypatch, capsys):
+    payloads = run_e2e(monkeypatch, "--summary-only", "--keep-alive", "0")
+    assert any("format" in p for p in payloads)
+    assert any("format" not in p for p in payloads)
+    assert all(p["keep_alive"] == 0 for p in payloads)
+    assert " keep_alive=0 " in capsys.readouterr().out.splitlines()[0]
+
+
+def test_e2e_probe_sends_a_duration_keep_alive_as_text(monkeypatch):
+    payloads = run_e2e(monkeypatch, "--ids", "e2e-009", "--keep-alive", "5m")
+    assert payloads and all(p["keep_alive"] == "5m" for p in payloads)
+
+
+def test_e2e_probe_omits_keep_alive_by_default(monkeypatch, capsys):
+    payloads = run_e2e(monkeypatch, "--summary-only")
+    assert payloads and all("keep_alive" not in p for p in payloads)
+    assert "keep_alive=" not in capsys.readouterr().out.splitlines()[0]
