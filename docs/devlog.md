@@ -19,6 +19,19 @@ Template:
 
 ---
 
+## 2026-10-29: Rendered answer-call prompt for Gate 1
+
+- **Date:** 2026-10-29 (ended about 22:58 +08:00; start time unverified)
+- **What changed:** No repo change. `runs/gate1_prompt.txt` (gitignored, not committed) holds the rendered answer-call prompt of e2e-009, the case with the longest answer prompt (631 tokens in `runs/check_render_gemma3_1b.txt`), for use in Gate 1.
+  - It was built with `render_gemma3()`, the frozen `prompts/e2e_answer_v1.txt` at the case's fixed now, and `announcements_message()`.
+  - The results came from the real fakebackend (default matcher `and_v1`) for the query gemma3:1b wrote in both cold baseline runs, `{"query": "student portal", "days": 30}`. They were asserted to be `ann-015, ann-001, ann-025`, as in those runs.
+  - No model was called.
+  - It is written as UTF-8 bytes with LF line endings: 2,127 characters, starting `<start_of_turn>user` and ending `<start_of_turn>model` and a newline. There is no `<bos>`; Ollama adds it.
+- **Why:** The user asked for the exact longest prompt Ollama receives, for the phone feasibility test.
+- **How it was verified:** The file has no `` and does not start with `<bos>`. That it tokenizes to 631 tokens on the phone runtime is unverified; on Ollama 0.40.13 the same rendering gave 631 tokens including `<bos>` (render evidence entry below).
+- **Commits:** this `docs:` commit (devlog only). Not pushed.
+- **Open questions / next:** Gate 1 measures response time and memory with this prompt on the phone runtime.
+
 ## 2026-10-29: Data plan decisions: mix, hand review, review files, teacher fallback, licenses
 
 - **Date:** 2026-10-29 (ended about 22:55 +08:00; start time unverified)
