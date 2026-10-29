@@ -1,7 +1,8 @@
 """End-to-end probe: question -> search -> final reply, scored on the final reply.
 
 Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
-    [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--summary-only]
+    [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--repeat 5]
+    [--summary-only]
     [--num-gpu 0] [--matcher and_v1|prefix_v2]
 
 For each case:
@@ -33,10 +34,15 @@ was retrieved.
 
 Both prompts are frozen before any held-out run (CLAUDE.md). The probe
 never reads the system clock: every date comes from the case's now
-(tests/test_e2e_harness.py checks this). Requests use seed 42,
-temperature 0 and num_ctx NUM_CTX. A call whose prompt uses
+(tests/test_e2e_harness.py checks this). Every request sends
+probe_tool_call.SAMPLING_OPTIONS (greedy: temperature 0, top_k 1, top_p 1,
+seed 42) and num_ctx NUM_CTX. A call whose prompt uses
 CONTEXT_LIMIT_SHARE of num_ctx or more fails its case, with a warning on
 stderr.
+
+--repeat N runs the selected cases N times in one process, in order (all
+cases, then all again); the header then adds repeat=N and the summary
+counts every repeat as a case.
 
 Prints a header line, one block per case (skipped with --summary-only)
 and a summary. Talks only to Ollama on localhost. Never reads .env or
@@ -53,8 +59,8 @@ from pathlib import Path
 import httpx
 from probe_tool_call import (
     ROOT,
+    SAMPLING_OPTIONS,
     SCHEMA_PATH,
-    SEED,
     chat,
     display_path,
     git_commit,
@@ -62,6 +68,7 @@ from probe_tool_call import (
     model_capabilities,
     ollama_version,
     ratio,
+    sampling_header,
 )
 
 from archways_assistant.e2escore import (
@@ -188,6 +195,9 @@ def main() -> None:
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES)
     parser.add_argument("--ids", help="comma-separated case IDs to run")
     parser.add_argument(
+        "--repeat", type=int, default=1, help="run the selected cases N times"
+    )
+    parser.add_argument(
         "--summary-only", action="store_true", help="skip per-case blocks"
     )
     parser.add_argument("--matcher", choices=MATCHERS, default=DEFAULT_MATCHER)
@@ -214,6 +224,9 @@ def main() -> None:
         if unknown:
             sys.exit(f"Unknown case id(s): {', '.join(unknown)}")
         cases = [case for case in cases if case["id"] in set(selected_ids)]
+    if args.repeat < 1:
+        sys.exit("--repeat must be at least 1")
+    cases = cases * args.repeat
 
     stats = {
         "hits": 0,
@@ -248,7 +261,7 @@ def main() -> None:
             payload = {"model": args.model, "stream": False}
             if send_think:
                 payload["think"] = False
-            payload["options"] = {"temperature": 0, "seed": SEED, "num_ctx": NUM_CTX}
+            payload["options"] = {**SAMPLING_OPTIONS, "num_ctx": NUM_CTX}
             if args.num_gpu is not None:
                 payload["options"]["num_gpu"] = args.num_gpu
             if fmt is not None:
@@ -268,13 +281,16 @@ def main() -> None:
         )
         nows = sorted({case["now"].isoformat() for case in cases})
         ids_field = f"ids={','.join(selected_ids)} " if selected_ids else ""
+        # Only on repeated runs, so a normal run's header is unchanged.
+        repeat_field = f"repeat={args.repeat} " if args.repeat > 1 else ""
         print(
             f"model={args.model} capabilities={shown_capabilities} "
             f"query_prompt={display_path(QUERY_PROMPT)} "
             f"answer_prompt={display_path(ANSWER_PROMPT)} "
             f"cases={display_path(args.cases)} seed_data={display_path(SEED_DATA)} "
             f"matcher={args.matcher} "
-            f"{ids_field}now={','.join(nows)} seed={SEED} num_ctx={NUM_CTX} "
+            f"{ids_field}{repeat_field}now={','.join(nows)} "
+            f"{sampling_header()} num_ctx={NUM_CTX} "
             f"num_gpu={'default' if args.num_gpu is None else args.num_gpu} "
             f"ollama={ollama_version(client)} commit={git_commit()}"
         )

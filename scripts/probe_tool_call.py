@@ -20,7 +20,7 @@ the run stops with its error; there is no fallback. Default none sends no
 format option.
 
 Prints a header line (model, tool mode, format mode, model capabilities,
-prompt, questions, seed, Ollama version, git commit, date) so runs can be
+prompt, questions, sampling options, Ollama version, git commit, date) so runs can be
 compared, then one block per question and a summary with per-category
 results.
 --summary-only skips the per-question blocks.
@@ -73,8 +73,10 @@ TOOL_PLACEHOLDER = "{tool_definition}"
 # Manila has no daylight saving time, so a fixed offset is exact.
 MANILA = timezone(timedelta(hours=8), "Asia/Manila")
 
-# Fixed sampling seed, sent with temperature 0, so repeated runs can match.
+# Greedy decoding with a fixed seed, so repeated runs can match. Both probes
+# send these options on every chat call and print them in the header.
 SEED = 42
+SAMPLING_OPTIONS = {"temperature": 0, "top_k": 1, "top_p": 1, "seed": SEED}
 MAX_QUERY_WORDS = 6
 CONTENT_PREVIEW_CHARS = 200
 
@@ -240,6 +242,11 @@ def ratio(part: int, whole: int) -> str:
     return f"{part}/{whole} ({percent})"
 
 
+def sampling_header() -> str:
+    """The sampling options as header fields, e.g. "temperature=0 ... seed=42"."""
+    return " ".join(f"{name}={value}" for name, value in SAMPLING_OPTIONS.items())
+
+
 def chat(client: httpx.Client, payload: dict) -> dict:
     try:
         response = client.post(f"{OLLAMA_URL}/api/chat", json=payload)
@@ -336,7 +343,7 @@ def main() -> None:
             f"format={args.format_mode} "
             f"capabilities={shown_capabilities} prompt={display_path(prompt_path)} "
             f"questions={display_path(args.questions)} {ids_field}"
-            f"seed={SEED} "
+            f"{sampling_header()} "
             f"ollama={ollama_version(client)} commit={git_commit()} "
             f"today={now:%Y-%m-%d}"
         )
@@ -346,7 +353,7 @@ def main() -> None:
             payload = {"model": args.model, "stream": False}
             if send_think:
                 payload["think"] = False
-            payload["options"] = {"temperature": 0, "seed": SEED}
+            payload["options"] = dict(SAMPLING_OPTIONS)
             if not prompt_mode:
                 payload["tools"] = [tool]
             if format_schema is not None:

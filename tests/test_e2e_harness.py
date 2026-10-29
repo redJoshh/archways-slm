@@ -112,3 +112,83 @@ def test_cases_file_loads_with_the_fixed_now():
     harness = load_script("probe_end_to_end")
     cases = harness.load_cases(harness.DEFAULT_CASES)
     assert {case["now"] for case in cases} == {FIXED_NOW}
+
+
+GREEDY = {"temperature": 0, "top_k": 1, "top_p": 1, "seed": 42}
+GREEDY_HEADER = "temperature=0 top_k=1 top_p=1 seed=42"
+
+
+def fake_ollama(module, monkeypatch, reply):
+    """Patch a probe's Ollama helpers; return the list of chat payloads sent."""
+    payloads = []
+
+    def chat(client, payload):
+        payloads.append(payload)
+        return {"message": {"content": reply(payload)}, "prompt_eval_count": 10}
+
+    monkeypatch.setattr(module, "chat", chat)
+    monkeypatch.setattr(module, "ollama_version", lambda client: "test")
+    monkeypatch.setattr(module, "model_capabilities", lambda client, model: [])
+    monkeypatch.setattr(module, "git_commit", lambda: "test")
+    return payloads
+
+
+def e2e_reply(payload):
+    # The query call sends a format schema; the answer call does not.
+    if "format" in payload:
+        return json.dumps({"query": "dropping"})
+    return "The dropping deadline was revised."
+
+
+def run_e2e(monkeypatch, *argv):
+    harness = load_script("probe_end_to_end")
+    payloads = fake_ollama(harness, monkeypatch, e2e_reply)
+    monkeypatch.setattr(sys, "argv", ["probe_end_to_end.py", *argv])
+    harness.main()
+    return payloads
+
+
+def test_e2e_probe_sends_greedy_options_on_every_call(monkeypatch, capsys):
+    payloads = run_e2e(monkeypatch, "--summary-only")
+    query_calls = [p for p in payloads if "format" in p]
+    answer_calls = [p for p in payloads if "format" not in p]
+    assert query_calls and answer_calls
+    for payload in payloads:
+        assert payload["options"] == {**GREEDY, "num_ctx": 4096}
+    header = capsys.readouterr().out.splitlines()[0]
+    assert f" {GREEDY_HEADER} num_ctx=4096 " in header
+
+
+def test_e2e_probe_repeat_runs_the_selected_cases_n_times(monkeypatch, capsys):
+    payloads = run_e2e(monkeypatch, "--ids", "e2e-009,e2e-032", "--repeat", "3")
+    out = capsys.readouterr().out
+    header = out.splitlines()[0]
+    assert " ids=e2e-009,e2e-032 repeat=3 " in header
+    blocks = [line for line in out.splitlines() if line.startswith("[")]
+    assert [line.split(":")[0] for line in blocks] == [
+        f"[{n}/6] {id_}" for n, id_ in enumerate(["e2e-009", "e2e-032"] * 3, 1)
+    ]
+    assert "  cases: 6" in out
+    assert sum("format" in p for p in payloads) == 6
+
+
+def test_e2e_probe_header_has_no_repeat_field_by_default(monkeypatch, capsys):
+    run_e2e(monkeypatch, "--ids", "e2e-009", "--summary-only")
+    assert "repeat=" not in capsys.readouterr().out.splitlines()[0]
+
+
+def test_e2e_probe_rejects_repeat_below_one(monkeypatch):
+    with pytest.raises(SystemExit, match="--repeat must be at least 1"):
+        run_e2e(monkeypatch, "--repeat", "0")
+
+
+def test_tool_call_probe_sends_greedy_options_on_every_call(monkeypatch, capsys):
+    probe = load_script("probe_tool_call")
+    payloads = fake_ollama(probe, monkeypatch, lambda payload: "Hello.")
+    monkeypatch.setattr(sys, "argv", ["probe_tool_call.py", "--summary-only"])
+    probe.main()
+    assert payloads
+    for payload in payloads:
+        assert payload["options"] == GREEDY
+    header = capsys.readouterr().out.splitlines()[0]
+    assert f" {GREEDY_HEADER} " in header
