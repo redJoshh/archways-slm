@@ -147,15 +147,15 @@ What it does:
    ```
    model=qwen3:1.7b tool_mode=native capabilities=completion,tools,thinking prompt=prompts/system_v1.txt questions=evals/dev_questions.jsonl ollama=0.40.4 commit=a0ea9c3 today=2026-10-15
    ```
-   `capabilities` comes from Ollama's `/api/show` (`unknown` if Ollama doesn't report them). With `--ids`, an `ids=...` field follows `questions=`; full runs don't have it. `commit` is the short git hash, with `-dirty` added if the work tree has any uncommitted or untracked changes, because then the hash doesn't fully describe the code or prompt that ran.
-5. Sends each question to `http://localhost:11434/api/chat`, one at a time, with `temperature: 0`. It adds `think: false` only if the model's capabilities include `thinking` (or are unknown), because models without thinking, like `gemma3`, reject it. Each answer's block starts with its position and question ID, e.g. `[3/30] dev-004: When is the enrollment deadline?`. Outputs from before commit `4ce37b4` have no ID there. For each answer it reports:
+   `capabilities` comes from Ollama's `/api/show` (`unknown` if Ollama doesn't report them). With `--ids`, an `ids=...` field follows `questions=`; full runs don't have it. Since commit `ffcd245` the sampling options follow, as `temperature=0 top_k=1 top_p=1 seed=42` (older headers show only `seed=42`, or nothing). `commit` is the short git hash, with `-dirty` added if the work tree has any uncommitted or untracked changes, because then the hash doesn't fully describe the code or prompt that ran.
+5. Sends each question to `http://localhost:11434/api/chat`, one at a time, with the sampling options `SAMPLING_OPTIONS` (`temperature: 0`, `top_k: 1`, `top_p: 1`, `seed: 42`; greedy decoding, shared with the [end-to-end probe](#the-end-to-end-probe-scriptsprobe_end_to_endpy)). It sends no `num_ctx`, so Ollama's default applies. It adds `think: false` only if the model's capabilities include `thinking` (or are unknown), because models without thinking, like `gemma3`, reject it. Each answer's block starts with its position and question ID, e.g. `[3/30] dev-004: When is the enrollment deadline?`. Outputs from before commit `4ce37b4` have no ID there. For each answer it reports:
    - whether the tool was called, and whether that was the right decision,
    - whether the arguments pass the contract (`jsonschema` validator),
    - whether `query` looks like a sentence (more than 6 words or ends with `?`) instead of keywords,
    - latency, prompt tokens and tokens/second from Ollama's timing fields.
 6. Prints a summary: correct decisions, valid arguments and sentence-like queries, then correct decisions per category with the ids of the wrong ones. With `--ids`, it counts only the selected questions.
 
-Even at `temperature: 0`, two runs of the same inputs can differ slightly (reply wording, argument key order). Compare the decision and validity counts, not exact text.
+Every earlier run also sent `temperature: 0`; only `top_k` and `top_p` were at the model's defaults before `ffcd245`. Even with greedy options, two runs of the same inputs can differ (reply wording, argument key order) while the model stays loaded: in the end-to-end diagnostic, a warm model's reply depended on the previous call. With the model unloaded after every call, the replies were identical. See the [devlog, 2026-10-29](devlog.md#2026-10-29-explicit-greedy-decoding-and-a-cache-state-diagnostic). Unless you measure that way, compare the decision and validity counts, not exact text.
 
 ### Tool modes
 
@@ -184,6 +184,24 @@ A **held-out** file, written by hand from real student questions, will be used o
 Prompts are versioned by file name. To try a change, copy `system_v1.txt` to `system_v2.txt` and edit the copy; never edit an old version. Then every old header line still points at the prompt that actually ran.
 
 It only talks to localhost (`trust_env=False` ignores proxy env vars), never reads `.env` and never touches a database. It doesn't execute the tool; it only inspects what the model *asks for*.
+
+### The end-to-end probe (`scripts/probe_end_to_end.py`)
+
+Question → search → final reply, scored on the final reply; its docstring describes each step. Both of its Ollama calls (the query call and the answer call) send the same `SAMPLING_OPTIONS` as above, plus `num_ctx: 4096`. The header prints them next to `num_ctx`, `num_gpu` and the Ollama version.
+
+- `--ids e2e-009,e2e-032` runs only those cases.
+- `--repeat N` runs the selected cases N times in one process (all cases, then all again). The header adds `repeat=N`, and the summary counts every repeat as a case.
+- `--keep-alive 0` sends Ollama's top-level `keep_alive` field on every chat call, so the model unloads after each call and every call starts cold. A bare number is sent as seconds, anything else (e.g. `5m`) as a duration string. The header adds `keep_alive=...`. Without the flag the field is not sent.
+- `--num-gpu 0` sends `num_gpu: 0` (CPU only); `--matcher` picks the fake backend's matcher.
+
+The reproducible (cold) measurement, with one `ollama serve` started with `OLLAMA_NUM_PARALLEL=1`:
+
+```powershell
+$env:OLLAMA_NUM_PARALLEL = "1"; ollama serve   # in its own window
+uv run python scripts/probe_end_to_end.py --model gemma3:1b --num-gpu 0 --keep-alive 0 | Tee-Object runs/<name>.txt
+```
+
+Why these settings: [devlog, 2026-10-29](devlog.md#2026-10-29-explicit-greedy-decoding-and-a-cache-state-diagnostic).
 
 ## 4. The tests
 
