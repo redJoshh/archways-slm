@@ -19,6 +19,48 @@ Template:
 
 ---
 
+## 2026-10-29: Second cold baseline run and ADR 0002
+
+- **Date:** 2026-10-29 (ended about 22:05 +08:00; start time unverified)
+- **What changed:**
+  - `72cfc7a`: new `docs/decisions/0002-gemma-primary-and-gate-2.md`. Only the status line of `0001-model-choice.md` changed, to partly superseded by 0002. `docs/how-it-works.md` now describes the greedy sampling options, `--repeat`, `--keep-alive` and the cold measurement command, with a link to the entry below.
+  - ADR 0002 records the team's decisions:
+    - gemma3:1b is the primary model.
+    - Fine-tuning is confirmed, for gemma3:1b only. The Gate 2 control is untuned gemma3:1b with the same prompts and settings. qwen3:0.6b stays as an untuned fallback.
+    - Gate 1 is unchanged and not done.
+    - Gate 2 now uses end-to-end metrics:
+      - unsafe after guards 0
+      - unhelpful after guards at most 20% of in-scope held-out cases, rounded down to whole cases
+      - no worse than the control on unsafe and unhelpful after guards
+      - malformed 0, measured as `invalid search arguments`
+    - Unsafe before guards and retrieval hit are reported, not gated.
+    - Out-of-scope held-out cases are scored on safety only. The user picks them by hand and writes them down before the held-out run; Claude Code never reads the held-out file to decide this.
+    - Gate 2 is decided on the cold run (one slot, `--num-gpu 0`, `--keep-alive 0`, greedy options, a fixed recorded Ollama version). One warm run is reported, not gated.
+    - No dev, e2e or held-out question, or a paraphrase of one, may appear in training data. The leak tests must be extended to training data before any training run.
+  - No code, prompt, case or seed-row change.
+- **Why:** The team decided gemma3:1b is primary and fine-tuning goes ahead. 0001's tool-decision thresholds no longer fit the always-retrieve-first pipeline. The second run checks whether the cold baseline repeats on all 34 cases.
+- **How it was verified:**
+  - `uv run python scripts/probe_end_to_end.py --model gemma3:1b --num-gpu 0 --keep-alive 0` → `runs/e2e34_greedy_gemma3_1b_cpu_parallel1_keepalive0_run2.txt` (gitignored).
+    - Header: `commit=13ffdb7`, `ollama=0.40.13`, `temperature=0 top_k=1 top_p=1 seed=42 num_ctx=4096 num_gpu=0 keep_alive=0`.
+    - Server: the same `ollama serve` process as Runs B and C and the first baseline (started 21:36 +08:00, `OLLAMA_NUM_PARALLEL=1` per the user's check of its startup log).
+  - **All 34 replies match the first baseline run (`…_keepalive0.txt`, `commit=777ad51`) word for word.** The per-case query, search, reply, guard, final and verdict lines are identical once timings are removed, and so are the summaries apart from latency.
+    - No reply reached the probe's 400-character print limit, so the full reply text was compared.
+    - Line breaks are printed as ` | `.
+    - The only change between the two commits is the devlog entry below.
+  - The scores are therefore the same as in the entry below: failed 10/34 before and after guards, unsafe 3/34 → 1/34, unhelpful 7/34 → 9/34.
+  - `uv run pytest -q` → `385 passed`; `uv run ruff check .` → `All checks passed!`.
+- **Scope:**
+  - Two identical cold runs on one machine, one Ollama version, and our 34 dev cases. Whether this holds on other machines, other Ollama versions or the held-out set is unverified.
+  - The probe does not yet score out-of-scope cases on safety only, or recognize a safe decline.
+- **Commits:** `72cfc7a` and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - Build the out-of-scope (safety-only) scoring and the safe-decline check before the held-out run.
+  - Extend the leak tests to the training data before any training run. How to check against held-out questions without code reading that file is unverified.
+  - The phone runs warm, so production replies can differ from the cold evaluation.
+  - The held-out run is blocked until real published announcements are available.
+  - Gate 1 is not started.
+  - The rest of `docs/how-it-works.md` is out of date (for example, it lists `data/seed/` as not built yet).
+
 ## 2026-10-29: Explicit greedy decoding and a cache-state diagnostic
 
 - **Date:** 2026-10-29 (ended about 21:49 +08:00; start time unverified)
