@@ -1,7 +1,7 @@
 # Fine-tuning data plan for gemma3:1b
 
 - **Status:** DRAFT, for the user's review. Nothing here is decided until the user approves it, except the decisions marked **Decided**.
-- **Decided (2026-10-29, user):** train the answer call only (Decision 1); the corpus authorship (Decision 2); the training `<bos>` rule (Decision 3); the teacher (Decision 4); size, mix, the overlap review rule and where review decisions are kept (Decision 5).
+- **Decided (2026-10-29, user):** train the answer call only (Decision 1); the corpus authorship (Decision 2); the training `<bos>` rule (Decision 3); the teacher, its pilot checks and fallback, and the hand review (Decision 4); size, mix, the overlap review rule and the review files (Decision 5).
 - **Date:** 2026-10-29
 - **Context:** [ADR 0002](../decisions/0002-gemma-primary-and-gate-2.md) confirms fine-tuning, for gemma3:1b only. This plan covers the data and the export path. No training code and no data exist yet.
 
@@ -81,7 +81,8 @@ Inputs must look exactly like evaluation inputs. Build them with the real code, 
 - **Teacher for real data: Qwen3-14B on a Kaggle GPU.**
   - It gets the frozen e2e answer prompt plus teacher-only instructions.
   - The training input uses the frozen prompt only. The teacher-only instructions never appear in it.
-  - Not checked: whether Qwen3-14B fits a Kaggle GPU at a useful speed, Kaggle's session and quota limits, and how its thinking output is switched off in the chosen runtime.
+  - **Decided: checked during the pilot phase, before any real data:** whether Qwen3-14B fits the Kaggle GPU at a useful speed, and whether `"think": false` keeps thinking text out of its replies. If Qwen3-14B doesn't fit, the fallback is **Qwen3-8B**, and the switch is logged in the devlog.
+  - Still not checked: Kaggle's session and quota limits.
 - **Pilot first: local qwen3:1.7b, about 50 examples, to debug the pipeline only.** Pilot outputs are never used as training data.
 - **Filters,** reusing `archways_assistant.e2escore`. An example is kept only if all of these hold:
   - `guard()` does not fire
@@ -90,7 +91,9 @@ Inputs must look exactly like evaluation inputs. Build them with the real code, 
   - the target has at most 3 sentences
   - the target never states `posted_at`
 - **Record the rejection rate per trap type.** A high rate means the teacher or the prompt is wrong for that trap.
-- **Hand review:** the user reviews a random sample, for example 50 examples or 5%, whichever is larger, before training. The sample size is still a proposal.
+- **Hand review (decided, 2026-10-29, user):** done by the user, not by Claude Code, before training.
+  - Sample 10% of each generated file, stratified by category, with at least 10 per category.
+  - If more than 2 in a category's sample are bad, the user reviews the whole category.
 - **Not-found targets** are the exact `NOT_FOUND_MESSAGE` string, set by rule rather than taken from the teacher.
 
 ### License texts
@@ -106,10 +109,12 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
 
 > Copyright 2024 Alibaba Cloud
 
-- The quoted license text never mentions model outputs (no occurrence of "output").
-- Whether teacher outputs may be used as training data under it is therefore not settled by the text. That is unverified.
+- **Decided (2026-10-29, user):** the quoted Apache License 2.0 text has no clause about model outputs (no occurrence of "output"). This is recorded as **"no restriction found"**.
+- This is a reading of the license text, not verified legal advice.
 
 **Gemma Terms of Use:** quoted from `ollama show gemma3:1b --license` ("Last modified: February 21, 2024"). The fine-tuned model is gemma3:1b, so these terms govern it.
+
+> (b) "Distribution" or "Distribute" means any transmission, publication, or other sharing of Gemma or Model Derivatives to a third party, including by providing or making Gemma or its functionality available as a hosted service via API, web access, or any other electronic or remote means ("Hosted Service").
 
 > (e) "Model Derivatives" means all (i) modifications to Gemma, (ii) works based on Gemma, or (iii) any other machine learning model which is created by transfer of patterns of the weights, parameters, operations, or Output of Gemma, to that model in order to cause that model to perform similarly to Gemma, including distillation methods that use intermediate data representations or methods based on the generation of synthetic data Outputs by Gemma for training that model. For clarity, Outputs are not deemed Model Derivatives.
 
@@ -131,7 +136,8 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
 > Google claims no rights in Outputs you generate using Gemma. You and your users are solely responsible for Outputs and their subsequent uses.
 
 - The fine-tuned gemma3:1b is a modification of Gemma, so it is a Model Derivative under (e)(i).
-- If it ships inside the app, the quoted 3.1 conditions apply: the use restrictions in the app's terms, a copy of the Agreement, modified-file notices, and the Notice file. Whether shipping inside an app counts as a Distribution is unverified.
+- **Decided (2026-10-29, user):** shipping the tuned model inside the mobile app likely counts as Distribution under (b): "any transmission, publication, or other sharing of … Model Derivatives to a third party". So the quoted 3.1 conditions apply: the 3.2 use restrictions in the app's terms, notice that the model is subject to them, a copy of the Agreement, modified-file notices, and the Notice file. This is not verified legal advice.
+- **Open (team to confirm):** the mobile app's Terms and Conditions page needs the Gemma notice and the 3.2 use restrictions.
 - The Prohibited Use Policy is incorporated by reference, but its text was not checked (unverified).
 
 **Kaggle:** no Kaggle terms text was available to quote. Whether Kaggle's terms allow this use of its free GPUs is unverified.
@@ -145,14 +151,14 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
     | Behavior | Share | Target |
     |---|---|---|
     | Single relevant result | 35% | Answers from it |
-    | Distractor / wrong-topic result | 20% | The not-found sentence |
+    | Distractor / wrong-topic result | 25% | The not-found sentence |
     | Detail not in the results | 20% | The not-found sentence when the results don't answer the question |
     | Superseded dates | 10% | Only the later row's fact |
-    | Injection | 5–10% | Ignores the instruction |
+    | Injection | 5% | Ignores the instruction |
     | year_level | 5% | Keeps the stated year level |
 
   - Filipino or Taglish questions: about 10%, spread across the categories, always answered in English.
-  - **The listed shares add up to 95–100%.** At 5% injection, 5% is unassigned; which behavior gets it is not decided.
+  - The shares add up to 100% (decided 2026-10-29: distractor/wrong-topic 25%, injection 5%).
   - **Zero empty-retrieval examples.** With no results the pipeline sends the fixed not-found message without a model call.
   - **The fixed `now` varies across examples.**
 - **Split:** 90/10 train/validation, split by synthetic announcement (or group of related rows), not by example. The same row never appears on both sides.
@@ -166,7 +172,10 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
     - The flagged share is reported per file (`check_overlap.py` prints `flagged items k/n (p%)`).
     - If a file's share exceeds 10%, the user reviews its flagged items by hand with `--show-candidates`, and records a decision for each: near-copy → drop; same topic only → keep.
     - The threshold stays 0.3.
-    - **Decided (2026-10-29, user):** review decisions are kept as one committed JSONL file per checked file (location and fields to be set when the generator is built). Generated training data stays gitignored (`data/generated/`).
+    - **Decided (2026-10-29, user): review files.** One committed file per checked file: `data/review/<checked-file-name>.overlap-review.jsonl`.
+      - One line per decision, with the fields `candidate_id`, `decision` (`drop` or `keep`), `reason` (`near-copy` or `same-topic-only`), `reviewer` and `date`.
+      - Never held-out text: these files hold only training-side candidate ids and decisions.
+      - Generated training data stays gitignored (`data/generated/`).
   - **Gate:** training starts only when every flagged item has been dropped or has a recorded keep decision from the user's review.
   - **Expected false positives:** dev against e2e already gives 8 paraphrase-flagged pairs at the 0.3 threshold, because short campus questions share words ("When is the deadline…"). Expect to drop a share of generated questions. The threshold stays 0.3.
   - **Limit:** the check is lexical. A paraphrase in different words passes. Semantic paraphrase detection is unverified.
@@ -193,6 +202,7 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
 ## Open questions for the user
 
 1. ~~Approve answer-call-only (Decision 1, A)?~~ Decided 2026-10-29: yes.
-2. ~~Teacher choice.~~ Decided 2026-10-29: Qwen3-14B on Kaggle, with a qwen3:1.7b pilot. The license questions above stay open.
-3. ~~Size and mix.~~ Decided 2026-10-29. Still open: the unassigned 0–5% of the mix, and the hand-review sample size.
+2. ~~Teacher choice.~~ Decided 2026-10-29: Qwen3-14B on Kaggle, with a qwen3:1.7b pilot; GPU fit and `"think": false` checked in the pilot phase; fallback Qwen3-8B, logged.
+3. ~~Size, mix and hand review.~~ Decided 2026-10-29.
 4. ~~Who writes the corpus.~~ Decided 2026-10-29: teammate-written anchors, teacher expansion, code-inserted traps.
+5. Open (team to confirm): the mobile app's Terms and Conditions page needs the Gemma notice and use restrictions.

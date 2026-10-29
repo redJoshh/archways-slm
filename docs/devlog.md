@@ -19,6 +19,36 @@ Template:
 
 ---
 
+## 2026-10-29: Data plan decisions: mix, hand review, review files, teacher fallback, licenses
+
+- **Date:** 2026-10-29 (ended about 22:55 +08:00; start time unverified)
+- **What changed:** Docs only: `docs/plans/finetune-data-plan.md` records these user decisions (2026-10-29) as Decided. No code, data or prompt change.
+  - **Mix:**
+    - Distractor/wrong-topic 25% (was 20%), injection 5% (was 5–10%); the others are unchanged.
+    - The shares now add up to 100%: single relevant 35, distractor/wrong-topic 25, detail not in results 20, superseded 10, injection 5, year_level 5.
+    - Filipino or Taglish about 10%, spread across the categories.
+  - **Hand review,** by the user, not by Claude Code:
+    - 10% of each generated file, stratified with at least 10 per category.
+    - If more than 2 in a category's sample are bad, the whole category is reviewed.
+  - **Review files:** `data/review/<checked-file-name>.overlap-review.jsonl`, committed.
+    - Fields: `candidate_id`, `decision` (`drop`|`keep`), `reason` (`near-copy`|`same-topic-only`), `reviewer`, `date`.
+    - Never held-out text.
+  - **Teacher:**
+    - Qwen3-14B's fit on the Kaggle GPU and the effect of `"think": false` are checked in the pilot phase, before any real data.
+    - The fallback is Qwen3-8B; a switch is logged in the devlog.
+  - **Licenses:**
+    - The quoted Apache License 2.0 text has no output clause. This is recorded as "no restriction found", not verified legal advice.
+    - Shipping the tuned model in the app likely counts as Distribution under the Gemma Terms. The plan now quotes the definition, 1.1(b), verbatim from `ollama show gemma3:1b --license`, next to the 3.1 conditions already quoted.
+- **Why:** These settle the open questions from the previous entry.
+- **How it was verified:**
+  - Docs only. All 18 quoted license lines in the plan were checked by script against the `ollama show ... --license` outputs for gemma3:1b and qwen3:1.7b.
+  - `uv run pytest -q` → `447 passed`; `uv run ruff check .` → `All checks passed!` (no code changed).
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - **Team to confirm:** the mobile app's Terms and Conditions page needs the Gemma notice and the 3.2 use restrictions.
+  - Still unverified: Qwen3-14B's own license text, Kaggle's terms and limits, and the Gemma Prohibited Use Policy text.
+  - Next: the teammate writes the anchors; then the corpus generator and the qwen3:1.7b pilot.
+
 ## 2026-10-29: Synthetic row schema, trap inserters, and anchor guide
 
 - **Date:** 2026-10-29 (ended about 22:49 +08:00; start time unverified)
