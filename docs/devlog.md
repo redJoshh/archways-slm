@@ -19,6 +19,41 @@ Template:
 
 ---
 
+## 2026-10-29: Lexical overlap check and fine-tuning data plan (draft)
+
+- **Date:** 2026-10-29 (ended about 22:15 +08:00; start time unverified)
+- **What changed:**
+  - `e24a30e`: new `src/archways_assistant/overlap.py`.
+    - The word-overlap paraphrase check moved there from `tests/test_prompts.py`, which now imports it. `MAX_WORD_OVERLAP` is unchanged at 0.3.
+    - An exact-copy check (the normalized protected text appears inside the candidate) also moved there. The prompt test's own copy of it was replaced by the shared `is_copy`.
+    - One edge case changed: `word_overlap` of two texts with no words now returns 0.0 instead of raising `ZeroDivisionError`.
+  - `e24a30e`: new `scripts/check_overlap.py PROTECTED CANDIDATE [...]`, with `--protected-field`, `--candidate-field` and `--candidate-id-field`.
+    - It prints counts only: protected items checked, candidate items checked, flagged pairs (exact and paraphrase).
+    - `--show-candidates` adds each flagged candidate's file, id and text. It never prints protected text or ids, and a bad protected line is reported by line number only.
+    - It exits 1 if anything is flagged, 2 on bad input.
+  - `e24a30e`: new `tests/test_overlap.py`, using dev and e2e data only. It includes a deliberate near-copy of e2e-001 ("When will the online enrollment for the second term close?"), which is not a substring of it and must be flagged.
+  - New `docs/plans/finetune-data-plan.md`, a DRAFT for the user's review. It gives options and a recommendation for:
+    - which calls to train (recommended: the answer call only)
+    - a new synthetic announcement corpus with the dev trap types
+    - inputs built by the real fakebackend and the frozen v1 prompts
+    - teacher targets filtered by the e2escore rules, with license questions marked unverified
+    - size, split, and the overlap check on every generated file
+    - the LoRA → merged GGUF (Q4_K_M) → `ollama create` with gemma3:1b's template → cold evaluation path
+  - No training code, no data, no prompt or case change.
+- **Why:** ADR 0002 requires the leak tests to cover training data before any training run, and the user asked for a data plan to review before any data exists.
+- **The check is lexical:** it catches copies and near-copies that reuse the same words, not every paraphrase. Semantic paraphrase detection is unverified.
+- **How it was verified:**
+  - `uv run pytest -q` → `398 passed`; `uv run ruff check .` → `All checks passed!`.
+  - The new tests do fail when the check is broken. With `MAX_WORD_OVERLAP` temporarily set to 0.99, 4 overlap tests failed, including both near-copy tests. With the exact check disabled in `overlap_kind`, 3 failed. Both edits were reverted before the commit.
+  - `uv run python scripts/check_overlap.py evals/dev_questions.jsonl evals/e2e_cases.jsonl` → `protected items checked: 30; candidate items checked: 34; flagged pairs: 8 (exact 0, paraphrase 8; …)`. Short campus questions share words at the 0.3 threshold, so generated questions will see false positives too. The plan says to drop flagged examples, not to change the threshold.
+  - The script was never run on the held-out file. The user runs that and pastes only the summary line.
+  - The plan's failure evidence comes from `runs/e2e34_greedy_gemma3_1b_cpu_parallel1_keepalive0.txt`. The template and the Q4_K_M quantization come from `ollama show gemma3:1b` (`--modelfile`).
+- **Commits:** `e24a30e` and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The user reviews the plan's six decisions and its four open questions.
+  - The seed rows need a JSONL export before announcement text can be overlap-checked (not built).
+  - Rendering training text exactly like Ollama's gemma3 template (system as its own user turn) needs a test; how to get Ollama's rendered prompt for comparison is unverified.
+
 ## 2026-10-29: Second cold baseline run and ADR 0002
 
 - **Date:** 2026-10-29 (ended about 22:05 +08:00; start time unverified)
