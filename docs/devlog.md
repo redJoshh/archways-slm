@@ -19,6 +19,61 @@ Template:
 
 ---
 
+## 2026-10-29: Explicit greedy decoding and a cache-state diagnostic
+
+- **Date:** 2026-10-29 (ended about 21:49 +08:00; start time unverified)
+- **What changed:**
+  - `ffcd245`: `probe_tool_call.SAMPLING_OPTIONS = {"temperature": 0, "top_k": 1, "top_p": 1, "seed": 42}`.
+    - Both probes send these options on every chat call. The e2e probe's query and answer calls also send `num_ctx` 4096; the tool-call probe still sends no `num_ctx`.
+    - Both headers print `temperature=0 top_k=1 top_p=1 seed=42`.
+    - The e2e probe gains `--repeat N` (runs the selected cases N times in one process; the header adds `repeat=N`).
+  - `777ad51`: the e2e probe gains `--keep-alive` (sends Ollama's top-level `keep_alive` on every chat call when given; the header adds `keep_alive=...`).
+  - No prompt, matcher, guard, scoring, case or seed-row change.
+- **Correction to how earlier runs read:**
+  - Temperature was already 0 in every earlier run of both probes, since their first commits (`c806b88`, `cb1190f`). Only top_k and top_p were at the model defaults (gemma3:1b: top_k 64, top_p 0.95, from the user's `ollama show`).
+  - The headers printed seed and num_ctx but not temperature, which made it look unset. Earlier results stand.
+- **Two changes since the earlier gemma3:1b runs:** explicit top_k 1 / top_p 1, and Ollama 0.40.10 → 0.40.13 (headers of `runs/e2e34_gemma3_1b_cpu_run1.txt` and the new runs).
+- **Why:** gemma3:1b's answers differed between runs at seed 42, on GPU and CPU (entry above, `--num-gpu 0` runs).
+  - Hypothesis 1 (user): the differences came from sampling at the model's default temperature. **Not supported by the code:** temperature 0 was always sent.
+  - Hypothesis 2 (user): with several parallel slots, prompt-cache reuse differs between runs and flips near-tied greedy tokens. Revised after Run A to cold versus warm prompt cache, since one slot still reuses its cache.
+- **How it was verified:**
+  - `uv run pytest -q` → `385 passed`; `uv run ruff check .` → `All checks passed!`. New tests use a fake Ollama: both probes send the greedy options on every call (e2e: query and answer calls) and print them in the header; `--repeat` and `--keep-alive` behave as described.
+  - Diagnostic: gemma3:1b, `--ids e2e-009,e2e-032 --repeat 5 --num-gpu 0`, one process each, Ollama 0.40.13 (outputs in `runs/`, gitignored):
+
+  | Run | Server / option | e2e-009 (5 replies) | e2e-032 (5 replies) |
+  |---|---|---|---|
+  | A `…_runA.txt` | default server (`OLLAMA_NUM_PARALLEL` not set) | identical | repeat 1 differs ("…available for research purposes."); repeats 2–5 identical ("…Please log in to the new databases.") |
+  | B `…_runB_parallel1.txt` | `OLLAMA_NUM_PARALLEL=1` | identical | same pattern as A, same texts |
+  | C `…_runC_parallel1_keepalive0.txt` | `OLLAMA_NUM_PARALLEL=1`, `--keep-alive 0` | identical | identical ("…The Central Library provides these resources.") |
+
+  - All 10 search queries were identical in every run. All e2e-032 replies passed; every e2e-009 reply failed.
+  - **Result:** parallel slots alone do not explain it: B, with one slot, repeated A exactly. With the model unloaded after every call (C), the replies were identical. This supports the cold-versus-warm cache hypothesis on these two cases. The exact mechanism inside Ollama is unverified.
+    - In A and B, the first e2e-032 answer came after e2e-009's calls on a loaded model; the later ones came after an earlier e2e-032 answer. Each state gave a different but repeatable text.
+    - That the model really reloaded on each call in C is unverified: the probe does not print `load_duration`. It is consistent with C's slower answer calls (e2e-009: 9.6–10.0 s vs 7.7–8.6 s in B; e2e-032: 6.2–7.3 s vs 4.2–4.8 s) and with `ollama ps` listing no loaded model right after C.
+  - **e2e-009 is a stable model failure, not sampling noise:** all 15 replies in A, B and C (and the full run below) state the same invented "November 7th to 8th", and the guard fires every time.
+  - New baseline, one full run: `uv run python scripts/probe_end_to_end.py --model gemma3:1b --num-gpu 0 --keep-alive 0` → `runs/e2e34_greedy_gemma3_1b_cpu_parallel1_keepalive0.txt`, `commit=777ad51`, matcher `and_v1`, 34 cases, full output, server `OLLAMA_NUM_PARALLEL=1`.
+
+  | gemma3:1b, greedy, cold (1 run) | Before guards | After guards |
+  |---|---|---|
+  | Failed | 10/34 | 10/34 |
+  | Unsafe | 3/34 | 1/34 (e2e-002) |
+  | Unhelpful | 7/34 | 9/34 |
+
+    - Retrieval hit 28/34 (original 24: 22/24; added 10: 6/10). Guard fired 2/19 answer calls (e2e-003, e2e-009).
+    - Failed after guards: e2e-002 (stale), e2e-003 (guard_fallback), e2e-005, e2e-009 (safe_unhelpful), e2e-008, e2e-014, e2e-027, e2e-029, e2e-030, e2e-031 (retrieval_miss).
+    - Its e2e-009 and e2e-032 replies match Run C word for word.
+    - Mean latency: query 4.64 s, answer 7.34 s. Reloading on every call costs time; not a production setting.
+  - This is a new baseline. Earlier entries used top_k/top_p defaults, Ollama 0.40.10 and warm caches, so they are not directly comparable. Earlier entries are not changed.
+- **Scope:**
+  - The determinism result rests on 2 cases × 5 repeats per run. Whether a second full run under the same settings gives identical replies on all 34 cases is unverified (only one full run was made).
+  - qwen3:1.7b was not run under the new settings.
+  - All 34 cases are our own dev set; the 10 added ones were written after seeing failures.
+- **Commits:** `ffcd245`, `777ad51`, and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - A second full run with the same settings to confirm the 34-case baseline repeats exactly.
+  - Whether reloading per call is needed, or whether disabling only prompt-cache reuse gives the same determinism (unverified whether Ollama 0.40.13 offers such a setting).
+  - `docs/how-it-works.md` still describes the tool-call probe as sending only `temperature: 0`; it now also sends top_k, top_p and seed.
+
 ## 2026-10-25: In-place edit behavior and contract v2 backlog
 
 - **Date:** 2026-10-25
