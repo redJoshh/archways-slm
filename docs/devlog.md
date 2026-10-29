@@ -19,6 +19,66 @@ Template:
 
 ---
 
+## 2026-10-29: Synthetic row schema, trap inserters, and anchor guide
+
+- **Date:** 2026-10-29 (ended about 22:49 +08:00; start time unverified)
+- **Decisions (user, 2026-10-29),** recorded as Decided in `docs/plans/finetune-data-plan.md`:
+  - **Teacher:** Qwen3-14B on a Kaggle GPU for real data, with the frozen e2e answer prompt plus teacher-only instructions. First, a local qwen3:1.7b pilot of about 50 examples, to debug the pipeline only.
+  - **Size and mix:**
+    - About 800 training and 100 validation examples.
+    - Single relevant result 35%, distractor/wrong-topic 20%, detail not in results 20%, superseded dates 10%, injection 5–10%, year_level 5%.
+    - Filipino or Taglish questions about 10%, spread across the categories and always answered in English.
+    - Zero empty-retrieval examples, and the fixed `now` varies.
+    - The listed shares add up to 95–100%; the remainder is not assigned yet.
+  - **Corpus:**
+    - 20–30 style anchors, hand-written from scratch by a teammate (not by Claude Code) and never paraphrased from real announcements.
+    - Traps are inserted by code. The teacher expands the anchors to 150–250 rows.
+  - **Review decisions:** one committed JSONL per checked file. Generated training data stays gitignored (`data/generated/`, already in `.gitignore`).
+  - **Training rule:** the renderer never adds `<bos>`, and the training notebook must assert exactly one `<bos>` per example.
+- **What changed:**
+  - `efbd06b`: new `src/archways_assistant/synthetic.py`.
+    - `ROW_SCHEMA` has exactly the seed's ten fields. Ids are `anc-NNN` or `syn-NNN`, so seed rows (`ann-NNN`) fail. Priority and status are limited to the seed's values; `published_at` is a naive timestamp.
+    - `validate_rows()` reports schema errors, duplicate ids and impossible dates.
+    - Four pure trap inserters (`insert_long_body`, `insert_injection`, `insert_superseded_pair`, `insert_year_level`) each return new rows and a `Trap` record (label, row ids, facts). The label is kept outside the row.
+  - `efbd06b`: new `data/anchors/example_anchor.json`, written by Claude Code as a deliberately fictional example ("Moon Campus Origami Dragon Fold-Off", "Office of Lunar Student Affairs"). It is not a training anchor. The code commit was amended to include it, because `tests/test_synthetic.py` loads it; it was not pushed.
+  - New `data/anchors/TEMPLATE.md`: a guide for the teammate (fields, length, tone, never copy or paraphrase a real announcement, the check commands).
+  - The plan gained the decisions above and verbatim license quotes.
+  - No training code, no teacher calls, no data generation, no anchors beyond the example. No prompt, matcher, guard, scoring, case or seed-row change.
+- **Why:** These are the deterministic parts of the data pipeline, built and tested before any teacher call or generated data.
+- **License texts:** quoted in the plan from `ollama show qwen3:1.7b --license` (Apache License 2.0, "Copyright 2024 Alibaba Cloud") and `ollama show gemma3:1b --license` (Gemma Terms of Use, last modified February 21, 2024: 1.1(e), 3.1, 3.2, 3.3).
+  - All 17 quoted lines were checked by script against those outputs.
+  - The Apache text never mentions outputs.
+  - Unverified: Qwen3-14B's own license, the Gemma Prohibited Use Policy, and Kaggle's terms (no text available to quote).
+- **How it was verified:**
+  - `uv run pytest -q` → `447 passed`; `uv run ruff check .` → `All checks passed!`. The amended code commit alone (the guide stashed) also gave `447 passed`.
+  - `tests/test_synthetic.py` (35 tests) checks:
+    - the schema fields against the seed, and every `data/anchors/*.json` file
+    - that seed rows are rejected, and eight kinds of bad rows
+    - that the rows are served by the real fakebackend
+    - each inserter: its output, its `Trap` record, its error cases, and that its input is unchanged
+    - through the fakebackend, that the long-body key fact is absent from the excerpt, the injection is inside it, and both superseded rows are returned newest first
+  - The tests fail when the code is broken (each change reverted afterwards):
+
+    | Change | Failed tests |
+    |---|---|
+    | Long-body threshold 500 → 100 | 2 |
+    | Injection excerpt check off | 1 |
+    | Superseded row keeps the old fact | 1 |
+    | year_level not set | 1 |
+    | Id pattern loosened | 2 |
+    | Long body changes its input row | 5 |
+
+  - End to end, with the dev seed as protected and the example anchor as candidate:
+    - `uv run python scripts/check_overlap.py data/seed/announcements.json data/anchors/example_anchor.json --protected-field title --candidate-field title --show-candidates` → `protected items checked: 25; candidate items checked: 1; flagged pairs: 0 (exact 0, paraphrase 0; …)`, `flagged items 0/1 (0%)`, exit 0.
+    - The same with `body`: also 0/1, exit 0.
+    - Negative control: a scratch copy of the anchor with ann-001's body pasted in gave `flagged pairs: 1 (exact 1, …)`, `flagged items 1/1 (100%) (over 10%: review by hand)`, exit 1.
+- **Commits:** `efbd06b` and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The unassigned 0–5% of the mix; the hand-review sample size.
+  - Where the review JSONL files live and their fields (set when the generator is built).
+  - Not yet checked: Qwen3-14B's license text, whether it fits a Kaggle GPU, Kaggle's terms and limits, how thinking output is switched off in the teacher runtime, and whether shipping the tuned model in the app is a Distribution under the Gemma Terms.
+  - The teammate writes the anchors; the corpus generator and the qwen3:1.7b pilot come after.
+
 ## 2026-10-29: Announcement overlap check, gemma3 renderer, and render evidence
 
 - **Date:** 2026-10-29 (ended about 22:37 +08:00; start time unverified)
