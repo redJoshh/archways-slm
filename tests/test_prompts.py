@@ -6,6 +6,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from archways_assistant.formatschema import build_format_schema
+from archways_assistant.overlap import MAX_WORD_OVERLAP, is_copy, word_overlap
 from archways_assistant.tooldef import SCHEMA_PATH
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,18 +31,6 @@ E2E_QUERY = (PROMPTS / "e2e_query_v1.txt").read_text(encoding="utf-8")
 E2E_QUERY_EXAMPLES = re.findall(r"^Student: (.+)\n(\{.*\})$", E2E_QUERY, re.MULTILINE)
 # An example is a "User: ..." line followed by the expected JSON output line.
 V4_EXAMPLES = re.findall(r"^User: (.+)\n(\{.*\})$", V4, re.MULTILINE)
-# Example inputs sharing at least this share of words with a dev question
-# count as paraphrases.
-MAX_WORD_OVERLAP = 0.3
-
-
-def words(text: str) -> set[str]:
-    return set(re.findall(r"[a-z0-9]+", text.lower()))
-
-
-def word_overlap(a: str, b: str) -> float:
-    a_words, b_words = words(a), words(b)
-    return len(a_words & b_words) / len(a_words | b_words)
 
 
 def test_prompt_mode_reuses_system_v1_rules_exactly():
@@ -58,9 +47,9 @@ def test_v3_prompt_mode_reuses_system_v3_rules_exactly():
 
 @pytest.mark.parametrize("path", sorted(PROMPTS.glob("*.txt")), ids=lambda p: p.name)
 def test_no_prompt_contains_a_dev_question(path):
-    text = " ".join(path.read_text(encoding="utf-8").lower().split())
+    text = path.read_text(encoding="utf-8")
     for question in DEV_QUESTIONS + E2E_QUESTIONS:
-        assert " ".join(question.lower().split()) not in text
+        assert not is_copy(question, text)
 
 
 def test_e2e_query_examples_match_the_arguments_schema():
