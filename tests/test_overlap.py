@@ -17,6 +17,18 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "check_overlap.py"
 DEV = ROOT / "evals" / "dev_questions.jsonl"
 E2E = ROOT / "evals" / "e2e_cases.jsonl"
+SEED = ROOT / "data" / "seed" / "announcements.json"
+SEED_ROWS = json.loads(SEED.read_text(encoding="utf-8"))
+# A deliberate near-copy of ann-001's body: reworded, not a substring.
+NEAR_COPY_BODY = (
+    "Second-term online enrollment opens November 9, 2026 and closes "
+    "November 20, 2026. Students settle assessed fees before enlisting "
+    "subjects in the student portal."
+)
+UNRELATED_BODY = (
+    "The swimming pool reopens after repairs. Bring your ID and a towel; "
+    "lockers are first come, first served."
+)
 E2E_001 = "When does online enrollment for the second term close?"
 # A deliberate near-copy of e2e-001: reworded, not a substring.
 NEAR_COPY = "When will the online enrollment for the second term close?"
@@ -99,12 +111,15 @@ def test_default_output_is_counts_only(tmp_path):
     assert result.returncode == 1
     # The near-copy also overlaps other enrollment questions, so only the
     # shape of the line is fixed, not the pair count.
-    (line,) = result.stdout.splitlines()
+    line, share = result.stdout.splitlines()
     assert re.fullmatch(
         r"protected items checked: 34; candidate items checked: 1; "
         r"flagged pairs: [1-9]\d* \(exact 0, paraphrase [1-9]\d*; "
         r"paraphrase = word overlap >= 0\.3\)",
         line,
+    )
+    assert (
+        share == f"  {candidates}: flagged items 1/1 (100%) (over 10%: review by hand)"
     )
 
 
@@ -147,6 +162,88 @@ def test_a_bad_protected_line_is_reported_without_its_text(tmp_path, line, error
     assert "line 2" in result.stderr and error in result.stderr
     assert "secret" not in result.stderr + result.stdout
     assert "not json" not in result.stderr + result.stdout
+
+
+def write_array(path: Path, records: list[dict]) -> Path:
+    path.write_text(json.dumps(records, indent=1), encoding="utf-8")
+    return path
+
+
+def test_the_body_near_copy_is_not_a_substring_but_is_flagged():
+    body = SEED_ROWS[0]["body"]
+    assert SEED_ROWS[0]["id"] == "ann-001"
+    assert not is_copy(body, NEAR_COPY_BODY)
+    assert overlap_kind(body, NEAR_COPY_BODY) == "paraphrase"
+
+
+def test_seed_bodies_are_checkable_as_a_json_array(tmp_path):
+    candidates = write_array(
+        tmp_path / "synth.json",
+        [
+            {"id": "syn-1", "body": NEAR_COPY_BODY},
+            {"id": "syn-2", "body": UNRELATED_BODY},
+        ],
+    )
+    result = run(
+        str(SEED),
+        str(candidates),
+        "--protected-field",
+        "body",
+        "--candidate-field",
+        "body",
+        "--show-candidates",
+    )
+    assert result.returncode == 1
+    assert (
+        f"protected items checked: {len(SEED_ROWS)}; candidate items checked: 2;"
+        in (result.stdout)
+    )
+    assert f"  {candidates}: flagged items 1/2 (50%) (over 10%: review by hand)" in (
+        result.stdout
+    )
+    assert "syn-1 [paraphrase]" in result.stdout
+    assert "syn-2" not in result.stdout
+    assert "ann-001" not in result.stdout
+    assert SEED_ROWS[0]["body"] not in result.stdout
+
+
+def test_every_seed_title_flags_itself():
+    result = run(
+        str(SEED), str(SEED), "--protected-field", "title", "--candidate-field", "title"
+    )
+    assert result.returncode == 1
+    assert f"flagged items {len(SEED_ROWS)}/{len(SEED_ROWS)} (100%)" in result.stdout
+
+
+def test_a_share_at_ten_percent_is_not_marked_for_review(tmp_path):
+    records = [{"id": "q0", "question": NEAR_COPY}] + [
+        {"id": f"q{n}", "question": f"Is the gym open on day {n}?"}
+        for n in range(1, 10)
+    ]
+    candidates = write_jsonl(tmp_path / "train.jsonl", records)
+    result = run(str(E2E), str(candidates))
+    assert f"  {candidates}: flagged items 1/10 (10%)" in result.stdout.splitlines()
+
+
+@pytest.mark.parametrize(
+    "content, error",
+    [('[{"body": "fine"}, {"title": "secret"}]', "item 2: no string"), ("[{", "array")],
+)
+def test_a_bad_protected_array_is_reported_without_its_text(tmp_path, content, error):
+    protected = tmp_path / "protected.json"
+    protected.write_text(content, encoding="utf-8")
+    candidates = write_jsonl(tmp_path / "c.jsonl", [{"body": UNRELATED_BODY}])
+    result = run(
+        str(protected),
+        str(candidates),
+        "--protected-field",
+        "body",
+        "--candidate-field",
+        "body",
+    )
+    assert result.returncode == 2
+    assert error in result.stderr
+    assert "secret" not in result.stderr + result.stdout
 
 
 def test_the_tests_never_name_the_held_out_file():
