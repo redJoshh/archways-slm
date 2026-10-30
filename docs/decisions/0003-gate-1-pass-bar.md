@@ -50,6 +50,14 @@ Every lever (prompt length, system-prompt caching, a smaller model, fine-tuning)
 - **The bar covers the answer call only.** The app also makes a query call before it (245 prompt tokens for e2e-009 on Ollama), which is not timed on the phone yet.
 - 0001's other Gate 1 checks (memory use, fit with Expo, the iOS route) have no threshold here. They are still reported.
 
+## Resolved 2026-10-30
+
+The user decided the two open points above the same day, before any further phone result. The 15 s bar itself is unchanged.
+
+- **Model load is not part of the 15 s.** It is bounded separately: **first load under 10 s on the reference device.** Load time is reported every time.
+- **The 15 s covers the whole question:** query call, search and answer call, from send to final reply.
+- The query call has not been timed on a phone yet. **Until it is, Gate 1 status stays FAIL.**
+
 ## Unverified
 
 - Memory and speed in a release build; all phone runs so far use a development build.

@@ -19,6 +19,41 @@ Template:
 
 ---
 
+## 2026-10-30: ADR 0003 open points resolved; Redmi replies and guard
+
+- **Date:** 2026-10-30 (ended about 19:56 +08:00; start time unverified)
+- **What changed:**
+  - `docs/decisions/0003-gate-1-pass-bar.md` gains a "Resolved 2026-10-30" section (user decisions). The 15 s bar is unchanged.
+    - Model load is not part of the 15 s. It is bounded separately: first load under 10 s on the Redmi 10C, and it is reported every time.
+    - The 15 s covers the whole question: query call, search and answer call, from send to final reply.
+    - The query call has not been timed on a phone, so Gate 1 stays FAIL until it is.
+  - The "Open" section above it is kept as written.
+  - No code, prompt, scoring rule, case or seed-row change.
+- **Redmi 10C replies (user), e2e-009:**
+  - Cold, threads default and threads 4 (identical): "The student portal is unavailable on November 7th from 10:00 PM to 2:00 AM. Online enrollment for the second term begins on November 9th and closes on November 20th. New research databases are available through the student portal."
+  - Warm (cache hits at 19:32:08, 19:32:26, 19:34:30, 19:36:01): the same except the last sentence, "New online research databases are available starting November 9th."
+- **Compared word for word with the cold Ollama reply** ("The student portal is unavailable from November 7th to 8th. …"):
+  - Redmi cold: differs from word 6, "on" vs "from".
+  - Redmi warm: also differs from word 6, "on" vs "from".
+  - The Redmi cold reply is word for word the reply of two earlier non-cold Ollama runs (`runs/e2e34_gemma3_1b.txt`, `commit=041cb82`, and `runs/e2e_full_gemma3_1b_run1.txt`, `commit=1f1241d`; neither used `--keep-alive 0`).
+  - With the entry below, e2e-009 has given four different greedy replies from the same prompt: cold Ollama (also the Nothing warm and Redmi threads 8), Nothing cold, Redmi cold (default and 4 threads), and Redmi warm.
+- **Guard** (`e2escore.guard()`, as in the entry below):
+  - Redmi cold: dates 11-07, 11-09, 11-20 and numbers 0, 2, 10 all supported; **guard not fired.** No date is moved to another announcement.
+  - Redmi warm: the same claims, all supported; **guard not fired.** But its last sentence gives the research databases (ann-025, no date) November 9th from ann-001, as the Nothing cold reply did. The guard cannot see this.
+- **Findings (user; no scoring rule changed):**
+  - e2e-009: the guard flags "8th" as invented, but ann-015's "until 2:00 AM the next day" implies November 8. The "invented" count for this case may be a scorer false positive. The decision on the rule is deferred.
+  - Caching the 209-token system turn would save roughly 12 s on the Redmi. This is an estimate from about 17 prompt tokens/s (631 tokens in 34.1–36.8 s is 17.1–18.5 tokens/s, so 11.3–12.2 s). That would leave about 22–25 s of prompt processing, not enough for 15 s alone.
+  - The system turn contains today's date, so a cached copy is valid for one day. Moving the date out is a future prompt version, not now.
+- **Correction** to "Gate 1 phone results, ADR 0003, and qwen3:0.6b phone prompt" below: its "ended about 19:55" was an estimate; its commit `81c74b6` is timed 19:53 +08:00.
+- **Why:** The user resolved 0003's open points and supplied the missing Redmi reply texts.
+- **How it was verified:** the guard and the word comparison were run with the scratch script from the entries below; the earlier Ollama run files were searched for e2e-009's reply. Docs only; no code changed since `447 passed` earlier today.
+- **Commits:** this `docs:` commit (0003 and devlog). Not pushed.
+- **Open questions / next:**
+  - Time the query call on the Redmi, then the whole question from send to final reply.
+  - The guard's rule for implied dates (e2e-009's "8th"), deferred.
+  - The guard does not check which announcement a date belongs to (Nothing cold, Redmi warm).
+  - The qwen3:0.6b cold run on the Redmi.
+
 ## 2026-10-30: Gate 1 phone results, ADR 0003, and qwen3:0.6b phone prompt
 
 - **Date:** 2026-10-30 (ended about 19:55 +08:00; start time unverified)
