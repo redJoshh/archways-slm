@@ -1,6 +1,6 @@
 # 0001: Model choice for on-device use
 
-- **Status:** PROVISIONAL; partly superseded by [0002](0002-gemma-primary-and-gate-2.md) (the Decision and Gate 2)
+- **Status:** PROVISIONAL; partly superseded by [0002](0002-gemma-primary-and-gate-2.md) (the Decision and Gate 2); [0003](0003-gate-1-pass-bar.md) defines the Gate 1 pass bar
 - **Date:** 2026-10-25
 
 ## Context
