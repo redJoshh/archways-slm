@@ -19,6 +19,73 @@ Template:
 
 ---
 
+## 2026-10-30: Gate 1 phone results, ADR 0003, and qwen3:0.6b phone prompt
+
+- **Date:** 2026-10-30 (ended about 19:55 +08:00; start time unverified)
+- **What changed:**
+  - `b4012b1`: new `docs/decisions/0003-gate-1-pass-bar.md`. Only the status line of `0001-model-choice.md` changed, to note that 0003 defines the Gate 1 pass bar.
+    - Reference device: Redmi 10C. A cold answer must take under 15 s total wall time on it, and the app must survive about a minute in the background and still answer.
+    - The record says the bar was set after the Redmi's ~40–43 s cold answers were measured, but before any optimization or qwen3:0.6b test.
+    - Current status: speed FAIL.
+  - New `runs/gate1_prompt_qwen3_0_6b.txt` (gitignored, not committed); see the qwen3:0.6b section below.
+  - This entry gathers today's phone results. It adds the first Redmi cold run and the thread tests to the three entries below, and corrects one of them.
+  - No code, prompt, case or seed-row change.
+- **Phone results (user):**
+  - **Nothing Phone 3a Pro:** development build via USB/Metro (the first entry below says EAS development build), llama.rn 0.13.0-rc.8, CPU only, `n_ctx` 2048.
+    - Load 2.0 s. Cold: prompt 631 tokens in 11.3 s, 87 tokens at 15.7 tok/s, total 16.9 s.
+    - Later runs in the same session were prompt-cache hits (1 prompt token, 2.6 s), not realistic.
+    - `use_mmap`: without it, PSS 1,554,625 kB (dirty 1,491,916, clean 43,964); with `use_mmap: true`, PSS 1,676,750 kB (dirty 780,580, clean 831,860). The weights now appear memory-mapped (unverified). `use_mmap: true` was kept.
+  - **Redmi 10C, 4 GB RAM** (same app, `use_mmap: true`):
+
+    | Cold run | Total | Prompt | Generated |
+    |---|---|---|---|
+    | 1, threads default | 43.2 s | 36.8 s | 56 tokens at 9.0 tok/s |
+    | 2, threads default | 41.2 s | 34.7 s | 56 tokens at 8.9 tok/s |
+    | threads 4 | 40.4 s | 34.2 s | 56 tokens at 9.4 tok/s |
+    | threads 8 | 39.5 s | 34.1 s | 37 tokens at 7.2 tok/s |
+
+    - Cold runs 1 and 2 gave identical replies; threads 4 gave the same reply as the default.
+    - Return after Android swapped the app out: the prompt cache survived (1 token), but generation slowed to 5.3 tok/s, 14.8 s against 8.5 s for the same cached work. The process was not killed.
+    - Memory right after a cold run, app on screen: PSS 494,672 kB, RSS 173,248 kB, swap PSS 365,648 kB, clean 63,244 kB.
+  - **Correction** to "Gate 1 Redmi 10C runs" below: the first cold run's numbers are now known (row 1 above). The 43.2 s in that entry's correction is this first cold run.
+- **Replies, compared word for word with the cold Ollama reply for e2e-009** (the same in both cold baseline runs, `…_keepalive0.txt` and `…_keepalive0_run2.txt`): "The student portal is unavailable from November 7th to 8th. Online enrollment for the second term begins on November 9th. New research databases are available through the student portal."
+
+  | Run | Reply | vs cold Ollama |
+  |---|---|---|
+  | Nothing, cold | "The student portal will be unavailable on November 7th, 2026, from 10:00 PM to 2:00 AM. Online enrollment for the second term begins on November 9th, 2026, and closes on November 20th, 2026. Access to new research databases will be available starting November 9th, 2026." | Differs from word 4: "will" vs "is" |
+  | Nothing, warm (cache hit, 2 runs) | "The student portal is unavailable from November 7th to 8th. Online enrollment for the second term begins on November 9th. New research databases are available through the student portal." | Match |
+  | Redmi, cold, threads default and 4 | Not reported (56 tokens) | Unknown |
+  | Redmi, cold, threads 8 | "The student portal is unavailable from November 7th to 8th. Online enrollment for the second term begins on November 9th. New research databases are available through the student portal." | Match |
+  | Redmi, warm | Not reported ("match the earlier warm reply") | Unknown |
+
+  - The Redmi's default-thread reply is 56 tokens, against 87 (Nothing cold) and 37–38 (the reply above). It is therefore probably a third distinct reply (inferred from token counts; the text was not reported).
+- **Guard check** (`e2escore.guard()`, fakebackend results `ann-015, ann-001, ann-025` at the case's now, the probe's forbidden titles; scratch script):
+  - Supported: dates 11-07, 11-09, 11-20; numbers 0, 2, 7, 9, 10, 20, 2026.
+  - Nothing cold: all dates and numbers supported; **guard not fired.** But it gives the research databases (ann-025, no date) the date November 9th from ann-001. The guard compares dates across all results, so it cannot see this.
+  - Nothing warm and Redmi threads 8 (same text): "8th" is the unsupported **number 8**; **guard fired**, as for e2e-009 in the cold Ollama baseline (scored "invented"). ann-015 says "until 2:00 AM the next day", so November 8 is implied but not written.
+  - Redmi default and threads 4: not checked (reply text not reported).
+- **System prompt vs case-specific tokens** (gemma3:1b, Ollama 0.40.13, raw `/api/generate`, cold settings; measured for the first entry below): system turn 209 tokens including `<bos>`; question and results 422 (423 when sent alone, with its own `<bos>`). 209 + 422 = 631.
+- **qwen3:0.6b phone prompt:**
+  - `runs/gate1_prompt_qwen3_0_6b.txt`: e2e-009's answer call with the same system prompt, question and results (`ann-015, ann-001, ann-025`, the results of gemma3:1b's query, not of a qwen3:0.6b query). UTF-8, LF, 2,148 characters.
+  - Rendered by hand from `ollama show qwen3:0.6b --template`, with thinking off as the probe does it (`"think": false`). The template gives `<|im_start|>system\n\n<system><|im_end|>\n<|im_start|>user\n<user> /no_think<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n`. Note the blank line after `system`, which the template prints.
+  - Checked against Ollama 0.40.13, cold settings (`SAMPLING_OPTIONS`, `num_ctx` 4096, `num_gpu` 0, `keep_alive` 0): `/api/chat` with `"think": false` and raw `/api/generate` of the file both gave `prompt_eval_count` **591** and the identical reply "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance."
+    - Without the blank line after `system`, the count was also 591 but the reply ended "for system maintenance.", repeated in two runs each. So token count alone does not prove a rendering matches.
+  - **Start of text differs from Gemma:** raw `"<|im_start|>"` → 1 token, `"<|im_start|><|im_start|>"` → 2. Ollama adds no start-of-text token for qwen3:0.6b, so on the phone nothing should be prepended either. Whether llama.rn adds one for this GGUF is unverified.
+  - Stop strings: `<|im_end|>` and `<|im_start|>`, from the model's Ollama parameters (`ollama show qwen3:0.6b --modelfile`). gemma3:1b has only `<end_of_turn>`.
+  - Blob (from `--modelfile`): `C:\Users\karlj\.ollama\models\blobs\sha256-7f4030143c1c477224c5434f8272c662a8b042079a0a584f0a27a1684fe2e1fa`, 522,640,096 bytes, Q4_K_M, 751.63M parameters.
+- **Findings (user):**
+  - Thread count does not change prompt time on the Redmi (34.1–36.8 s), consistent with a memory-bound phone (unverified).
+  - The greedy reply depends on the phone and on the thread count, so laptop evaluation cannot certify phone replies. The guard must run on-device.
+  - Phone timings must reload the model before each run to be cold.
+  - This is a development build; memory in a release build is unverified.
+- **Why:** Gate 1 needed a pass bar written down before any optimization, and the qwen3:0.6b phone test needs its exact prompt.
+- **How it was verified:** the Ollama checks above (scratch scripts, not committed). `uv run pytest -q` and `uv run ruff check .` were run earlier today (`447 passed`, `All checks passed!`); no code changed since.
+- **Commits:** `b4012b1` and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - Run `runs/gate1_prompt_qwen3_0_6b.txt` cold on the Redmi, with the stop strings above.
+  - Record the Redmi's default-thread cold reply text and its warm reply.
+  - ADR 0003's open points: whether model load counts toward the 15 s, and the query call, which is not timed on the phone yet.
+
 ## 2026-10-30: Gate 1 Redmi 10C runs: cold repeat, swap-out, reload, memory
 
 - **Date:** 2026-10-30 (ended about 19:38 +08:00; start time unverified)
