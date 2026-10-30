@@ -19,6 +19,39 @@ Template:
 
 ---
 
+## 2026-10-30: Gate 1 Redmi 10C runs: cold repeat, swap-out, reload, memory
+
+- **Date:** 2026-10-30 (ended about 19:38 +08:00; start time unverified)
+- **What changed:** Docs only: this entry. No code, prompt, case or seed-row change. All phone numbers are as the user reported them; nothing here was measured in the repo.
+- **Device:** Redmi 10C, 4 GB RAM (the minimum Google suggests for Gemma 3 1B), treated as the weakest target phone for Gate 1. Standalone build with `use_mmap: true` per the entry below (inferred; the notes don't restate the build). The notes on the cold repeat, swap-out and reload don't name the phone; they are recorded here as Redmi 10C runs, inferred from the slower speeds and the swap. Same prompt as before: e2e-009's answer call from `runs/gate1_prompt.txt`.
+- **First cold run:** its full numbers are not in the devlog. The user's notes give only its prompt time, 36.8 s, and its model load, 4.9 s.
+- **Second cold run (19:35:26, model reloaded):**
+  - 41.2 s total: prompt 34.7 s; 56 tokens at 8.9 tok/s.
+  - Reply identical to the first cold run (the reply text itself is not in the notes).
+  - So cold replies repeat on the same phone. Warm replies repeat too: the runs at 19:34:30 and 19:36:01 match the earlier warm reply.
+- **Return after Android swapped the app out (19:34:30, no reload):**
+  - The process was not killed and the prompt cache survived (1 prompt token).
+  - Generation slowed to 5.3 tok/s: total 14.8 s, against 8.5 s for the same cached work before.
+  - About 6 s penalty, read as the model pages being re-read (the cost the entry below left unverified).
+- **Reload after the file was cached:** 1.3 s (first load 4.9 s).
+- **Peak memory** right after a cold run, app on screen (`dumpsys meminfo`):
+  - TOTAL PSS 494,672 kB, TOTAL RSS 173,248 kB, swap PSS 365,648 kB, clean 63,244 kB.
+  - The user's note gives about 1.77 GB RSS on the Nothing. The devlog recorded 1,698,116 kB there without `use_mmap`; RSS with `use_mmap` on the Nothing was not recorded.
+  - Reading: Android keeps the app's resident memory small on this phone, so model pages are likely re-read during inference (unverified). This may account for part of the prompt time (36.8 s).
+  - Number of other apps open: not recorded.
+- **Correction (user):** a "run directly" result of 43.2 s, reported earlier in conversation (it was never in the devlog), was a misreading of the first run's line, not a new run.
+- **Why:** Gate 1 needs timings and memory on the weakest target phone.
+- **How it was verified:** not verified in the repo; the user's measurements. The 8.5 s vs 14.8 s difference is 6.3 s.
+- **Scope / unverified:**
+  - Two cold runs on one phone; what other apps were open is not recorded.
+  - Whether model pages are re-read during inference.
+  - This is not a Gate 1 decision.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** candidate tests:
+  - `n_threads` 4 vs 8.
+  - qwen3:0.6b on the Redmi. It needs a Qwen-rendered prompt; `render.py` only has `render_gemma3()`.
+  - A shorter prompt or a cached system prompt (209 of 631 tokens, entry "Gate 1 first phone run" below).
+
 ## 2026-10-30: Gate 1 use_mmap memory experiment
 
 - **Date:** 2026-10-30 (ended about 19:26 +08:00; start time unverified)
