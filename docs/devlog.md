@@ -19,6 +19,55 @@ Template:
 
 ---
 
+## 2026-10-30: Gate 1 first phone run (not a gate decision)
+
+- **Date:** 2026-10-30 (ended about 19:20 +08:00; start time unverified)
+- **What changed:** Docs only: this entry. No code, prompt, case or seed-row change. The phone run was done by the user; the numbers and replies below are as the user reported them, and the rest was checked in the repo.
+- **Setup (user):**
+  - Device: Nothing Phone 3a Pro. llama.rn 0.13.0-rc.8, EAS development build, CPU only (`n_gpu_layers` 0), `n_ctx` 2048, threads default, temperature 0, `n_predict` 200.
+  - Prompt: the raw text of `runs/gate1_prompt.txt` from `render_gemma3()`, without `<bos>`.
+  - Model: the Ollama gemma3:1b blob copied as GGUF (806 MB).
+- **Case:** `runs/gate1_prompt.txt` is the answer call of **e2e-009**, "When will the student portal be down for maintenance?" (now 2026-11-02T10:00:00+08:00), with results `ann-015, ann-001, ann-025` (entry "Rendered answer-call prompt for Gate 1" below).
+- **Run 1 (model just loaded), the only realistic timing:**
+  - Load 2.0 s; prompt 631 tokens in 11.3 s; 87 tokens generated at 15.7 tok/s; total wall time 16.9 s.
+  - Prompt processing is 11.3 of the 16.9 s.
+  - Reply: "The student portal will be unavailable on November 7th, 2026, from 10:00 PM to 2:00 AM. Online enrollment for the second term begins on November 9th, 2026, and closes on November 20th, 2026. Access to new research databases will be available starting November 9th, 2026."
+- **Runs 2 and 3 (same session, same prompt, no reload):**
+  - "Prompt tokens: 1 in 0.0 s"; wall time 2.6 s each; 38 tokens at 15.8 tok/s. llama.rn reused the cached prompt, so these are cache hits, not realistic timings.
+  - Reply, identical in both runs: "The student portal is unavailable from November 7th to 8th. Online enrollment for the second term begins on November 9th. New research databases are available through the student portal."
+- **Memory (user, `dumpsys meminfo` after loading the model and one run):**
+  - TOTAL PSS 1,554,625 kB (~1.48 GB), TOTAL RSS 1,698,116 kB.
+  - Mostly dirty (1,491,916 kB) vs clean (43,964 kB). This suggests the weights are not memory-mapped (unverified).
+  - Development build, so an upper bound.
+- **Prompt token count:** the phone's 631 equals Ollama's `prompt_eval_count` for e2e-009's answer call: 631 in both cold baseline runs (`runs/e2e34_greedy_gemma3_1b_cpu_parallel1_keepalive0.txt`, `commit=777ad51`, and `…_keepalive0_run2.txt`, `commit=13ffdb7`) and in `runs/check_render_gemma3_1b.txt` (chat 631 / raw 631). Ollama's count includes the `<bos>` it adds, and the phone was given the text without `<bos>`, so the phone adds one `<bos>` like Ollama does. This assumes llama.rn uses the same tokenizer from the same blob (unverified).
+- **Replies compared word for word with the cold Ollama reply** (identical in both cold baseline runs: "The student portal is unavailable from November 7th to 8th. Online enrollment for the second term begins on November 9th. New research databases are available through the student portal."):
+  - Phone runs 2 and 3: **match**, word for word.
+  - Phone run 1: **differs.** First difference at word 4: phone "will" ("The student portal will be unavailable"), Ollama "is" ("The student portal is unavailable").
+  - None of the 16 gemma3:1b run files in `runs/` with an e2e-009 reply has phone run 1's reply.
+- **Guard check** (`e2escore.guard()` with the fakebackend results for `{"query": "student portal", "days": 30}` at the case's now, and the probe's forbidden titles; scratch script, not committed):
+  - Supported: dates 11-07, 11-09, 11-20; numbers 0, 2, 7, 9, 10, 20, 2026.
+  - Phone run 1: dates 11-07, 11-09, 11-20 and numbers 0, 2, 10, 2026 are all supported. **Guard not fired.** But its last sentence gives the research databases a start date of November 9th; that date is in ann-001 (enrollment), not in ann-025, which has no date. The guard compares dates as a set over all results, so it cannot catch a date moved to another announcement.
+  - Phone runs 2 and 3: "8th" in "November 7th to 8th" is read as the unsupported **number 8**. **Guard fired** (`number 8`), the same as e2e-009 in the cold baseline runs. The other dates, 11-07 and 11-09, are supported.
+- **System prompt share of the 631 tokens:** counted with `/api/generate` `"raw": true` on Ollama 0.40.13 (cold settings, `num_gpu` 0, `keep_alive` 0), splitting `runs/gate1_prompt.txt` after the first `<end_of_turn>\n`:
+  - Full prompt → 631. System turn (890 characters) → 209. Rest (1,237 characters) → 423. Each call adds one `<bos>`, so 209 + 423 = 632 = 631 + 1.
+  - So **209 of 631 tokens (33%), including `<bos>`**, are the `<bos>` and system turn, the part that could be cached across questions. The other 422 are the question and results.
+  - The system turn contains "Today is Monday, 2026-11-02", so a cached system prompt is valid for one day only.
+- **Conclusions (user):**
+  - The cold/warm reply difference also occurs on the phone.
+  - The guard must run on-device.
+  - Future phone timings must reload the model before each run.
+- **Why:** First Gate 1 measurement on a real phone, with the longest answer prompt.
+- **How it was verified:** the repo checks above. `uv run pytest -q` → `447 passed`; `uv run ruff check .` → `All checks passed!` (no code changed).
+- **Scope / unverified:**
+  - One cold run on one phone. Run-to-run stability of cold runs, memory after switching apps, and any weaker phone are untested.
+  - The Redmi 10C (the weakest target phone) is not yet tested. The Nothing is a mid/high-range phone, so these numbers are optimistic. Memory is a risk for 3–4 GB phones.
+  - This is not a Gate 1 decision.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - Redmi 10C: timing (model reloaded before each run) and memory, including switching away and back.
+  - Levers for prompt processing time, to test later: fewer or shorter results, system-prompt caching, thread count, streaming.
+  - The guard does not check which announcement a date belongs to (phone run 1).
+
 ## 2026-10-30: Keep throw-away-app/ out of git
 
 - **Date:** 2026-10-30 (ended about 00:34 +08:00; start time unverified)
