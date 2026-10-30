@@ -19,6 +19,32 @@ Template:
 
 ---
 
+## 2026-10-30: Gate 1 use_mmap memory experiment
+
+- **Date:** 2026-10-30 (ended about 19:26 +08:00; start time unverified)
+- **What changed:** Docs only: this entry. No code, prompt, case or seed-row change. The phone measurements were done by the user and are as the user reported them.
+- **Experiment (user):** Nothing Phone 3a Pro, the same development build as the entry below, with `use_mmap` on. `dumpsys meminfo` after loading the model and one run:
+
+  | | `use_mmap` on | Without `use_mmap` (entry below) | Change |
+  |---|---|---|---|
+  | TOTAL PSS | 1,676,750 kB | 1,554,625 kB | +122,125 kB |
+  | Dirty | 780,580 kB | 1,491,916 kB | −711,336 kB |
+  | Clean | 831,860 kB | 43,964 kB | +787,896 kB |
+  | Swap | 47,065 kB | not reported | — |
+
+- **Reading:**
+  - Several hundred MB moved from dirty to clean. This is consistent with the weights now being memory-mapped from the file, and with the entry below's reading that they were not mapped before. The user's note gives the move as about 830 MB; the computed changes are about 788 MB more clean and about 711 MB less dirty (the new clean total is 831,860 kB).
+  - Total PSS rose about 120 MB. The cause is unverified.
+- **Decision (user, 2026-10-30):** keep `use_mmap: true` for the standalone Redmi build.
+- **Why:** Clean, file-backed pages can be dropped and re-read under memory pressure; dirty pages cannot. This matters for the 3–4 GB target phones.
+- **How it was verified:** the changes in the table were computed from the reported numbers. Nothing else was checked in the repo; no code changed.
+- **Scope / unverified:**
+  - One measurement on one phone, development build.
+  - The possible cost, re-reading pages after eviction (slower replies after switching back), is unverified until the Redmi 10C background test.
+  - Why PSS rose, and whether swap was used without `use_mmap`.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** Redmi 10C standalone build with `use_mmap: true`: timing (model reloaded before each run), memory, and switching away and back.
+
 ## 2026-10-30: Gate 1 first phone run (not a gate decision)
 
 - **Date:** 2026-10-30 (ended about 19:20 +08:00; start time unverified)
