@@ -19,6 +19,29 @@ Template:
 
 ---
 
+## 2026-10-31: .gitattributes (LF), contract v2 docs, ADR 0004 and_v2 results
+
+- **Date:** 2026-10-31 (ended about 16:05 +08:00; start time unverified)
+- **What changed:**
+  - **`.gitattributes`** (`1f75dd9`): `*.txt`, `*.json`, `*.jsonl` and `*.md` are `text eol=lf`. Git for Windows sets `core.autocrlf=true` in its system config (`C:/Program Files/Git/etc/gitconfig`).
+  - **Renormalization** (`git add --renormalize .`): one file changed, `docs/devlog.md`, in its own commit (`ce69629`).
+    - The devlog had been committed with CRLF (1,890 line endings) plus one lone CR, so Git treated it as binary.
+    - Only line endings changed: the old blob with CRLF → LF is byte-identical to the new one.
+    - The lone CR, a CR byte inside backticks in an older entry where `\r` was presumably meant, is kept; past entries are not edited.
+    - Every other committed file was already LF in the index.
+  - **Contract docs** (`254616c`): `docs/how-it-works.md` gets a "Search contract version 2 (matching)" section and two folder-map rows. Arguments and results are the same as v1. Matching is `and_v2` with `contracts/search_synonyms_v1.json`, and the section links both vector files. No new schema file; the schema `$id` stays v1.
+  - **ADR 0004** (`189fe3d`, still PROPOSED): `and_v2` results.
+    - gemma3:1b fails 5 vs qwen3:0.6b's 6 (unsafe after guards 1 vs 0), within noise for 34 cases.
+    - The case for qwen3:0.6b now rests mainly on Redmi speed (answer call about 24–26 s vs about 40–43 s), not on dev-set quality.
+    - Taglish: no improvement for either model under `and_v2`. gemma3:1b's taglish-04 miss is tied to keeping "may"; qwen3:0.6b's comes from a truncated query word.
+    - The caveat and consequence bullets now give the `and_v2` figures as well.
+- **How it was verified:**
+  - Fresh clones into the scratchpad. `git clone` of HEAD (`ce69629`): the frozen prompts and map are LF with the pinned hashes, and `uv run --offline pytest` → 531 passed.
+  - `git clone --no-checkout` then `checkout abff8ce` (before the fix): the same files come out CRLF, and pytest → 5 failed (the two frozen-prompt hashes, the two date-in-user byte comparisons, and the synonym-map hash), 526 passed.
+  - A first attempt at the old clone was invalid: switching an existing clone between commits kept the LF files, so I redid it with `--no-checkout`.
+- **Commits:** `1f75dd9`, `ce69629`, `254616c`, `189fe3d`, and this docs commit. Not pushed. `origin/main` is at `fde5122`, so the remote has everything up to that commit.
+- **Open questions / next:** the Spring implementation of contract v2; the ADR 0004 decision (the team).
+
 ## 2026-10-31: and_v2 synonym matcher (search contract v2) replaces and_v1
 
 - **Date:** 2026-10-31 (ended about 16:00 +08:00; start time unverified)
