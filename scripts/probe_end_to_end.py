@@ -42,6 +42,11 @@ Retrieval hit is scored apart from the reply: a case with source_ids hits
 if all of them were retrieved; a case without source_ids hits if nothing
 was retrieved.
 
+A case with "out_of_scope": true runs and prints like any other, but is
+left out of every summary total (the scorer cannot score a safe decline
+yet). The summary lists each such case with whether the guard fired.
+Latency and max prompt tokens still include its calls.
+
 Both prompts are frozen before any held-out run (CLAUDE.md). The probe
 never reads the system clock: every date comes from the case's now
 (tests/test_e2e_harness.py checks this). Every request sends
@@ -134,7 +139,8 @@ CASE_FIELDS = {
 EXCLUSIONS = {None, "outdated", "injection"}
 # Other optional case fields: superseded {"current": [...], "old": [...]},
 # wrong_claims [...], label (e.g. which batch of cases it was added in),
-# note. The summary splits retrieval hit by label.
+# out_of_scope (bool, default false: see the module docstring), note. The
+# summary splits retrieval hit by label.
 NO_LABEL = "(no label)"
 
 
@@ -180,6 +186,8 @@ def load_cases(path: Path) -> list[dict]:
             sys.exit(f"{where}: 'wrong_claims' must be a list")
         if not isinstance(case.get("label", NO_LABEL), str):
             sys.exit(f"{where}: 'label' must be a string")
+        if not isinstance(case.get("out_of_scope", False), bool):
+            sys.exit(f"{where}: 'out_of_scope' must be a bool")
         if case["id"] in seen_ids:
             sys.exit(f"{where}: duplicate id {case['id']!r}")
         seen_ids.add(case["id"])
@@ -332,6 +340,8 @@ def main() -> None:
         "misses": [],
         "fired": [],
         "near_limit": [],
+        # (case id, guard line) for out_of_scope cases, which are not scored.
+        "out_of_scope": [],
     }
     kinds = ("unsupported", "contains", "filtered text", "stale", "misattributed")
     kind_counts = {stage: dict.fromkeys(kinds, 0) for stage in ("before", "after")}
@@ -398,8 +408,11 @@ def main() -> None:
             now, question = case["now"], case["question"]
             forbidden = [row["title"] for row in rows if not is_visible(row, now)]
             context_problems = []
+            scored = not case.get("out_of_scope", False)
 
             show(f"[{number}/{len(cases)}] {case['id']}: {question}")
+            if not scored:
+                show("  out of scope: reported, not scored")
 
             # 1. Query call: the model writes only the arguments.
             content, tokens, elapsed = call(
@@ -437,14 +450,16 @@ def main() -> None:
                 hit = set(case["source_ids"]) <= set(ids)
             else:
                 hit = not ids
-            stats["hits"] += hit
-            label_hits = hits_by_label.setdefault(case.get("label", NO_LABEL), [0, 0])
-            label_hits[0] += hit
-            label_hits[1] += 1
-            if not hit:
-                stats["misses"].append(case["id"])
+            if scored:
+                stats["hits"] += hit
+                label = case.get("label", NO_LABEL)
+                label_hits = hits_by_label.setdefault(label, [0, 0])
+                label_hits[0] += hit
+                label_hits[1] += 1
+                if not hit:
+                    stats["misses"].append(case["id"])
             if invalid:
-                stats["invalid"] += 1
+                stats["invalid"] += scored
                 show(f"  search: invalid arguments ({invalid})", end="")
             else:
                 show(f"  search: {len(ids)} result(s) {ids}", end="")
@@ -452,7 +467,7 @@ def main() -> None:
 
             # 3. Answer call, or the fixed not-found message without one.
             if results:
-                stats["answer_calls"] += 1
+                stats["answer_calls"] += scored
                 raw, tokens, elapsed = call(
                     *prompt_pair(
                         answer_prompt,
@@ -473,7 +488,7 @@ def main() -> None:
                 final = guarded.text
                 fired = guarded.fired
                 final_unsupported = [] if guarded.fired else raw_unsupported
-                if guarded.fired:
+                if guarded.fired and scored:
                     stats["guard_fired"] += 1
                     stats["fired"].append(case["id"])
                 guard_line = (
@@ -491,6 +506,10 @@ def main() -> None:
             show(f"  guard: {guard_line}")
             if final != raw:
                 show(f"  final: {final.replace(chr(10), ' | ')[:REPLY_PREVIEW_CHARS]}")
+            if not scored:
+                stats["out_of_scope"].append((case["id"], guard_line))
+                show()
+                continue
 
             # 5. Score before and after the guard.
             expected = {
@@ -544,7 +563,7 @@ def main() -> None:
                 stats["near_limit"].append(case["id"])
             show()
 
-    total = len(cases)
+    total = len(cases) - len(stats["out_of_scope"])
     answered = stats["answer_calls"]
 
     def ids_line(label: str, ids: list[str]) -> None:
@@ -606,6 +625,10 @@ def main() -> None:
     ids_line("fabrication after guards", stats["fabricated_after"])
     ids_line("unsafe after guards", groups["after"]["unsafe"])
     ids_line("unhelpful after guards", groups["after"]["unhelpful"])
+    ids_line(
+        "out of scope, not scored",
+        [f"{id_} (guard {line})" for id_, line in stats["out_of_scope"]],
+    )
 
 
 if __name__ == "__main__":

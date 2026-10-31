@@ -380,3 +380,63 @@ def test_e2e_probe_omits_keep_alive_by_default(monkeypatch, capsys):
     payloads = run_e2e(monkeypatch, "--summary-only")
     assert payloads and all("keep_alive" not in p for p in payloads)
     assert "keep_alive=" not in capsys.readouterr().out.splitlines()[0]
+
+
+def write_cases(path: Path, *cases: dict) -> Path:
+    base = {
+        "now": FIXED_NOW.isoformat(),
+        "source_ids": ["ann-003"],
+        "must_include": [["November 13"]],
+        "must_not_include": [],
+        "expects_not_found": False,
+    }
+    path.write_text(
+        "".join(json.dumps({**base, **case}) + "\n" for case in cases),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_e2e_probe_leaves_out_of_scope_cases_out_of_every_total(
+    monkeypatch, capsys, tmp_path
+):
+    cases = write_cases(
+        tmp_path / "cases.jsonl",
+        {"id": "scored", "question": "When is the dropping deadline?"},
+        {"id": "oos", "question": "Off topic?", "out_of_scope": True},
+    )
+    payloads = run_e2e(monkeypatch, "--cases", str(cases))
+    out = capsys.readouterr().out
+    # Both cases still run: a query call and an answer call each.
+    assert sum("format" in p for p in payloads) == 2
+    assert sum("format" not in p for p in payloads) == 2
+    assert "  out of scope: reported, not scored" in out
+    summary = out.split("Summary\n", 1)[1]
+    assert "  cases: 1\n" in summary
+    assert "  retrieval hit: 1/1 " in summary
+    assert "  answer calls: 1 " in summary
+    assert "  failed after guards: 1/1 " in summary
+    assert "  failed after guards: scored (" in summary
+    assert "oos" not in summary.split("  out of scope, not scored:")[0]
+    assert "  out of scope, not scored: oos (guard " in summary
+
+
+def test_e2e_probe_lists_no_out_of_scope_cases_by_default(monkeypatch, capsys):
+    run_e2e(monkeypatch, "--ids", "e2e-009", "--summary-only")
+    assert "  out of scope, not scored: none" in capsys.readouterr().out
+
+
+def test_cases_file_rejects_a_non_bool_out_of_scope(tmp_path):
+    harness = load_script("probe_end_to_end")
+    cases = write_cases(
+        tmp_path / "cases.jsonl", {"id": "x", "question": "q", "out_of_scope": "yes"}
+    )
+    with pytest.raises(SystemExit, match="'out_of_scope' must be a bool"):
+        harness.load_cases(cases)
+
+
+def test_taglish_cases_load_with_the_fixed_now():
+    harness = load_script("probe_end_to_end")
+    cases = harness.load_cases(ROOT / "evals" / "taglish_cases.jsonl")
+    assert {case["now"] for case in cases} == {FIXED_NOW}
+    assert [case["id"] for case in cases if case.get("out_of_scope")] == ["taglish-10"]
