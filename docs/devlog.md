@@ -19,6 +19,89 @@ Template:
 
 ---
 
+## 2026-10-31: Gate 1 qwen3:0.6b on the Redmi 10C; caching and query-call prompts
+
+- **Date:** 2026-10-31 (ended about 10:58 +08:00; start time unverified)
+- **What changed:**
+  - Docs only: this entry. No code, prompt, scoring rule, case or seed-row change.
+  - Two new prompt files in `runs/`, gitignored and not committed:
+    - `runs/gate1_prompt_qwen3_0_6b_b.txt` (second answer call, for the caching test)
+    - `runs/gate1_query_qwen3_0_6b.txt` (query call)
+- **Redmi 10C, qwen3:0.6b (user):**
+  - Setup:
+    - development build via USB, llama.rn 0.13.0-rc.8, CPU only, `n_ctx` 2048, threads 4, `use_mmap: true`
+    - stop strings `<|im_end|>` and `<|im_start|>`
+    - raw prompt from `runs/gate1_prompt_qwen3_0_6b.txt`, model reloaded before each run
+
+    | Cold run | Load | Prompt (591 tokens) | Generated (37 tokens) | Total |
+    |---|---|---|---|---|
+    | 1 | 2.5 s | 21.2 s | 9.7 tok/s | 25.1 s |
+    | 2 | 2.4 s | 22.1 s | 10.2 tok/s | 25.9 s |
+    | 3 | 2.0 s | 20.2 s | 10.4 tok/s | 23.9 s |
+
+    - Prompt speed works out to 26.7–29.3 tokens/s (591 / 22.1 s to 591 / 20.2 s). gemma3:1b managed 17.1–18.5 on the same phone.
+    - The phone counted 591 prompt tokens, the same as Ollama. So llama.rn adds no start-of-text token for this GGUF, which settles the open point in the 2026-10-30 qwen3:0.6b entry.
+    - All three runs gave the same reply: "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance."
+    - Memory right after the third run, app on screen: TOTAL PSS 1,039,611 kB, RSS 711,444 kB, swap PSS 382,646 kB, dirty 633,664 kB, clean 11,096 kB.
+      - That is about twice gemma3:1b's PSS after a cold run (494,672 kB, entry below), even though this model is smaller. Why is unverified. The runs may not be comparable: gemma3:1b was measured after one cold run, this after three reloads.
+  - **Storage lesson (user):** the test app copies the model into its cache every time it is picked; after several picks about 2 GB was used. A real app must keep one permanent copy.
+- **Scored against e2e-009** (scratch script; the same calls as the probe):
+  - must_include `November 7`: present.
+  - Not-found message: absent, as expected.
+  - Guard: dates and numbers all supported, no forbidden title; **not fired**.
+  - **PASS** before and after the guard.
+- **vs qwen3:0.6b's cold Ollama reply:**
+  - The phone reply is word for word the cold Ollama reply, both from the raw file check on 2026-10-30 and from today's cold probe run (below).
+  - It is not the "for system maintenance." reply that the rendering without the blank line gave.
+  - So unlike gemma3:1b (four different e2e-009 replies across devices and threads), qwen3:0.6b's cold reply matched on this phone. This is one case on one phone.
+- **Gate 1 status: still FAIL.**
+  - On the same phone the qwen3:0.6b answer call takes about 24–26 s, against about 40–43 s for gemma3:1b. The bar is 15 s for the whole question.
+  - The query call is still not timed on a phone.
+- **Today's cold Ollama run** (Ollama 0.40.13, `commit=67cd900`):
+  - Command: `uv run python scripts/probe_end_to_end.py --model qwen3:0.6b --ids e2e-009,e2e-001,e2e-004,e2e-006,e2e-007,e2e-010,e2e-011,e2e-013 --num-gpu 0 --keep-alive 0`. Output saved to scratch only.
+  - qwen3:0.6b's own query for e2e-009 is `{"query": "student portal", "days": 30}`, the same as gemma3:1b's. So the results in `runs/gate1_prompt_qwen3_0_6b.txt` (`ann-015, ann-001, ann-025`) are also qwen3:0.6b's own; the entry below could not say this.
+  - 7 of the 8 cases passed. e2e-001 failed: the model gave the not-found message although ann-001 was retrieved. e2e-001 also failed in both earlier qwen3:0.6b runs (entry of the first e2e baseline); whether for the same reason is unverified.
+- **Caching test prompt:** `runs/gate1_prompt_qwen3_0_6b_b.txt`
+  - Case: e2e-004, "When is the curriculum advising session for second year students?"
+  - Results: `ann-005` only. This is qwen3:0.6b's own cold query, `{"query": "curriculum advising session", "days": 30}`, sent to the real fakebackend.
+  - Same case `now` (2026-11-02T10:00:00+08:00), so the system turn has the same date.
+  - Rendered the same way as the first file. The first file re-renders byte for byte from the script.
+  - File: UTF-8, LF, 1,486 characters.
+  - Shared system turn: `<|im_start|>system\n\n` + system prompt + `<|im_end|>\n`, 887 bytes.
+    - Both files start with exactly those 887 bytes.
+    - The files actually match for 919 bytes, because the next line `<|im_start|>user\nQuestion: When ` is also the same.
+  - Token counts (Ollama 0.40.13, raw `/api/generate`, cold settings, `keep_alive` 0):
+
+    | Prompt | Tokens |
+    |---|---|
+    | Shared system turn alone | 197 |
+    | First file (e2e-009) | 591 = 197 + 394 |
+    | Second file (e2e-004) | 374 = 197 + 177 |
+
+    - The rest of each prompt was also counted alone: 394 and 177, so the split at the system turn adds up.
+    - `/api/chat` with `"think": false` gave the same counts and the same replies as raw.
+  - e2e-004's reply: "Curriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room." PASS.
+  - Estimate, not measured: at 26.7–29.3 tokens/s, a cached system turn saves about 6.7–7.4 s per answer call on the Redmi. The first answer call would drop to about 13.4–14.8 s of prompt processing (394 tokens). That is still over 15 s once generation and the query call are added.
+- **Query-call prompt:** `runs/gate1_query_qwen3_0_6b.txt`
+  - e2e-009's query call: `prompts/e2e_query_v1.txt` at the case's `now`, then the question.
+  - Same template as the answer call, with thinking off. UTF-8, LF, 984 characters.
+  - **239 tokens.** Raw `/api/generate` and `/api/chat` agree, and both reply `{"query": "student portal", "days": 30}`.
+  - Its system turn is the query prompt, not the answer prompt. A cached answer-call system turn does not help the query call; it would need its own cached prefix.
+  - The probe sends the contract's arguments schema as Ollama's `format`. Ollama applies it as a sampling constraint, not as prompt text, so the file holds all the text Ollama feeds the model.
+    - Raw without `format` also gave 239 tokens and the same reply. Here the schema made no difference.
+    - On the phone the schema would have to be passed as llama.rn's grammar or JSON schema option. Whether that matters on the phone is unverified.
+- **Why:** to record the qwen3:0.6b phone run, and to prepare the caching test and the query-call timing that ADR 0003 needs.
+- **How it was verified:**
+  - The probe run and the scratch script above, both against local Ollama only.
+  - The phone numbers are as the user reported them.
+  - Docs only. No code changed since `447 passed` on 2026-10-29, so tests were not rerun.
+- **Commits:** this `docs:` commit (devlog only). Not pushed.
+- **Open questions / next:**
+  - On the Redmi: run the second file right after the first without reloading, to see whether llama.rn reuses the 197-token prefix and how long the 177-token remainder takes.
+  - Time `runs/gate1_query_qwen3_0_6b.txt` on the Redmi, with and without the arguments schema as a grammar. Then time the whole question.
+  - Why qwen3:0.6b's PSS is about twice gemma3:1b's.
+  - The real app keeps one permanent copy of the model.
+
 ## 2026-10-30: ADR 0003 open points resolved; Redmi replies and guard
 
 - **Date:** 2026-10-30 (ended about 19:56 +08:00; start time unverified)
