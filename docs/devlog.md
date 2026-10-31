@@ -19,6 +19,41 @@ Template:
 
 ---
 
+## 2026-10-31: Wrong-row rule on every case; query v3 does not qualify; and_v2 plan
+
+- **Date:** 2026-10-31 (ended about 16:00 +08:00; start time unverified)
+- **Decisions (user, 2026-10-31):** generalize the wrong-row rule to every case; re-score all saved runs; apply the query-v3 rule mechanically; plan (no code) a synonym step `and_v2`.
+- **Honesty note:** the generalized rule was written **after** seeing qwen3:0.6b's e2e-003 reply under query v3 (a date from the dropping row given as the accreditation deadline).
+- **What changed** (`dff15e3`, `feat:`):
+  - `e2escore`'s module docstring states the rule. On every case, the wrong rows are every retrieved row that is not a source row, plus any named `wrong_rows`. A model-written reply's date or number that is in a wrong row's title or body, but in no source row's title or body and not in the question, fails as `wrong_row` (unsafe).
+  - The documented year limit stays. The question exclusion is my reading of "only in retrieved rows".
+  - New `wrong_rows_for()` builds the list, and the probe uses it.
+  - Tests: the probe flags qwen3:0.6b's e2e-003 reply as `wrong_row`, and a question's own date is not flagged. Both failed before the change.
+- **Re-score:** 13 saved runs from their saved replies: the 9 cited earlier plus the four query-v3 runs. Replayed with the scorer they ran under, the v3 files gave 0 differences. Every verdict that changes from the previous scorer (both fixes, named `wrong_rows` only) to the generalized rule:
+  - **gemma3:1b e2e-002** (v1 run 1 and run 2, v2, date-in-user, v3) and **gemma3:1b taglish-03** (v1, v3), before and after the guard: `[stale]` → `[wrong_row, stale]` (adds ann-002 date 11-06). The cases already failed and were already unsafe, so the counts don't change.
+  - **gemma3:1b e2e-009, before the guard** (v1 run 1 and run 2, v3): `[invented]` → `[invented, wrong_row]` (ann-001 date 11-09). No count changes.
+  - **gemma3:1b e2e-009** (v2 and date-in-user, before and after the guard): PASS → `FAIL [wrong_row]` (ann-001 11-09; date-in-user also 11-20).
+    - v2: failed 10 → 11, unsafe 2/1 → 3/2. Date-in-user: failed 11 → 12, unsafe 2/1 → 3/2.
+    - **These are false positives of the rule as written:** the replies answer correctly, then add the enrollment dates, labelled as enrollment. The rule can't tell a labelled extra fact from a misattributed one.
+  - **qwen3:0.6b e2e-003 (v3), before and after the guard:** `[other]` → `[wrong_row]` (ann-003 11-13, plus "number 0" from ":00" in ann-003 and ann-002). qwen3:0.6b's v3 e2e unsafe goes from 0/0 to 1/1.
+  - No change in any other qwen3:0.6b file, or in either qwen3:0.6b Taglish file.
+- **Query v3 decision (mechanical, generalized rule):**
+
+  | v1 → v3 | qwen3:0.6b e2e | gemma3:1b e2e | qwen3:0.6b Taglish | gemma3:1b Taglish |
+  |---|---|---|---|---|
+  | Failed after guards | 8 → 8 | 10 → 8 | 3 → 3 | 3 → 3 |
+  | Unsafe before / after | 0/0 → **1/1** | 3/1 → 3/1 | 0/0 → 0/0 | 2/2 → 2/2 |
+  | Unhelpful before / after | 8/8 → 7/7 | 7/9 → 5/7 | 3/3 → 3/3 | 2/2 → 2/2 |
+
+  - **Outcome: v3 does not qualify.** qwen3:0.6b gets worse on unsafe (e2e-003). Query v1 stays the default; the probe was not changed.
+- **and_v2 synonym step:** proposed in chat as a plan only. No code and no runs, pending the user's approval.
+- **How it was verified:** `uv run ruff check .` → clean; `uv run pytest` → 490 passed.
+- **Commits:** `dff15e3` and this docs commit. Not pushed.
+- **Open questions / next:**
+  - The rule's false positives on labelled extra facts (gemma3:1b e2e-009).
+  - "number 0" from times adds noise to the claims, but the verdicts don't depend on it.
+  - The and_v2 plan's approval.
+
 ## 2026-10-31: Stale-check fix, wrong_rows scoring, query prompt v3
 
 - **Date:** 2026-10-31 (ended about 15:35 +08:00; start time unverified)
