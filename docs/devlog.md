@@ -19,6 +19,81 @@ Template:
 
 ---
 
+## 2026-10-31: Gate 1 Redmi 10C caching test (qwen3:0.6b); llama.rn state APIs
+
+- **Date:** 2026-10-31 (ended about 11:15 +08:00; start time unverified)
+- **What changed:**
+  - Docs only: this entry. No code, prompt, scoring rule, case or seed-row change.
+  - The raw-question matcher experiment below is a plan only and waits for the user's approval.
+- **Redmi 10C, qwen3:0.6b (user):**
+  - Setup: development build, threads 4, `use_mmap: true`, `n_ctx` 2048. "Load" releases the context, so the prompt cache starts empty.
+  - Prompts: A = `runs/gate1_prompt_qwen3_0_6b.txt` (e2e-009 answer call), B = `runs/gate1_prompt_qwen3_0_6b_b.txt` (e2e-004 answer call), Q = `runs/gate1_query_qwen3_0_6b.txt` (e2e-009 query call).
+
+    | Sequence | Load | Call | Prompt tokens processed | Prompt time | Generated | Total |
+    |---|---|---|---|---|---|---|
+    | 1 | 2.3 s | A | 591 | 20.2 s | 37 at 10.4 tok/s | 23.9 s |
+    | | | then B | 171 of 374 | 6.0 s | 41 at 12.8 tok/s | 9.3 s |
+    | 2 | 1.3 s | Q | 239 | 8.0 s | 13 at 14.6 tok/s | 9.0 s |
+    | 3 | 1.0 s | A | 591 | 20.2 s | n/r | 23.9 s |
+    | | | then Q | 235 of 239 | 7.7 s | n/r | 8.7 s |
+    | | | then B | 370 of 374 | 12.4 s | 41 at 12.6 tok/s | 15.8 s |
+
+    (n/r: not reported.)
+  - Replies:
+    - A: the same as in the entry below.
+    - B: "Curriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room." This is word for word the cold Ollama reply in the entry below.
+    - Q: `{"query": "student portal", "days": 30}`, the same as Ollama.
+  - B scored against e2e-004 (scratch script, the probe's calls):
+    - must_include `November 10`: present. No not-found message.
+    - Guard: not fired.
+    - **PASS.**
+- **What the cache reused** (Ollama 0.40.13 raw token counts, scratch script):
+  - The tokens llama.rn skipped match the longest common token prefix of the two prompts, not just the system turn:
+    - A then B: 374 − 171 = 203 skipped. The prompts share `…<|im_end|>\n<|im_start|>user\nQuestion: When`, which is 203 tokens (197 system turn + 6).
+    - A then Q, and Q then B: 4 skipped. The prompts share only `<|im_start|>system\n\nYou`, which is 4 tokens.
+  - So there is one cache, and every call replaces it with its own prompt. The query call, whose system prompt is different, evicts the answer-call prefix.
+- **Findings (user):**
+  - llama.rn reuses a shared prompt prefix across different questions.
+  - The query call evicts that cache.
+  - With the current two-call design, the user estimates a whole question at about 25–33 s on the Redmi.
+  - **Gate 1: FAIL.**
+- **Investigation A: llama.rn 0.13.0-rc.8 state APIs** (read-only, in `C:\throw-away-app\gate1-llm\node_modules\llama.rn`; nothing changed there):
+  - **Parallel slots: they exist, but in this version they do not keep their own prompt caches by themselves.**
+    - API: `initLlama({ n_parallel })` (sets `n_seq_max`, default 8; `lib/typescript/types.d.ts:64-68`), then `context.parallel.enable({ n_parallel, n_batch })` and `context.parallel.completion(params, onToken)` (`lib/typescript/index.d.ts:147-211`; `README.md:534-637`).
+    - Limit: each slot gets `n_ctx / n_parallel` tokens (`cpp/rn-slot-manager.cpp:54-58`). With `n_ctx` 2048 and 2 slots, that is 1,024 per slot.
+    - Slot choice is least recently used, not prompt similarity (`cpp/rn-slot-manager.cpp:549-570`). `compute_similarity()` is a "stub for Phase 3" and nothing calls it (`:658-677`).
+    - A slot reuses its common prefix only when the request passes `load_state_path` (`cpp/rn-slot.cpp:193-236`). Without one it clears its sequence and starts fresh (`:256-270`).
+    - The README says "Slots share the same KV cache" (`README.md:633`).
+  - **Saving and loading state: supported**, in two forms.
+    - `context.saveSession(path, { tokenSize })` returns the number of tokens saved, and `context.loadSession(path)` returns `{ tokens_loaded, prompt }` (`lib/typescript/index.d.ts:213-216`, `types.d.ts:704-707`, `README.md:639-657`).
+      - Both throw while parallel mode is enabled (`cpp/jsi/JSISession.h:26-30`, `:102-106`).
+      - `tokenSize` saves only the first N tokens (`JSISession.h:113-120`).
+    - Per request in parallel mode: `load_state_path`, `save_state_path`, `save_prompt_state_path`, `load_state_size` and `save_state_size` (`lib/typescript/types.d.ts:391-427`).
+      - Loading reads the file into the slot's sequence (`cpp/rn-slot.cpp:809-816`).
+    - Stated limits:
+      - Multimodal sessions store only the text before the first media chunk (`README.md:657`).
+      - On Android with OpenCL, state load needs `kv_unified: true` and `flash_attn_type: 'off'` (`README.md:637`; enforced at `cpp/rn-slot.cpp:782-789`). This app runs on CPU.
+    - Not measured: how long a load takes on the Redmi. Rough estimate, unverified: about 22 MB of KV per 197 tokens (28 layers × 8 KV heads × 128 × 2 × 2 bytes for qwen3:0.6b at f16).
+  - **Several contexts sharing one model: not found (unverified).**
+    - Each `initLlama` calls `common_init_from_params()`, which loads the model for that context (`cpp/rn-llama.cpp:559`).
+    - No README or type mentions sharing a model between contexts.
+    - Whether `use_mmap` lets two contexts share the weight pages in memory is unverified.
+- **Investigation B: raw-question matcher.** The plan was given to the user in chat and waits for approval. No matcher code, run or retrieval on the raw question has been done.
+  - Estimate for the proposed snippet rule, made with today's results, not the new matcher's (Ollama raw counts, the snippets cut by hand):
+    - e2e-009's case part: 394 → 350 tokens.
+    - e2e-004's: 177 → 169.
+  - Most of the case part is the JSON fields, not the excerpts.
+- **Why:** to record the caching test, and to find out what llama.rn offers for keeping both system turns cached.
+- **How it was verified:**
+  - The phone numbers are as the user reported them.
+  - The token counts and the e2e-004 score come from scratch scripts against local Ollama only.
+  - The llama.rn findings come from reading the files cited.
+  - No code changed, so tests were not rerun.
+- **Commits:** this `docs:` commit (devlog only). Not pushed.
+- **Open questions / next:**
+  - Try `saveSession`/`loadSession` with one state file per system turn (query and answer). Time the load on the Redmi.
+  - The user's approval or changes for the raw-question matcher plan.
+
 ## 2026-10-31: Gate 1 qwen3:0.6b on the Redmi 10C; caching and query-call prompts
 
 - **Date:** 2026-10-31 (ended about 10:58 +08:00; start time unverified)
