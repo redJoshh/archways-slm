@@ -37,8 +37,9 @@ For each case:
    summary counts. A case's optional "exclusion" ("outdated" or
    "injection") says why its must_not_include phrases are wrong. The
    summary also reports unsafe and unhelpful rates (e2escore.UNSAFE and
-   UNHELPFUL) before and after the guard. A case's optional "wrong_rows"
-   (seed ids) applies e2escore's wrong-topic rule to model-written replies.
+   UNHELPFUL) before and after the guard. e2escore's wrong-row rule
+   applies to every model-written reply: the wrong rows are the retrieved
+   rows that are not source rows, plus the case's optional "wrong_rows".
 
 Retrieval hit is scored apart from the reply: a case with source_ids hits
 if all of them were retrieved; a case without source_ids hits if nothing
@@ -106,6 +107,7 @@ from archways_assistant.e2escore import (
     supported,
     unsupported_claims,
     wrong_row_claims,
+    wrong_rows_for,
 )
 from archways_assistant.fakebackend import (
     DEFAULT_MATCHER,
@@ -542,7 +544,12 @@ def main() -> None:
                 "wrong_claims": case.get("wrong_claims", []),
             }
             retrieved_text = "\n".join(f"{r['title']}\n{r['excerpt']}" for r in results)
-            wrong_rows = [rows_by_id[id_] for id_ in case.get("wrong_rows", [])]
+            wrong_ids = wrong_rows_for(
+                named=case.get("wrong_rows", []),
+                retrieved=ids,
+                sources=case["source_ids"],
+            )
+            wrong_rows = [rows_by_id[id_] for id_ in wrong_ids]
             source_rows = [rows_by_id[id_] for id_ in case["source_ids"]]
             for stage, reply, unsupported, code_built, fallback_used in (
                 ("before", raw, raw_unsupported, not results, False),
@@ -551,7 +558,7 @@ def main() -> None:
                 wrong_row = (
                     []
                     if code_built
-                    else wrong_row_claims(reply, wrong_rows, source_rows)
+                    else wrong_row_claims(reply, wrong_rows, source_rows, question)
                 )
                 problems = failures(
                     reply, **expected, unsupported=unsupported, wrong_row=wrong_row

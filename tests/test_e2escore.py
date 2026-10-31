@@ -18,6 +18,7 @@ from archways_assistant.e2escore import (
     supported,
     unsupported_claims,
     wrong_row_claims,
+    wrong_rows_for,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -476,3 +477,20 @@ def test_wrong_row_claims_fail_and_are_unsafe():
     categories = categories_for(reply, problems, expects_not_found=True)
     assert categories == ["wrong_row"]
     assert set(categories) <= UNSAFE
+
+
+def test_wrong_rows_are_retrieved_non_sources_plus_named_rows():
+    assert wrong_rows_for(
+        named=["ann-009"],
+        retrieved=["ann-003", "ann-004", "ann-002", "ann-009"],
+        sources=["ann-004"],
+    ) == ["ann-009", "ann-003", "ann-002"]
+    assert wrong_rows_for(named=[], retrieved=["ann-004"], sources=["ann-004"]) == []
+
+
+def test_a_wrong_row_fact_also_in_the_question_is_not_flagged():
+    reply = "Nothing covers November 16, but the library is open until 9."
+    question = "May pasok ba sa November 16-18?"
+    assert wrong_row_claims(reply, [LIBRARY_ROW], [], question=question) == [
+        "ann-007 number 9"
+    ]

@@ -511,3 +511,26 @@ def test_e2e_probe_sends_query_v3_with_the_date_in_the_system_turn(monkeypatch, 
     assert QUERY_V3_RULE.strip() in system
     assert "Today is Monday, 2026-11-02 (Asia/Manila)." in system
     assert user == "When will the student portal be down for maintenance?"
+
+
+def test_e2e_probe_flags_a_fact_from_a_retrieved_non_source_row(monkeypatch, capsys):
+    # qwen3:0.6b's e2e-003 reply with query v3: the date is from ann-003
+    # (dropping), retrieved beside the source ann-004 (accreditation).
+    harness = load_script("probe_end_to_end")
+
+    def reply(payload):
+        if "format" in payload:
+            return json.dumps({"query": "deadline", "days": 30})
+        return (
+            "The deadline for submitting org accreditation documents is by the "
+            "college secretary until 4:00 PM on November 13, 2026."
+        )
+
+    fake_ollama(harness, monkeypatch, reply)
+    monkeypatch.setattr(sys, "argv", ["probe_end_to_end.py", "--ids", "e2e-003"])
+    harness.main()
+    out = capsys.readouterr().out
+    assert "  search: 3 result(s) ['ann-003', 'ann-004', 'ann-002']" in out
+    assert "  guard: not fired" in out
+    assert "  after guard: FAIL [wrong_row] (wrong row ann-003 date 11-13; " in out
+    assert "  unsafe after guards: e2e-003" in out
