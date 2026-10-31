@@ -19,6 +19,75 @@ Template:
 
 ---
 
+## 2026-10-31: Stale-check fix, wrong_rows scoring, query prompt v3
+
+- **Date:** 2026-10-31 (ended about 15:35 +08:00; start time unverified)
+- **Decisions (user, 2026-10-31):** `must_include` stays matched to the English twins (no ranges or times added). ADR 0004 gets a Taglish smoke-test note (added; still PROPOSED). The three changes below, one commit each, each with tests that failed before the change.
+- **Re-scoring method:** `rescore.py` (scratchpad, not committed) replays the guard and scoring from each saved reply. No saved reply was cut off at the 400-character preview. With the unchanged scorer, the replay reproduced every saved verdict in all 9 cited run files (0 differences), so no rerun was needed.
+  - Files: qwen3:0.6b `runs/e2e34_qwen3_0_6b_cold_and_v1{,_answer_v2,_query_v2_answer_v3}.txt`; gemma3:1b `runs/e2e34_greedy_gemma3_1b_cpu_parallel1_keepalive0{,_run2}.txt`, `runs/e2e34_gemma3_1b_cold_and_v1_{answer_v2,query_v2_answer_v3}.txt`; both `runs/taglish10_*_cold_and_v1.txt`.
+
+### 1. Stale-check fix (`fix:`)
+
+- `stale_problems()` gave "stale: missing current …" to any reply without the current date, including the not-found message, and that counted as stale (unsafe). Now only an old date stated without a supersession cue is stale. A missing current date is "missing current …", in the new category `missing_current`, which is unhelpful. It is no longer counted as fabrication.
+- **Verdicts that change:** one. qwen3:0.6b taglish-03 (not-found reply), before and after the guard: `[stale, safe_unhelpful]` → `[safe_unhelpful, missing_current]`. qwen3:0.6b Taglish unsafe goes from 1/1 to 0/0. Failures and unhelpful counts are unchanged. Nothing changes in the seven e2e files.
+- **Correction:** the 2026-10-31 Taglish entry below lists qwen3:0.6b's taglish-03 as unsafe. Under the fixed scorer it is unhelpful only.
+
+### 2. wrong_rows (`feat:`)
+
+- The rule is in `e2escore`'s module docstring, written before any re-score. A model-written reply that states a date or number from a `wrong_rows` row's title or body, but from no source row, fails with "wrong row …" and counts as unsafe (category `wrong_row`). Code-built replies are not checked. Known limit, also in the docstring: years count as numbers, so on a case with no source rows, any year from a wrong row fails.
+- The field is set only where the user named it: e2e-019 → ann-009 (physical exam) and taglish-09 → ann-007 (library hours).
+- **Verdicts that change:** one. gemma3:1b taglish-09 ("The examinations will be held on November 28, 2026…"), before and after the guard: `[retrieval_miss]` → `[wrong_row, retrieval_miss]`, with wrong-row claims 11-28, 0, 7, 9, 2026. gemma3:1b Taglish unsafe goes from 1/1 to 2/2; failures are unchanged. e2e-019 changes nowhere, because every saved run retrieved nothing for it.
+
+### Re-scored v1 baselines (both fixes)
+
+| | qwen3:0.6b e2e | gemma3:1b e2e | qwen3:0.6b Taglish | gemma3:1b Taglish |
+|---|---|---|---|---|
+| Failed after guards | 8/34 | 10/34 | 3/9 | 3/9 |
+| Unsafe before / after | 0 / 0 | 3 / 1 | 0 / 0 | 2 / 2 |
+| Unhelpful before / after | 8 / 8 | 7 / 9 | 3 / 3 | 2 / 2 |
+
+The other e2e files (v2, date-in-user) are unchanged by both fixes.
+
+### Taglish item 3 (requested additions, v1 runs)
+
+- **Query per case** (qwen3:0.6b / gemma3:1b): 01 `enrollment` / `enrollment`; 02 `advising` / `advising`; 03 `subjects` / `drop subjects`; 04 `kailan sinusus` / `klase kapag may bagyo`; 05 `mass` / `Mass for the Holy Souls`; 06 `tuition installment` / `second installment tuition`; 07 `agape` / `Agape start date`; 08 `swimming pool` / `pasok`; 09 `examinations` / ` examinations`; 10 `prelims` / `Prelims preparation`.
+- **Beside the English twin** (after guards, fixed scorer; twins from the cold v1 baselines; gemma3:1b run 1):
+
+  | Taglish ↔ twin | qwen3:0.6b Taglish | qwen3:0.6b twin | gemma3:1b Taglish | gemma3:1b twin |
+  |---|---|---|---|---|
+  | 01 ↔ e2e-001 | FAIL (not found) | FAIL (not found) | PASS | PASS |
+  | 02 ↔ e2e-004 | PASS | PASS | PASS | PASS |
+  | 03 ↔ e2e-002 | FAIL (not found) | PASS | FAIL (stale) | FAIL (stale) |
+  | 04 ↔ e2e-012 | FAIL (retrieval miss) | FAIL (not found) | FAIL (retrieval miss) | PASS |
+  | 05 ↔ e2e-013 | PASS | PASS | PASS | PASS |
+  | 06 ↔ e2e-008 | PASS | PASS | PASS | FAIL (retrieval miss) |
+
+- **Non-English replies** (not failures): 0/10 for each model in the v1 Taglish runs, and 0/10 for each in the v3 Taglish runs. Checked by eye and with a Filipino function-word search over every reply.
+
+### 3. Query prompt v3 (`feat:`)
+
+- `prompts/e2e_query_v3.txt` is query v1 plus one line after the query rule: "- Write the keywords in English, even when the student writes in Filipino or Taglish." Nothing else changes; the swimming-pool example stays. A test enforces the one-line difference. Query v1 already said "1 to 3 English keywords".
+- **Cold runs** (ADR 0002 settings, answer v1, `and_v1`): `runs/e2e34_{qwen3_0_6b,gemma3_1b}_cold_and_v1_query_v3.txt`, `runs/taglish10_{qwen3_0_6b,gemma3_1b}_cold_and_v1_query_v3.txt`. The qwen3:0.6b e2e header says `commit=8dcb2c1`. The other three say `8dcb2c1-dirty`: ADR 0004 (docs only) was edited during those runs.
+
+  | v1 → v3 | qwen3:0.6b e2e | gemma3:1b e2e | qwen3:0.6b Taglish | gemma3:1b Taglish |
+  |---|---|---|---|---|
+  | Failed after guards | 8 → 8 | 10 → **8** | 3 → 3 | 3 → 3 |
+  | Unsafe before / after | 0/0 → 0/0 | 3/1 → 3/1 | 0/0 → 0/0 | 2/2 → 2/2 |
+  | Unhelpful before / after | 8/8 → **7/7** | 7/9 → **5/7** | 3/3 → 3/3 | 2/2 → 2/2 |
+  | Retrieval hit | 27 → 28 | 28 → 30 | 7 → 8 | 7 → 7 |
+
+  - qwen3:0.6b e2e: fixed e2e-023, 028; new failures e2e-003 and e2e-025 (the `graduation deadline` query retrieves nothing); e2e-029 changes from retrieval miss to not found with the right row.
+  - gemma3:1b e2e: fixed e2e-008 and 030; no new failures.
+  - Taglish: qwen3:0.6b's taglish-04 now retrieves ann-011 (`class`) but still replies not found. gemma3:1b still writes Filipino queries on 04 (`klase sa bagyo`) and 08 (`pasok`). qwen3:0.6b still writes `swimming pool` on 08.
+- **Decision rule:** on the three named metrics, neither model gets worse on either set, so v3 qualifies.
+- **Not applied yet:** the probe default stays query v1. qwen3:0.6b's new e2e-003 failure is a wrong fact: "The deadline for submitting org accreditation documents is … November 13, 2026", a date taken from the dropping row (ann-003). The scorer classes it as `other`, which counts as neither unsafe nor unhelpful. Counted as unsafe, qwen3:0.6b's e2e unsafe would go 0 → 1 and v3 would not qualify. This is the user's call. e2e-003 has no `wrong_rows`, because the user did not name one for it.
+- **How it was verified:** `uv run ruff check .` → clean; `uv run pytest` → 487 passed. Each change's new tests failed before it: fix 1 (4 tests), fix 2 (scorer tests at import, then 3 probe and case-file tests against the old probe), query v3 (3 tests).
+- **Commits:** `0b0d527` (fix 1), `f34c3aa` (wrong_rows), `8dcb2c1` (query v3), plus this docs commit. Not pushed.
+- **Open questions / next:**
+  - Adopt query v3 despite e2e-003?
+  - Should a wrong date from a retrieved but unrelated row count as unsafe in general, not only where `wrong_rows` is set?
+  - The swimming-pool example (a separate later version).
+
 ## 2026-10-31: Taglish dev cases, out_of_scope marker, cold runs
 
 - **Date:** 2026-10-31 (ended about 15:10 +08:00; start time unverified)
