@@ -19,6 +19,64 @@ Template:
 
 ---
 
+## 2026-10-31: and_v2 synonym matcher (search contract v2) replaces and_v1
+
+- **Date:** 2026-10-31 (ended about 16:00 +08:00; start time unverified)
+- **Decisions (user, 2026-10-31):**
+  - Keep the question-echo exception in the wrong-row rule.
+  - **Known scorer limit, no fix now:** labelled extra facts look like misattribution. Example: gemma3:1b e2e-009 under answer v2 and date-in-user, where the reply correctly labels the enrollment dates as enrollment but is flagged `wrong_row`.
+  - `and_v2` approved as specified below; never tuned afterwards (a change is a new version).
+- **Correction:** the previous entry's "ended about 16:00" was wrong: that work ended before 15:56.
+- **What changed:**
+  - `contracts/search_synonyms_v1.json` (next to the search contract, `contracts/search_announcements.schema.json`; the folder is `contracts/`, not `contract/`). It is frozen, with a SHA-256 test like the frozen prompts.
+    - Map: payment → due; enrolment → enrollment; second-term → second term; registration → sign up; examinations → examination; bagyo → typhoon; klase → class.
+    - `extra_stopwords`: "kapag".
+    - Not included: register (no observed failure), pasok (breaks taglish-08; revisit with real announcements), deadline (no safe bridge), "may" as a stopword.
+  - **The map and the `fakebackend` docstring rule were written and committed before any run** (`e4e6959`).
+    - Rule: query lowercased and split on whitespace; `and_v1` stopwords plus "kapag" dropped. Each word becomes a group: the word, then its synonyms. A group matches if any member is a plain substring of the title or body (OR within a group); every group must match (AND across groups).
+    - "kapag" is an `and_v2`-only stopword. `STOPWORDS` (`and_v1`, `prefix_v2`) is unchanged, so the baselines and the existing vectors still hold.
+  - `tests/vectors/search_vectors_and_v2.json`: the `and_v1` rows plus six new rows, and 12 vectors with the expected ids and ILIKE patterns per group, written by hand before the code. Every `and_v1` vector without a mapped word gives the same result under `and_v2`.
+  - **Search contract v2:** the arguments and results are unchanged, but matching changes. The Spring owner must implement the same map from the same file and pass the `and_v2` vectors. Per word: `(title ILIKE ? OR body ILIKE ? …)` over the word and its synonyms, AND across words, same escaping (`ilike_pattern()`), allowlist filter unchanged. The schema file's `$id` is still v1; no schema v2 file was created.
+  - **Risk, untested on real data:** "due" as a substring also matches phrases such as "due to".
+- **1. Retrieval replay** (saved v1 queries, no model calls; the `and_v1` replay reproduced every saved result):
+
+  | | qwen3:0.6b | gemma3:1b |
+  |---|---|---|
+  | e2e retrieval hit (and_v1 → and_v2) | 27 → 30 (027, 028, 029) | 28 → 33 (008, 027, 029, 030, 031) |
+  | e2e traps (10) | 8 → 8 | 10 → 10 |
+  | Taglish retrieval hit | 7 → 7 | 7 → 7 |
+  | Taglish traps (3) | 2 → 2 | 2 → 2 |
+
+  - taglish-09 (a trap) also retrieves ann-009 beside ann-007; it was already a miss.
+  - taglish-04 is still missed: qwen3:0.6b's query was "kailan sinusus", and gemma3:1b's query keeps "may".
+- **2. Cold runs** (ADR 0002 settings, answer v1, query v1, `and_v2`, one each, `commit=e4e6959` clean): `runs/e2e34_{qwen3_0_6b,gemma3_1b}_cold_and_v2.txt`, `runs/taglish10_{qwen3_0_6b,gemma3_1b}_cold_and_v2.txt`. The baselines are the `and_v1` v1 runs re-scored with the current scorer.
+
+  | and_v1 → and_v2 | qwen3:0.6b e2e | gemma3:1b e2e | qwen3:0.6b Taglish | gemma3:1b Taglish |
+  |---|---|---|---|---|
+  | Failed after guards | 8 → **6** | 10 → **5** | 3 → 3 | 3 → 3 |
+  | Unsafe before / after | 0/0 → 0/0 | 3/1 → 3/1 | 0/0 → 0/0 | 2/2 → 2/2 |
+  | Unhelpful before / after | 8/8 → **6/6** | 7/9 → **2/4** | 3/3 → 3/3 | 2/2 → 2/2 |
+  | Retrieval hit | 27 → 30 | 28 → 33 | 7 → 7 | 7 → 7 |
+  | Trap retrieval | 8/10 → 8/10 | 10/10 → 10/10 | 2/3 → 2/3 | 2/3 → 2/3 |
+
+  - Fixed: qwen3:0.6b e2e-027 and 028; gemma3:1b e2e-008, 027, 029, 030 and 031.
+  - **No new failure for either model.**
+  - qwen3:0.6b's e2e-029 now retrieves ann-001 but still replies not found.
+  - The cold retrieval hits match the replay exactly.
+- **3. Rule, applied mechanically:** neither model got worse on failures, unsafe, unhelpful or trap retrieval, on e2e or Taglish. **`and_v2` replaces `and_v1`:** `DEFAULT_MATCHER` is `and_v2` (`4444371`). `and_v1` stays available for comparisons. Answer v2 may also run with `and_v2`, since both order results newest first.
+- **4. The map was built from dev failures.** Every entry comes from a retrieval miss on the e2e or Taglish dev cases, so these dev gains overstate what to expect on the held-out set and on real announcements.
+- **How it was verified:** `uv run ruff check .` → clean; `uv run pytest` → 531 passed.
+  - The `and_v2` tests failed at import before the code existed.
+  - The default-matcher tests (`test_default_matcher_is_and_v2`, `test_e2e_probe_uses_and_v2_by_default`) failed before the default changed.
+- **Risk found:** `core.autocrlf` is `true` and the repo has no `.gitattributes`. A fresh Windows checkout would write CRLF, which breaks the SHA-256 tests for the frozen map and prompts (the current working copies are LF). This is unverified on a fresh clone and not fixed; `*.txt`/`*.json eol=lf` in `.gitattributes` would pin it.
+- **Commits:** `e4e6959` (and_v2 and the map), `4444371` (default), and this docs commit. Not pushed.
+- **Open questions / next:**
+  - The Spring implementation of contract v2.
+  - Whether the schema needs a v2 `$id`.
+  - The `.gitattributes` fix.
+  - taglish-04 ("may"; truncated Filipino queries).
+  - pasok, with real announcements.
+
 ## 2026-10-31: Wrong-row rule on every case; query v3 does not qualify; and_v2 plan
 
 - **Date:** 2026-10-31 (ended about 16:00 +08:00; start time unverified)
