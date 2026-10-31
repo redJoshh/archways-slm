@@ -90,7 +90,8 @@ def test_no_code_reads_the_held_out_file():
 
 
 @pytest.mark.parametrize(
-    "name", ["e2e_query_v1.txt", "e2e_answer_v1.txt", "e2e_answer_v2.txt"]
+    "name",
+    ["e2e_query_v1.txt", "e2e_query_v3.txt", "e2e_answer_v1.txt", "e2e_answer_v2.txt"],
 )
 def test_e2e_prompts_get_the_fixed_date_with_its_weekday(name):
     probe = load_script("probe_tool_call")
@@ -483,3 +484,30 @@ def test_cases_file_rejects_an_unknown_wrong_row(tmp_path):
     )
     with pytest.raises(SystemExit, match="'wrong_rows' must be a list of seed ids"):
         harness.load_cases(cases)
+
+
+QUERY_V3_RULE = (
+    "- Write the keywords in English, even when the student writes in Filipino "
+    "or Taglish.\n"
+)
+
+
+def test_query_v3_is_query_v1_plus_one_rule():
+    # One change only: the English-keywords rule after the query rule.
+    v1 = (ROOT / "prompts" / "e2e_query_v1.txt").read_text(encoding="utf-8")
+    v3 = (ROOT / "prompts" / "e2e_query_v3.txt").read_text(encoding="utf-8")
+    lines = v1.splitlines(keepends=True)
+    (at,) = [n for n, line in enumerate(lines) if line.startswith("- query: ")]
+    assert v3 == "".join(lines[: at + 1] + [QUERY_V3_RULE] + lines[at + 1 :])
+
+
+def test_e2e_probe_sends_query_v3_with_the_date_in_the_system_turn(monkeypatch, capsys):
+    payloads = run_e2e(monkeypatch, "--ids", "e2e-009", "--query-prompt", "v3")
+    header = capsys.readouterr().out.splitlines()[0]
+    assert " query_prompt=prompts/e2e_query_v3.txt " in header
+    assert " answer_prompt=prompts/e2e_answer_v1.txt " in header
+    (query,) = [p for p in payloads if "format" in p]
+    system, user = (m["content"] for m in query["messages"])
+    assert QUERY_V3_RULE.strip() in system
+    assert "Today is Monday, 2026-11-02 (Asia/Manila)." in system
+    assert user == "When will the student portal be down for maintenance?"

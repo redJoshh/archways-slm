@@ -4,7 +4,7 @@ Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
     [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--repeat 5]
     [--summary-only]
     [--num-gpu 0] [--keep-alive 0] [--matcher and_v1|prefix_v2]
-    [--answer-prompt v1|v2|v3] [--query-prompt v1|v2]
+    [--answer-prompt v1|v2|v3] [--query-prompt v1|v2|v3]
 
 For each case:
 1. Query call. The model writes only the search arguments: Ollama's format
@@ -24,7 +24,8 @@ For each case:
    order is newest first. v3 is v1 with today's date moved from the
    system turn to the start of the user message (prompt_pair()), so the
    system turn is the same every day; --query-prompt v2 does the same to
-   the query prompt (default v1).
+   the query prompt (default v1). --query-prompt v3 is query v1 plus one
+   rule: write the keywords in English, even for Filipino or Taglish.
 4. Guard. A model reply with a date or number that the retrieved titles
    and excerpts and the question don't support, or with the title
    of a row that must never reach the model, is replaced by a fallback
@@ -116,6 +117,7 @@ from archways_assistant.fakebackend import (
 
 QUERY_PROMPT = ROOT / "prompts" / "e2e_query_v1.txt"
 QUERY_PROMPT_V2 = ROOT / "prompts" / "e2e_query_v2.txt"
+QUERY_PROMPT_V3 = ROOT / "prompts" / "e2e_query_v3.txt"
 ANSWER_PROMPT = ROOT / "prompts" / "e2e_answer_v1.txt"
 ANSWER_PROMPT_V2 = ROOT / "prompts" / "e2e_answer_v2.txt"
 ANSWER_PROMPT_V3 = ROOT / "prompts" / "e2e_answer_v3.txt"
@@ -257,7 +259,11 @@ ANSWER_VERSIONS = {
     "v3": (ANSWER_PROMPT_V3, announcements_message, True),
 }
 # --query-prompt: (prompt file, date in the user turn).
-QUERY_VERSIONS = {"v1": (QUERY_PROMPT, False), "v2": (QUERY_PROMPT_V2, True)}
+QUERY_VERSIONS = {
+    "v1": (QUERY_PROMPT, False),
+    "v2": (QUERY_PROMPT_V2, True),
+    "v3": (QUERY_PROMPT_V3, False),
+}
 
 
 def prompt_pair(

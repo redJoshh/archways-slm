@@ -25,6 +25,13 @@ E2E_QUESTIONS = [
     .splitlines()
     if line.strip()
 ]
+TAGLISH_QUESTIONS = [
+    json.loads(line)["question"]
+    for line in (ROOT / "evals" / "taglish_cases.jsonl")
+    .read_text(encoding="utf-8")
+    .splitlines()
+    if line.strip()
+]
 V4 = (PROMPTS / "system_v4_schema_mode.txt").read_text(encoding="utf-8")
 E2E_QUERY = (PROMPTS / "e2e_query_v1.txt").read_text(encoding="utf-8")
 # An e2e query example is a "Student: ..." line followed by its JSON line.
@@ -48,7 +55,7 @@ def test_v3_prompt_mode_reuses_system_v3_rules_exactly():
 @pytest.mark.parametrize("path", sorted(PROMPTS.glob("*.txt")), ids=lambda p: p.name)
 def test_no_prompt_contains_a_dev_question(path):
     text = path.read_text(encoding="utf-8")
-    for question in DEV_QUESTIONS + E2E_QUESTIONS:
+    for question in DEV_QUESTIONS + E2E_QUESTIONS + TAGLISH_QUESTIONS:
         assert not is_copy(question, text)
 
 
