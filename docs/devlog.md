@@ -19,6 +19,47 @@ Template:
 
 ---
 
+## 2026-10-31: Taglish dev cases, out_of_scope marker, cold runs
+
+- **Date:** 2026-10-31 (ended about 15:10 +08:00; start time unverified)
+- **What changed:**
+  - `evals/taglish_cases.jsonl`: 10 Filipino/Taglish dev cases written by the user, with expected answers fixed before any run. Dev-only; not the held-out file.
+    - Extra fields: `english_twin`, `expected` (the user's text, verbatim), `label` "taglish dev set (KJ)".
+    - `must_include` copies the English twin exactly: taglish-01 ← e2e-001 (Nov 20), 02 ← e2e-004 (Nov 10), 03 ← e2e-002 (Nov 13, with its `superseded` and `wrong_claims`), 04 ← e2e-012 (Signal No. 2), 05 ← e2e-013 (Nov 2), 06 ← e2e-008 (Nov 12, as the user asked). 07–10 have no twin.
+    - So taglish-01, 02 and 05 do not require the range or time in their `expected` text (their twins ask "when" or "close", not "what time").
+  - `scripts/probe_end_to_end.py`: optional `"out_of_scope": true`. Such a case runs and prints as usual, but is left out of every summary total. The summary lists it with the guard line. Latency and max prompt tokens still include its calls. taglish-10 uses it.
+  - Tests: out_of_scope cases out of the totals, listed as `none` by default, a non-bool rejected, and the Taglish file loads.
+- **Seed checks:** no row mentions Agape. No row gives a second-term exam schedule: ann-018 is first-term midterms, and ann-007 mentions final examinations only as the reason for library hours (Nov 16–28). No row covers classes on Nov 16–18: ann-007 (library hours) and ann-008 (scholarship deadline, Nov 18) fall on those dates.
+- **Overlap** (`check_overlap.py`, question field): e2e protected → 2/10 flagged (taglish-05, 06; paraphrase, 0 exact). dev_questions protected → 1/10 (taglish-08; paraphrase). All are intended Taglish twins or near the dev question "May pasok ba bukas?"; kept, since both files are dev-only.
+- **Cold runs** (ADR 0002 settings, answer v1, query v1, `and_v1`, one each; `runs/taglish10_qwen3_0_6b_cold_and_v1.txt`, `runs/taglish10_gemma3_1b_cold_and_v1.txt`):
+
+  | 9 scored cases | qwen3:0.6b | gemma3:1b |
+  |---|---|---|
+  | Failed after guards | 3 (01, 03, 04) | 3 (03, 04, 09) |
+  | Unsafe before / after | 1 / 1 (03) | 1 / 1 (03) |
+  | Unhelpful before / after | 3 / 3 (01, 03, 04) | 2 / 2 (04, 09) |
+  | Retrieval hit | 7/9 (misses 04, 09) | 7/9 (misses 04, 09) |
+  | Guard fired | 0/6 | 0/6 |
+  | taglish-10 (not scored) | not-found message, guard not run | not-found message, guard not run |
+
+  - Both headers say `commit=fde5122-dirty`: the probe change and the case file were uncommitted during the runs; they are committed unchanged below.
+  - **Scorer gaps seen:**
+    - qwen3:0.6b's taglish-03 counts as unsafe (stale: missing current date), but its reply is the not-found message.
+    - gemma3:1b's taglish-09 says "The examinations will be held on November 28, 2026" from ann-007. The guard did not fire (Nov 28 is in the excerpt), and the scorer counts it as a retrieval miss (unhelpful), not unsafe.
+  - qwen3:0.6b searched for `"swimming pool"` on taglish-08, the prompt's own example again (seen on e2e-021 before).
+- **How it was verified:** `uv run ruff check .` → clean; `uv run pytest` → 472 passed. Setting `total = len(cases)` made the totals test fail.
+- **Commits:** see git log (feat, test, docs).
+- **Open questions / next:** whether taglish-01, 02 and 05 should require the range or time; the two scorer gaps above.
+
+## 2026-10-31: Seed announcements listed (read-only)
+
+- **Date:** 2026-10-31 (time unverified)
+- **What changed:** nothing in code, data or prompts. A table of the 25 rows in `data/seed/announcements.json` (id, title, office, `published_at`, body dates and times) was printed for the user.
+- **Why:** user request, read-only.
+- **How it was verified:** `python -c "json.load(...)"` over the file → 25 rows. The file has no `posted_at` field; `published_at` was shown instead.
+- **Commits:** none.
+- **Open questions / next:** none from this task.
+
 ## 2026-10-31: Session-file phone test, ADR 0005, date-in-user prompts, result cap
 
 - **Date:** 2026-10-31 (ended about 12:25 +08:00; start time unverified)
