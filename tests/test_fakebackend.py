@@ -50,8 +50,13 @@ RESULT_VALIDATOR = Draft202012Validator(
 
 
 def search(arguments, rows=None, now=VECTOR_NOW):
+    """and_v1 search (tests/vectors/search_vectors.json is for and_v1)."""
     return search_announcements(
-        VECTORS["rows"] if rows is None else rows, arguments, now, CONTRACT
+        VECTORS["rows"] if rows is None else rows,
+        arguments,
+        now,
+        CONTRACT,
+        matcher="and_v1",
     )
 
 
@@ -175,10 +180,21 @@ def test_v2_vectors_share_the_stopwords_and_v1_rows():
     assert VECTORS_V2["rows"][: len(VECTORS["rows"])] == VECTORS["rows"]
 
 
-def test_default_matcher_is_and_v1():
-    assert DEFAULT_MATCHER == "and_v1"
+def test_and_v1_matches_enrolment_only_as_written():
     arguments = {"query": "enrolment"}
     assert [r["id"] for r in search(arguments, rows=VECTORS_V2["rows"])] == ["v-12"]
+
+
+def test_default_matcher_is_and_v2():
+    # and_v2 replaced and_v1 on 2026-10-31 under the user's rule (devlog).
+    assert DEFAULT_MATCHER == "and_v2"
+    results = search_announcements(
+        VECTORS_AND_V2["rows"],
+        {"query": "tuition payment"},
+        datetime.fromisoformat(VECTORS_AND_V2["now"]),
+        CONTRACT,
+    )
+    assert [r["id"] for r in results] == ["s-01"]
 
 
 def test_unknown_matcher_is_rejected():

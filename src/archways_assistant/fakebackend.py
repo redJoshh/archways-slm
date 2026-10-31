@@ -115,7 +115,8 @@ _SYNONYM_MAP = json.loads(SYNONYMS_PATH.read_text(encoding="utf-8"))
 SYNONYMS: dict[str, list[str]] = _SYNONYM_MAP["synonyms"]
 AND_V2_STOPWORDS = STOPWORDS | frozenset(_SYNONYM_MAP["extra_stopwords"])
 MATCHERS = ("and_v1", "prefix_v2", "and_v2")
-DEFAULT_MATCHER = "and_v1"
+# and_v2 replaced and_v1 on 2026-10-31 (devlog); and_v1 stays for comparisons.
+DEFAULT_MATCHER = "and_v2"
 # prefix_v2: words this long or longer are cut to their first STEM_CHARS.
 STEM_MIN_CHARS = 5
 STEM_CHARS = 4
