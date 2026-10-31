@@ -29,6 +29,8 @@ The model never touches the database and never "knows" announcements from traini
 | Path | What it is |
 |---|---|
 | `contracts/search_announcements.schema.json` | **The source of truth.** A JSON Schema describing the tool's arguments and its results. |
+| `contracts/search_synonyms_v1.json` | Frozen synonym map for search contract v2 (the and_v2 matcher). Spring loads the same file. |
+| `tests/vectors/search_vectors_and_v2.json` | Search vectors that Spring's and_v2 implementation must pass. |
 | `src/archways_assistant/tooldef.py` | Generator that turns the contract into the tool definition Ollama understands. |
 | `generated/search_announcements.tool.json` | Output of the generator. Never edit by hand. |
 | `scripts/probe_tool_call.py` | Sends test questions to a local Ollama model and checks whether it calls the tool correctly. |
@@ -76,6 +78,16 @@ An array of announcements, newest first, at most 10 items. That 10 must match `a
 
 - `description` is **written for the model**. It ends up in the prompt.
 - `$comment` holds **notes for developers** (Spring's responsibilities, design rules). It is never sent to the model.
+
+### Search contract version 2 (matching)
+
+The search contract is now **version 2** (2026-10-31). The arguments and results are the same as above. Only the matching changes: Spring must search with **and_v2**.
+
+- **and_v2:** the query is lowercased and split on whitespace, and the and_v1 stopwords plus the map's `extra_stopwords` ("kapag") are dropped. Each remaining word, with its synonyms from [`contracts/search_synonyms_v1.json`](../contracts/search_synonyms_v1.json), forms a group: `(title ILIKE '%alt%' OR body ILIKE '%alt%' …)` over the word and its synonyms, escaped as `ilike_pattern()` does (escape char `\`). Every group must match (AND across words). Visibility, the days window, newest-first order and limit are unchanged.
+- **The map file is frozen.** A hash test pins it. A change is a new file (`search_synonyms_v2.json`) and a new matcher, never an edit. Spring must load this same file, not a copy.
+- **Vectors:** Spring's search must pass [`tests/vectors/search_vectors_and_v2.json`](../tests/vectors/search_vectors_and_v2.json) (and_v2) as well as [`tests/vectors/search_vectors.json`](../tests/vectors/search_vectors.json) (visibility, window, limit, validation and escaping, shared with and_v1).
+- **No new schema file:** the schema's `$id` stays `...:v1`, because the arguments and results did not change. "Version 2" names the matching behaviour. `src/archways_assistant/fakebackend.py` is the reference implementation (`DEFAULT_MATCHER = "and_v2"`).
+- **Caveats:** the map was built from dev-set retrieval failures, so it is not evidence of held-out quality. It is untested on real announcements; for example, "due" also matches "due to".
 
 ## 2. The generator (`src/archways_assistant/tooldef.py`)
 
