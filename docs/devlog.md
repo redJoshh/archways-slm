@@ -19,6 +19,107 @@ Template:
 
 ---
 
+## 2026-10-31: fts_v3/snip_v1 deferred; qwen3:0.6b cold baseline and token budget
+
+- **Date:** 2026-10-31 (ended about 11:25 +08:00; start time unverified)
+- **Decisions (user, 2026-10-31):**
+  - `fts_v3` and `snip_v1` (plan in the entry below) are **deferred, not approved**. They are recorded in `docs/plans/finetune-data-plan.md`, "Deferred: raw-question retrieval and snippet excerpts". The reasons:
+    - Session files (Option 2) may fix the cache eviction while keeping the measured retrieval.
+    - `fts_v3`'s ceil(n/2) partial match repeats the idea that broke the not-found traps under `prefix_v2`. This is a prediction; it is untested.
+    - `snip_v1` saves little (394 → 350) and could expose the long-body trap.
+  - No new dependency and no network fetch.
+  - Next phone test: Option 2, one session file per system turn.
+- **What changed:**
+  - `docs/plans/finetune-data-plan.md`: the new "Deferred" section.
+  - New `runs/e2e34_qwen3_0_6b_cold_and_v1.txt` (gitignored, not committed).
+  - No prompt, matcher, guard, scoring, case or seed-row change.
+- **qwen3:0.6b cold baseline:** 34 e2e cases, `and_v1`, ADR 0002's cold settings.
+  - Settings: `--num-gpu 0 --keep-alive 0`, greedy options, one `ollama serve` with `OLLAMA_NUM_PARALLEL:1`. The flag is from the server's own startup log, started 10:05 +08:00 today.
+  - Command: `uv run python scripts/probe_end_to_end.py --model qwen3:0.6b --num-gpu 0 --keep-alive 0`.
+  - Header: `ollama=0.40.13 commit=c48922a`. Run once.
+
+  | Measure | Before guards | After guards |
+  |---|---|---|
+  | Failed | 8/34 | 8/34 |
+  | Unsafe | 0/34 | 0/34 |
+  | Unhelpful | 8/34 | 8/34 |
+  | Fabrication | 0/34 | 0/34 |
+
+  - Retrieval hit: 27/34. That is 20/24 for the original cases and 7/10 for the regression set.
+    - Misses: e2e-003, 014, 021, 023, 027, 028, 029.
+  - Invalid search arguments: 0/34. Answer calls: 20 (14 not-found without a model call). Guard fired: 0/20.
+  - Failed after guards:
+    - `safe_unhelpful`: e2e-001, 005, 012
+    - `retrieval_miss`: e2e-014, 023, 027, 028, 029
+  - Max prompt tokens: query 279, answer 605. Mean latency on the laptop CPU: query 3.24 s, answer 4.48 s.
+- **Token budget** (qwen3:0.6b, Ollama raw counts, scratch script):
+  - **Shared system turns:** answer 197 tokens, query **213 tokens**. The query figure is the part a session file would cache.
+  - **Answer case part** = the answer prompt's total minus 197. It was recomputed for each of the 20 answer calls and matched the run's count minus 197 in every case.
+
+    | Case | Results | Case part (JSON) | Compact (estimate) | Query prompt |
+    |---|---|---|---|---|
+    | e2e-001 | 1 | 170 | 109 | 239 |
+    | e2e-002 | 2 | 304 | 183 | 241 |
+    | e2e-004 | 1 | 177 | 118 | 240 |
+    | e2e-005 | 1 | 177 | 116 | 239 |
+    | e2e-006 | 1 | 170 | 109 | 238 |
+    | e2e-007 | 1 | 156 | 94 | 237 |
+    | e2e-008 | 1 | 158 | 97 | 238 |
+    | e2e-009 | 3 | 394 | 215 | 239 |
+    | e2e-010 | 1 | 165 | 104 | 235 |
+    | e2e-011 | 1 | 167 | 106 | 238 |
+    | e2e-012 | 1 | 158 | 97 | 237 |
+    | e2e-013 | 1 | 162 | 101 | 238 |
+    | e2e-015 | 1 | 142 | 81 | 239 |
+    | e2e-021 | 3 | 408 | 229 | 242 |
+    | e2e-024 | 1 | 171 | 110 | 240 |
+    | e2e-025 | 1 | 145 | 84 | 238 |
+    | e2e-026 | 1 | 147 | 86 | 240 |
+    | e2e-030 | 1 | 151 | 90 | 240 |
+    | e2e-031 | 1 | 166 | 105 | 235 |
+    | e2e-032 | 2 | 274 | 154 | 238 |
+
+  - **Answer case part, current JSON:** min 142, median 166.5, max 408. **16/20** are 200 tokens or fewer. Over 200: e2e-002, 009, 021, 032.
+  - **Query prompt** (all 34 cases): min 235, median 238, max 279. Its case part (total minus 213) is min 22, median 25, max 66.
+  - e2e-021 is a not-found trap that `and_v1` failed to keep empty (3 rows retrieved); its reply still passed.
+- **Compact results format: plan only, not approved, no prompt file.**
+  - Format: one block per result, numbered in Spring's order, with no JSON keys:
+
+    ```
+    1. <title> (<office>, posted <YYYY-MM-DD>[, year <year_level>])
+    <excerpt>
+    ```
+
+    - Blocks are separated by a blank line. The year appears only when `year_level` is not null.
+    - The excerpt's whitespace is collapsed to single spaces.
+    - `<` is escaped as `<`, as now, so row text cannot close the tag.
+  - Kept: title, excerpt and office (to answer and to cite), the posted date (for the newest-wins rule), year_level when set.
+  - Dropped:
+    - `id`: the student never sees it, and the list number maps back to Spring's order.
+    - `priority`: no prompt rule uses it.
+    - The posted time and offset: two rows posted on the same day lose their order, and the list order (newest first) would have to decide.
+  - This needs a new answer prompt version (`prompts/e2e_answer_v2.txt`). It must name the posted date instead of `posted_at`, and say that no year means all students. If it is ever adopted, the training inputs must use the same format (data plan).
+  - **Estimate, made with this run's results:** case part min 81, median 105.5, max 229. **18/20** are 200 tokens or fewer. Over 200: e2e-009 (215) and e2e-021 (229).
+  - Not tested: whether qwen3:0.6b or gemma3:1b answers as well from this format.
+- **Budget estimate (ESTIMATE, not measured):**
+  - Rates on the Redmi: about 28 prompt tokens/s and about 10–13 generated tokens/s (the measured 10.4–12.8, and 14.6 for the 13-token query reply).
+  - Assumption: both system turns are cached, and loading a session file takes little time (unmeasured).
+  - Then a whole question costs:
+    - query call: case part about 25 tokens (0.9 s) + 13 generated (0.9 s) ≈ 1.8 s
+    - answer call: case part P / 28 s + about 40 generated (3.1–4.0 s)
+  - At P = 200 that is about 12.0–12.9 s, which leaves about 2–3 s for two session loads, the search and the app. **So a whole question fits 15 s only if the case part is about 200 tokens or fewer.**
+  - At e2e-009's current 394 it is about 19.4 s.
+- **Why:** to measure qwen3:0.6b's cold baseline, and to size the case part against the 15 s bar before the session-file phone test.
+- **How it was verified:**
+  - The probe run above, and the scratch script, which asserted the recomputed JSON case parts against the run.
+  - Local Ollama only.
+  - No code changed, so tests were not rerun.
+- **Commits:** this `docs:` commit (devlog and data plan). Not pushed.
+- **Open questions / next:**
+  - Phone test, Option 2: save one session file per system turn (213 query, 197 answer), load the matching one before each call, and time the loads on the Redmi.
+  - The user's approval or changes for the compact format.
+  - e2e-002, 009, 021 and 032 are over 200 tokens in today's format.
+
 ## 2026-10-31: Gate 1 Redmi 10C caching test (qwen3:0.6b); llama.rn state APIs
 
 - **Date:** 2026-10-31 (ended about 11:15 +08:00; start time unverified)

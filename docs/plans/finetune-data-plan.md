@@ -199,6 +199,23 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
    - one warm run reported alongside, not gated
 6. **Phone:** GGUF through Ollama is the evaluation path. Whether the phone runtime chosen in Gate 1 can load this GGUF, or needs another export of the same weights, is unverified.
 
+## Deferred: raw-question retrieval and snippet excerpts (2026-10-31, user)
+
+Two proposals from the Gate 1 work are **deferred, not approved**:
+
+- `fts_v3` would search on the student's raw question (no query call), like Postgres full-text search: English stopwords, Snowball stemming, a match on at least ceil(n/2) of the n stems, ranking, limit 3.
+- `snip_v1` would show the text around the matched words instead of the first 500 characters of the body.
+
+Reasons (user):
+
+- One session file per system turn (llama.rn `saveSession`/`loadSession`) may fix the phone's cache eviction while keeping the measured retrieval. This is the next phone test.
+- `fts_v3`'s ceil(n/2) partial match repeats the idea that broke the not-found traps under `prefix_v2` (e2e-016, 018, 019). This is a prediction; it is untested.
+- `snip_v1` saves little (e2e-009's case part: 394 → 350 tokens, estimated) and could expose the long-body trap's hidden fact.
+
+No new dependency and no network fetch were made for either. Training inputs keep the current retrieval and the 500-character excerpt (Decision 3).
+
+A more compact way to show the results in the answer prompt is proposed for the Gate 1 budget (devlog, 2026-10-31) and is not approved either. If it is approved, it becomes a new answer prompt version, and the training inputs must use that same format.
+
 ## Open questions for the user
 
 1. ~~Approve answer-call-only (Decision 1, A)?~~ Decided 2026-10-29: yes.
