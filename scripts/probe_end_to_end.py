@@ -4,6 +4,7 @@ Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
     [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--repeat 5]
     [--summary-only]
     [--num-gpu 0] [--keep-alive 0] [--matcher and_v1|prefix_v2]
+    [--answer-prompt v1|v2]
 
 For each case:
 1. Query call. The model writes only the search arguments: Ollama's format
@@ -13,8 +14,13 @@ For each case:
    case's fixed now, with --matcher (default and_v1). Arguments the contract rejects count as no results,
    as Spring rejects them.
 3. Answer call. With no results the reply is the fixed not-found message
-   and the model is not called. Otherwise prompts/e2e_answer_v1.txt gets
-   the question and the results as JSON between <announcements> tags.
+   and the model is not called. Otherwise the answer prompt gets the
+   question and the results between <announcements> tags. With
+   --answer-prompt v1 (the default) that is prompts/e2e_answer_v1.txt and
+   the results as JSON; with v2 it is prompts/e2e_answer_v2.txt and the
+   compact format of compact_announcements_message(). v2 tells the model
+   the list is newest first, so it runs only with --matcher and_v1, whose
+   order is newest first.
 4. Guard. A model reply with a date or number that the retrieved titles
    and excerpts and the question don't support, or with the title
    of a row that must never reach the model, is replaced by a fallback
@@ -57,6 +63,7 @@ import json
 import sys
 import time
 from datetime import datetime
+from itertools import pairwise
 from pathlib import Path
 
 import httpx
@@ -96,6 +103,7 @@ from archways_assistant.fakebackend import (
 
 QUERY_PROMPT = ROOT / "prompts" / "e2e_query_v1.txt"
 ANSWER_PROMPT = ROOT / "prompts" / "e2e_answer_v1.txt"
+ANSWER_PROMPT_V2 = ROOT / "prompts" / "e2e_answer_v2.txt"
 DEFAULT_CASES = ROOT / "evals" / "e2e_cases.jsonl"
 SEED_DATA = ROOT / "data" / "seed" / "announcements.json"
 NUM_CTX = 4096
@@ -192,6 +200,37 @@ def announcements_message(question: str, results: list[dict]) -> str:
     return f"Question: {question}\n\n<announcements>\n{data}\n</announcements>"
 
 
+def compact_announcements_message(question: str, results: list[dict]) -> str:
+    """The v2 answer call's user message: numbered results, newest first.
+
+    Each result is "N. Title (office, posted YYYY-MM-DD[, year Y])" and the
+    excerpt on the next line, with whitespace collapsed; id and priority are
+    left out. Raises ValueError if the results are not newest first, since
+    the v2 prompt tells the model they are.
+    """
+    posted = [datetime.fromisoformat(result["posted_at"]) for result in results]
+    if any(later > earlier for earlier, later in pairwise(posted)):
+        raise ValueError("results are not ordered newest first")
+    blocks = []
+    for number, (result, when) in enumerate(zip(results, posted), start=1):
+        meta = f"{result['office']}, posted {when.date().isoformat()}"
+        if result["year_level"] is not None:
+            meta += f", year {result['year_level']}"
+        # Escaping "<" stops row text from closing the tag, as in v1.
+        title = result["title"].replace("<", "\\u003c")
+        excerpt = " ".join(result["excerpt"].split()).replace("<", "\\u003c")
+        blocks.append(f"{number}. {title} ({meta})\n{excerpt}")
+    data = "\n\n".join(blocks)
+    return f"Question: {question}\n\n<announcements>\n{data}\n</announcements>"
+
+
+# --answer-prompt: (prompt file, user message builder).
+ANSWER_VERSIONS = {
+    "v1": (ANSWER_PROMPT, announcements_message),
+    "v2": (ANSWER_PROMPT_V2, compact_announcements_message),
+}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", default="qwen3:1.7b")
@@ -204,6 +243,7 @@ def main() -> None:
         "--summary-only", action="store_true", help="skip per-case blocks"
     )
     parser.add_argument("--matcher", choices=MATCHERS, default=DEFAULT_MATCHER)
+    parser.add_argument("--answer-prompt", choices=ANSWER_VERSIONS, default="v1")
     parser.add_argument(
         "--num-gpu",
         type=int,
@@ -217,6 +257,9 @@ def main() -> None:
     )
     args = parser.parse_args()
     show = (lambda *_, **__: None) if args.summary_only else print
+    if args.answer_prompt == "v2" and args.matcher != "and_v1":
+        sys.exit("--answer-prompt v2 needs --matcher and_v1 (results newest first)")
+    answer_prompt, answer_message = ANSWER_VERSIONS[args.answer_prompt]
 
     contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     query_format = contract["$defs"]["arguments"]
@@ -303,7 +346,7 @@ def main() -> None:
         print(
             f"model={args.model} capabilities={shown_capabilities} "
             f"query_prompt={display_path(QUERY_PROMPT)} "
-            f"answer_prompt={display_path(ANSWER_PROMPT)} "
+            f"answer_prompt={display_path(answer_prompt)} "
             f"cases={display_path(args.cases)} seed_data={display_path(SEED_DATA)} "
             f"matcher={args.matcher} "
             f"{ids_field}{repeat_field}now={','.join(nows)} "
@@ -373,8 +416,8 @@ def main() -> None:
             if results:
                 stats["answer_calls"] += 1
                 raw, tokens, elapsed = call(
-                    load_prompt(ANSWER_PROMPT, now, None),
-                    announcements_message(question, results),
+                    load_prompt(answer_prompt, now, None),
+                    answer_message(question, results),
                 )
                 raw = raw.strip()
                 latency["answer"].append(elapsed)
