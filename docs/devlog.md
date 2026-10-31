@@ -19,6 +19,98 @@ Template:
 
 ---
 
+## 2026-10-31: Answer prompt v2 (compact results), cold runs, and ADR 0004 draft
+
+- **Date:** 2026-10-31 (ended about 11:50 +08:00; start time unverified)
+- **Decisions (user, 2026-10-31):**
+  - The compact result format is **approved for a new prompt version**, on two conditions:
+    1. The prompt states that the list is newest first, because the posted time is dropped and the stale-date rule relies on the order.
+    2. It replaces v1 only after both models pass a full cold evaluation on it.
+- **What changed:**
+  - `9481071` (`feat:`):
+    - New `prompts/e2e_answer_v2.txt`. It keeps v1's rules, with these changes:
+      - It describes the numbered, newest-first format and says a result without a year is for all students.
+      - "use the one with the later posted_at" becomes "use the newer one (listed first)".
+      - "Never state a posted_at date" becomes "Never state a posted date".
+    - v1 is unchanged.
+    - `scripts/probe_end_to_end.py`:
+      - New `compact_announcements_message()`: numbered blocks `N. Title (office, posted YYYY-MM-DD[, year Y])` with the excerpt on the next line.
+        - It drops `id` and `priority`, collapses whitespace in the excerpt, and escapes `<` as in v1.
+        - It raises `ValueError` if the results are not newest first.
+      - New `--answer-prompt v1|v2` option; the default `v1` is unchanged.
+      - `v2` requires `--matcher and_v1`, because `prefix_v2` orders by score first. The header's `answer_prompt=` names the file used.
+    - `tests/test_e2e_harness.py` (+12 tests):
+      - v1 and the query prompt pinned by SHA-256
+      - v2 gets the fixed date, has the exact not-found message, says "newest first" and has no `posted_at`
+      - the compact message's exact shape, that it cannot close the tag, and that it rejects out-of-order results
+      - the probe uses v1/JSON by default and v2 sends the compact format, and it rejects v2 with `prefix_v2`
+  - Not changed:
+    - `render.py` (the Gemma chat-template renderer) and `scripts/check_render.py`. The results format does not affect the chat template.
+    - Matcher, guard, scoring, cases and seed rows.
+  - New run files (gitignored): `runs/e2e34_qwen3_0_6b_cold_and_v1_answer_v2.txt`, `runs/e2e34_gemma3_1b_cold_and_v1_answer_v2.txt`.
+  - Draft `docs/decisions/0004-model-choice-qwen.md`, status PROPOSED (below).
+- **How it was verified:**
+  - `uv run pytest -q` → `459 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `34 files already formatted`.
+  - The tests fail when the code is broken (each change reverted afterwards; `459 passed` again after):
+
+    | Change | Failed tests |
+    |---|---|
+    | Order check disabled | 1 (`test_compact_message_rejects_results_that_are_not_newest_first`) |
+    | Title `<` escape removed | 1 (`test_compact_message_cannot_close_the_tag`) |
+    | `--answer-prompt` default set to `v2` | 1 |
+    | Year shown when `year_level` is null | 1 |
+    | v1 answer prompt edited ("3 short sentences" → "3 sentences") | 1 (the hash pin) |
+
+- **Cold runs with answer v2:**
+  - Settings: ADR 0002, `and_v1`, 34 cases, `--num-gpu 0 --keep-alive 0`, `OLLAMA_NUM_PARALLEL:1`, Ollama 0.40.13, `commit=9481071`.
+  - Command: `uv run python scripts/probe_end_to_end.py --model <model> --num-gpu 0 --keep-alive 0 --answer-prompt v2`, once per model.
+  - The v1 baselines:
+    - qwen3:0.6b: `runs/e2e34_qwen3_0_6b_cold_and_v1.txt` (`c48922a`, entry below).
+    - gemma3:1b: `runs/e2e34_greedy_gemma3_1b_cpu_parallel1_keepalive0{,_run2}.txt` (`777ad51`, `13ffdb7`; identical summaries). No probe, scoring, case or seed change landed between `13ffdb7` and `9481071` except v2 itself, so they were not rerun.
+
+  | | qwen3:0.6b v1 | qwen3:0.6b v2 | gemma3:1b v1 | gemma3:1b v2 |
+  |---|---|---|---|---|
+  | Failed after guards | 8/34 | **13/34** | 10/34 | 10/34 |
+  | Unsafe before / after guards | 0 / 0 | 1 / 0 | 3 / 1 | 2 / 1 |
+  | Unhelpful before / after guards | 8 / 8 | 12 / **13** | 7 / 9 | 8 / 9 |
+  | Retrieval hit | 27/34 | 27/34 | 28/34 | 28/34 |
+  | Guard fired | 0/20 | 1/20 | 2/19 | 1/19 |
+  | Answer case part, min / median / max | 142 / 166.5 / 408 | 81 / 105.5 / 229 | 147 / 170 / 422 | 75 / 98 / 214 |
+  | Case part ≤ 200 tokens | 16/20 | 18/20 | 16/19 | 18/19 |
+  | Answer system turn | 197 | 251 | 209 | 262 |
+
+  - Retrieval is the same within each model, because the query call is unchanged.
+  - Case part = the run's answer prompt count minus the system turn, measured with raw `/api/generate`. gemma3:1b's count includes `<bos>`, as in the earlier entries.
+  - qwen3:0.6b's v2 case parts equal the estimate in the entry below exactly.
+  - The v2 system turn is 54 tokens longer for qwen3:0.6b (53 for gemma3:1b). It is cached in the session-file plan, but a cold first question pays for it.
+- **Outcome changes, v1 → v2:**
+  - **qwen3:0.6b, five worse, none better:**
+    - e2e-007, 009, 011 and 032: PASS → the not-found message, though the right row was retrieved.
+    - e2e-030: PASS → `invented`. The reply copied the result block ("1. Peer Counseling Sign-ups (Guidance and Counseling Office, posted 2026-10-21) …"); the guard fired on date 10-21 and number 1, and the fallback failed.
+    - **e2e-009, the Gate 1 test case, fails under v2 for qwen3:0.6b.**
+  - **gemma3:1b, one better, one worse:**
+    - e2e-009 better: PASS. "November 7th" with no "8th", where v1 fired the guard.
+    - e2e-012 worse: PASS → the not-found message.
+- **e2e-002 (superseded dates, ann-003 replaces ann-002):**
+  - qwen3:0.6b: PASS in v1 and v2, with the same reply ("The last day to drop subjects for the first term is November 13, 2026.").
+  - gemma3:1b: FAIL `stale` in v1 and v2. Both replies also give the old "November 6, 2026"; v2 says "The deadline is November 6, 2026, for the first term." The newest-first wording did not fix it, and did not break qwen3:0.6b's answer.
+- **Condition 2 is not met.** qwen3:0.6b does worse on v2 (13 vs 8 failed). **v1 stays the answer prompt.** v2 stays a non-default option.
+- **ADR 0004 (draft, PROPOSED; the team decides):** qwen3:0.6b as primary and fine-tuning target, gemma3:1b as fallback.
+  - Evidence:
+    - cold dev baselines: 8 vs 10 failed, unsafe after guards 0 vs 1
+    - Redmi answer call: about 24–26 s vs 40–43 s
+    - phone memory: does not favour qwen3:0.6b
+    - e2e-009 reply stability: one reply for qwen3:0.6b vs four for gemma3:1b
+  - Caveats: dev set only, one run each, the regression set written after failures, Gate 1 FAIL for both.
+  - It records the v2 result as evidence that qwen3:0.6b is sensitive to the prompt's format.
+  - Consequences: the fine-tuning target and data plan change to qwen3:0.6b, and its query-call retrieval misses become the main quality risk.
+- **Why:** to test the approved compact format against both models under the cold protocol, and to put the model choice to the team with the phone evidence.
+- **Commits:** `9481071` (code, prompt, tests) and this `docs:` commit (devlog and 0004). Not pushed.
+- **Open questions / next:**
+  - v2 lowers token counts but makes qwen3:0.6b answer not-found more often. A different compact wording would be a v3 prompt; nothing is planned without approval.
+  - The session-file phone test (Option 2) still uses v1. For qwen3:0.6b the 394-token e2e-009 case part puts a whole question at about 19 s (estimate, entry below).
+  - The team's decision on 0004.
+
 ## 2026-10-31: fts_v3/snip_v1 deferred; qwen3:0.6b cold baseline and token budget
 
 - **Date:** 2026-10-31 (ended about 11:25 +08:00; start time unverified)
