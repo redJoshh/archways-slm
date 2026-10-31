@@ -27,6 +27,7 @@ SHARED_HELPERS = {
     "model_capabilities",
     "ollama_version",
     "ratio",
+    "today_text",
 }
 CLOCK_CALLS = {
     "now",
@@ -97,7 +98,9 @@ def test_e2e_prompts_get_the_fixed_date_with_its_weekday(name):
     assert "Today is Monday, 2026-11-02 (Asia/Manila)." in prompt
 
 
-@pytest.mark.parametrize("name", ["e2e_answer_v1.txt", "e2e_answer_v2.txt"])
+@pytest.mark.parametrize(
+    "name", ["e2e_answer_v1.txt", "e2e_answer_v2.txt", "e2e_answer_v3.txt"]
+)
 def test_answer_prompt_uses_the_exact_not_found_message(name):
     text = (ROOT / "prompts" / name).read_text(encoding="utf-8")
     assert NOT_FOUND_MESSAGE in text
@@ -122,6 +125,38 @@ def test_answer_v2_says_the_list_is_newest_first():
     text = (ROOT / "prompts" / "e2e_answer_v2.txt").read_text(encoding="utf-8")
     assert "newest first" in text
     assert "posted_at" not in text
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("e2e_answer_v1.txt", "e2e_answer_v3.txt"),
+        ("e2e_query_v1.txt", "e2e_query_v2.txt"),
+    ],
+)
+def test_date_in_user_versions_only_drop_the_date_line(old, new):
+    # One change only: the new file is the old one without its date line.
+    harness = load_script("probe_end_to_end")
+    old_bytes = (ROOT / "prompts" / old).read_bytes()
+    line = f"{harness.USER_DATE_LINE}\n".encode()
+    assert old_bytes.count(line) == 1
+    assert (ROOT / "prompts" / new).read_bytes() == old_bytes.replace(line, b"")
+
+
+@pytest.mark.parametrize("name", ["e2e_answer_v3.txt", "e2e_query_v2.txt"])
+def test_date_in_user_puts_the_date_first_in_the_user_turn(name):
+    harness = load_script("probe_end_to_end")
+    system, user = harness.prompt_pair(ROOT / "prompts" / name, True, FIXED_NOW, "Hi?")
+    assert "Today is" not in system
+    assert user == "Today is Monday, 2026-11-02 (Asia/Manila).\n\nHi?"
+    later = datetime.fromisoformat("2026-11-03T10:00:00+08:00")
+    assert harness.prompt_pair(ROOT / "prompts" / name, True, later, "Hi?")[0] == system
+
+
+def test_date_in_user_rejects_a_prompt_with_a_today_placeholder():
+    harness = load_script("probe_end_to_end")
+    with pytest.raises(SystemExit, match="has a {today} placeholder"):
+        harness.prompt_pair(harness.ANSWER_PROMPT, True, FIXED_NOW, "Hi?")
 
 
 def row(id_, posted_at, **fields):
@@ -291,11 +326,37 @@ def answer_calls(payloads):
 def test_e2e_probe_uses_answer_v1_and_json_by_default(monkeypatch, capsys):
     payloads = run_e2e(monkeypatch, "--ids", "e2e-009")
     header = capsys.readouterr().out.splitlines()[0]
+    assert " query_prompt=prompts/e2e_query_v1.txt " in header
     assert " answer_prompt=prompts/e2e_answer_v1.txt " in header
     (call,) = answer_calls(payloads)
     system, user = (m["content"] for m in call["messages"])
     assert "posted_at" in system
+    assert "Today is Monday, 2026-11-02" in system
+    assert user.startswith("Question: ")
     assert '"id": "' in user
+    (query,) = [p for p in payloads if "format" in p]
+    assert "Today is Monday, 2026-11-02" in query["messages"][0]["content"]
+
+
+def test_e2e_probe_date_in_user_versions_move_the_date(monkeypatch, capsys):
+    payloads = run_e2e(
+        monkeypatch, "--ids", "e2e-009", "--answer-prompt", "v3", "--query-prompt", "v2"
+    )
+    header = capsys.readouterr().out.splitlines()[0]
+    assert " query_prompt=prompts/e2e_query_v2.txt " in header
+    assert " answer_prompt=prompts/e2e_answer_v3.txt " in header
+    assert len(payloads) == 2
+    for payload in payloads:
+        system, user = (m["content"] for m in payload["messages"])
+        assert "Today is" not in system
+        assert user.startswith("Today is Monday, 2026-11-02 (Asia/Manila).\n\n")
+    query, answer = payloads
+    assert query["messages"][1]["content"].endswith(
+        "\n\nWhen will the student portal be down for maintenance?"
+    )
+    assert (
+        "\n\nQuestion: When will the student portal" in answer["messages"][1]["content"]
+    )
 
 
 def test_e2e_probe_answer_v2_sends_the_compact_format(monkeypatch, capsys):

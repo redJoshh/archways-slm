@@ -88,6 +88,11 @@ SCORE_MODES = {"decision", "reply_check"}
 DEFAULT_SCORE = "decision"
 
 
+def today_text(now: datetime) -> str:
+    """What {today} becomes: the weekday and date of now, e.g. Monday, 2026-11-02."""
+    return f"{now:%A}, {now:%Y-%m-%d}"
+
+
 def load_prompt(
     path: Path,
     now: datetime,
@@ -117,7 +122,7 @@ def load_prompt(
     if tool_definition is None and has_tool_placeholder:
         sys.exit(f"Prompt file {path} is for --tool-mode prompt")
     # str.replace, not str.format, so prompts may contain other braces.
-    prompt = template.replace(TODAY_PLACEHOLDER, f"{now:%A}, {now:%Y-%m-%d}")
+    prompt = template.replace(TODAY_PLACEHOLDER, today_text(now))
     if tool_definition is not None:
         prompt = prompt.replace(TOOL_PLACEHOLDER, tool_definition)
     return prompt

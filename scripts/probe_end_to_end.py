@@ -4,12 +4,13 @@ Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
     [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--repeat 5]
     [--summary-only]
     [--num-gpu 0] [--keep-alive 0] [--matcher and_v1|prefix_v2]
-    [--answer-prompt v1|v2]
+    [--answer-prompt v1|v2|v3] [--query-prompt v1|v2]
 
 For each case:
 1. Query call. The model writes only the search arguments: Ollama's format
    option is the contract's arguments schema, and the prompt is
-   prompts/e2e_query_v1.txt. Every case searches.
+   prompts/e2e_query_v1.txt (--query-prompt v2: e2e_query_v2.txt). Every
+   case searches.
 2. Search. fakebackend runs it over data/seed/announcements.json at the
    case's fixed now, with --matcher (default and_v1). Arguments the contract rejects count as no results,
    as Spring rejects them.
@@ -20,7 +21,10 @@ For each case:
    the results as JSON; with v2 it is prompts/e2e_answer_v2.txt and the
    compact format of compact_announcements_message(). v2 tells the model
    the list is newest first, so it runs only with --matcher and_v1, whose
-   order is newest first.
+   order is newest first. v3 is v1 with today's date moved from the
+   system turn to the start of the user message (prompt_pair()), so the
+   system turn is the same every day; --query-prompt v2 does the same to
+   the query prompt (default v1).
 4. Guard. A model reply with a date or number that the retrieved titles
    and excerpts and the question don't support, or with the title
    of a row that must never reach the model, is replaced by a fallback
@@ -71,6 +75,7 @@ from probe_tool_call import (
     ROOT,
     SAMPLING_OPTIONS,
     SCHEMA_PATH,
+    TODAY_PLACEHOLDER,
     chat,
     display_path,
     git_commit,
@@ -79,6 +84,7 @@ from probe_tool_call import (
     ollama_version,
     ratio,
     sampling_header,
+    today_text,
 )
 
 from archways_assistant.e2escore import (
@@ -102,8 +108,13 @@ from archways_assistant.fakebackend import (
 )
 
 QUERY_PROMPT = ROOT / "prompts" / "e2e_query_v1.txt"
+QUERY_PROMPT_V2 = ROOT / "prompts" / "e2e_query_v2.txt"
 ANSWER_PROMPT = ROOT / "prompts" / "e2e_answer_v1.txt"
 ANSWER_PROMPT_V2 = ROOT / "prompts" / "e2e_answer_v2.txt"
+ANSWER_PROMPT_V3 = ROOT / "prompts" / "e2e_answer_v3.txt"
+# The line that query v2 and answer v3 move from the system turn to the
+# start of the user turn, word for word as in query v1 and answer v1.
+USER_DATE_LINE = "Today is {today} (Asia/Manila)."
 DEFAULT_CASES = ROOT / "evals" / "e2e_cases.jsonl"
 SEED_DATA = ROOT / "data" / "seed" / "announcements.json"
 NUM_CTX = 4096
@@ -224,11 +235,33 @@ def compact_announcements_message(question: str, results: list[dict]) -> str:
     return f"Question: {question}\n\n<announcements>\n{data}\n</announcements>"
 
 
-# --answer-prompt: (prompt file, user message builder).
+# --answer-prompt: (prompt file, user message builder, date in the user turn).
 ANSWER_VERSIONS = {
-    "v1": (ANSWER_PROMPT, announcements_message),
-    "v2": (ANSWER_PROMPT_V2, compact_announcements_message),
+    "v1": (ANSWER_PROMPT, announcements_message, False),
+    "v2": (ANSWER_PROMPT_V2, compact_announcements_message, False),
+    "v3": (ANSWER_PROMPT_V3, announcements_message, True),
 }
+# --query-prompt: (prompt file, date in the user turn).
+QUERY_VERSIONS = {"v1": (QUERY_PROMPT, False), "v2": (QUERY_PROMPT_V2, True)}
+
+
+def prompt_pair(
+    path: Path, date_in_user: bool, now: datetime, user: str
+) -> tuple[str, str]:
+    """The system and user messages for one call.
+
+    A prompt with the date in the system turn fills its {today}. One with
+    the date in the user turn must not have a {today}; the user message then
+    starts with USER_DATE_LINE and a blank line, so the system turn is the
+    same on every day.
+    """
+    if not date_in_user:
+        return load_prompt(path, now, None), user
+    system = path.read_text(encoding="utf-8").removesuffix("\n")
+    if TODAY_PLACEHOLDER in system:
+        sys.exit(f"Prompt file {path} has a {TODAY_PLACEHOLDER} placeholder")
+    date_line = USER_DATE_LINE.replace(TODAY_PLACEHOLDER, today_text(now))
+    return system, f"{date_line}\n\n{user}"
 
 
 def main() -> None:
@@ -244,6 +277,7 @@ def main() -> None:
     )
     parser.add_argument("--matcher", choices=MATCHERS, default=DEFAULT_MATCHER)
     parser.add_argument("--answer-prompt", choices=ANSWER_VERSIONS, default="v1")
+    parser.add_argument("--query-prompt", choices=QUERY_VERSIONS, default="v1")
     parser.add_argument(
         "--num-gpu",
         type=int,
@@ -259,7 +293,10 @@ def main() -> None:
     show = (lambda *_, **__: None) if args.summary_only else print
     if args.answer_prompt == "v2" and args.matcher != "and_v1":
         sys.exit("--answer-prompt v2 needs --matcher and_v1 (results newest first)")
-    answer_prompt, answer_message = ANSWER_VERSIONS[args.answer_prompt]
+    answer_prompt, answer_message, answer_date_in_user = ANSWER_VERSIONS[
+        args.answer_prompt
+    ]
+    query_prompt, query_date_in_user = QUERY_VERSIONS[args.query_prompt]
 
     contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     query_format = contract["$defs"]["arguments"]
@@ -345,7 +382,7 @@ def main() -> None:
         )
         print(
             f"model={args.model} capabilities={shown_capabilities} "
-            f"query_prompt={display_path(QUERY_PROMPT)} "
+            f"query_prompt={display_path(query_prompt)} "
             f"answer_prompt={display_path(answer_prompt)} "
             f"cases={display_path(args.cases)} seed_data={display_path(SEED_DATA)} "
             f"matcher={args.matcher} "
@@ -366,7 +403,8 @@ def main() -> None:
 
             # 1. Query call: the model writes only the arguments.
             content, tokens, elapsed = call(
-                load_prompt(QUERY_PROMPT, now, None), question, query_format
+                *prompt_pair(query_prompt, query_date_in_user, now, question),
+                query_format,
             )
             latency["query"].append(elapsed)
             if tokens is not None:
@@ -416,8 +454,12 @@ def main() -> None:
             if results:
                 stats["answer_calls"] += 1
                 raw, tokens, elapsed = call(
-                    load_prompt(answer_prompt, now, None),
-                    answer_message(question, results),
+                    *prompt_pair(
+                        answer_prompt,
+                        answer_date_in_user,
+                        now,
+                        answer_message(question, results),
+                    )
                 )
                 raw = raw.strip()
                 latency["answer"].append(elapsed)
