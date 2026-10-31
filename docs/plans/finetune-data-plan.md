@@ -214,7 +214,17 @@ Reasons (user):
 
 No new dependency and no network fetch were made for either. Training inputs keep the current retrieval and the 500-character excerpt (Decision 3).
 
-A more compact way to show the results in the answer prompt is proposed for the Gate 1 budget (devlog, 2026-10-31) and is not approved either. If it is approved, it becomes a new answer prompt version, and the training inputs must use that same format.
+## Decided: the compact results format moves into fine-tuning (2026-10-31, user)
+
+- **Background:** a compact way to show the results (`prompts/e2e_answer_v2.txt`: numbered blocks `N. Title (office, posted YYYY-MM-DD[, year Y])` with the excerpt below, newest first, without JSON keys, `id` or `priority`) was proposed for the Gate 1 token budget. It was evaluated cold on 2026-10-31 (devlog).
+- **v2 is rejected for untuned use.**
+  - qwen3:0.6b failed 13/34 on it, against 8/34 on v1. gemma3:1b failed 10/34 on both.
+  - v2 changed the results format and the prompt's wording at once, so which of the two caused qwen3:0.6b's drop is unknown.
+- **v1 stays the answer prompt, and untuned evaluations stay on v1.**
+- **Training data may use the compact format.** Its effect is measured as tuned versus untuned:
+  - the tuned model on the compact format
+  - the untuned control on v1, with the protocol of Decision 6
+  - Using it in training means the training inputs and the tuned model's evaluation prompt both use that format.
 
 ## Open questions for the user
 

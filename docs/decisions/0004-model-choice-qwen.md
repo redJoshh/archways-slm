@@ -27,7 +27,7 @@ ADR 0002's cold settings: one `ollama serve` with `OLLAMA_NUM_PARALLEL=1`, `--nu
 | e2e-002 (superseded dates) | PASS | FAIL, stale (gives the old November 6 as well) |
 
 - qwen3:0.6b's failures are all unhelpful: three not-found replies despite the right result (e2e-001, 005, 012) and five retrieval misses. gemma3:1b's include one unsafe reply after the guards (e2e-002, stale).
-- On the compact answer prompt v2 (devlog, 2026-10-31), qwen3:0.6b got worse (13/34 failed, five new not-found replies) and gemma3:1b did not (10/34). v2 is not adopted, so these figures use v1. They do show that qwen3:0.6b is more sensitive to the prompt's format.
+- On the compact answer prompt v2 (devlog, 2026-10-31), qwen3:0.6b got worse (13/34 failed, five new not-found replies) and gemma3:1b did not (10/34). v2 is rejected for untuned use, so these figures use v1. v2 changed the results format and the prompt's wording at once, so the cause of qwen3:0.6b's drop is unknown. It does show that qwen3:0.6b's results moved more than gemma3:1b's under that change.
 
 ### Redmi 10C (4 GB RAM), llama.rn 0.13.0-rc.8, CPU, development build
 

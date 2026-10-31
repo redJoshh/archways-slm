@@ -19,6 +19,120 @@ Template:
 
 ---
 
+## 2026-10-31: Session-file phone test, ADR 0005, date-in-user prompts, result cap
+
+- **Date:** 2026-10-31 (ended about 12:25 +08:00; start time unverified)
+- **Decisions (user, 2026-10-31):**
+  - **v1 stays the answer prompt; v2 is rejected for qwen3:0.6b** (13 vs 8 failures).
+    - v2 changed the results format and the prompt's wording at once, so the cause of the drop is unknown.
+  - The compact format moves into the fine-tuning plan:
+    - Training data may use it, and its effect is measured as tuned versus untuned.
+    - Untuned evaluations stay on v1.
+  - "Cold" for Gate 1 is redefined in ADR 0005 (below).
+  - New prompt versions with one change each, the date moved to the user turn (below).
+- **Redmi 10C, qwen3:0.6b, session files, answer prompt v1 (user):**
+  - Setup: development build, threads 4, `use_mmap: true`, `n_ctx` 2048.
+  - **Priming (once):** answer system turn saved, 197 tokens, prompt 22.0 s; query system turn saved, 213 tokens, 7.7 s.
+  - **Each question after a fresh Load:** load the query session, query call, load the answer session, answer call.
+
+    | Question | Session loads (query / answer) | Query call | Answer call | Whole question |
+    |---|---|---|---|---|
+    | e2e-004 | 0.1 / 0.2 s | 26 tokens, 2.1 s | 177 tokens, 9.4 s | **11.9 s** |
+    | e2e-004, repeat | 0.1 / 0.1 s | 2.0 s | 10.3 s | **12.4 s** |
+    | e2e-009 | 0.1 / 0.1 s | 26 tokens, 2.1 s | 394 tokens, 18.0 s | **20.2 s** |
+
+    - The token counts are the tokens processed after loading the session.
+    - All three questions used e2e-009's query prompt, a shortcut for the test.
+    - Replies: identical to the earlier runs.
+    - Not included: the Spring search call.
+  - **Findings (user):**
+    - Session files keep one cache per system turn and load in 0.1–0.2 s.
+    - The earlier budget estimate held. It predicted about 19.4 s for e2e-009; 20.2 s was measured.
+    - **Gate 1: e2e-009 (the test case) 20.2 s, still FAIL.** Short-result cases pass.
+- **ADR 0005** (`docs/decisions/0005-gate-1-cold-definition.md`, ACCEPTED by the user):
+  - "Cold" excludes reuse of an earlier question's prompt, and includes loading the saved system-turn session files.
+  - Priming (about 30 s) is reported separately, like model load, with no bar.
+  - e2e-009 remains the test case. 0003's bar is not edited.
+  - It states that it was written after the session-file results, and why it does not move the bar: the limit, device and test case are unchanged; it allows only what production does on every question; and Gate 1 stays FAIL under it.
+  - It notes that these runs left out the Spring search, so they are lower bounds.
+- **Doc updates:**
+  - `docs/plans/finetune-data-plan.md`: the paragraph that proposed the compact format is replaced by "Decided: the compact results format moves into fine-tuning", recording the decisions above.
+  - `docs/decisions/0004-model-choice-qwen.md` (still PROPOSED): "They do show that qwen3:0.6b is more sensitive to the prompt's format" is replaced. The new text says the cause is unknown, because v2 changed format and wording at once, and that qwen3:0.6b's results moved more than gemma3:1b's under that change.
+- **Date-in-user prompts** (`9c7c334`, `feat:`):
+  - New prompt files, each with one change: `prompts/e2e_answer_v3.txt` (answer v1 without its line `Today is {today} (Asia/Manila).`) and `prompts/e2e_query_v2.txt` (query v1 without the same line).
+  - `scripts/probe_end_to_end.py`:
+    - New `--answer-prompt v3` and `--query-prompt v1|v2`; the defaults stay v1.
+    - New `prompt_pair()`: for these versions it puts `Today is <weekday>, <date> (Asia/Manila).` and a blank line at the start of the user message. It refuses a prompt file that still has `{today}`.
+    - The header's `query_prompt=` names the file used.
+  - `scripts/probe_tool_call.py`: `today_text()` is factored out of `load_prompt()`, so both fill the date the same way.
+  - `tests/test_e2e_harness.py` (+9 tests):
+    - each new file is byte for byte the old one without the date line
+    - the date is first in the user turn, and the system turn is the same on another day
+    - a `{today}` prompt is rejected
+    - the probe moves the date for both calls
+    - the defaults are unchanged
+  - Verified: `uv run pytest -q` → `468 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `35 files already formatted`.
+  - The tests fail when the code is broken (each change reverted afterwards; `468 passed` again after):
+
+    | Change | Failed tests |
+    |---|---|
+    | Date line put at the end of the user turn | 3 |
+    | `{today}` check disabled | 1 |
+    | `--query-prompt` ignored | 1 |
+    | A second change in answer v3 ("3 short sentences" → "2 short sentences") | 1 |
+
+- **Cold runs, query v2 + answer v3:**
+  - Settings: ADR 0002, `and_v1`, 34 cases, `--num-gpu 0 --keep-alive 0`, `OLLAMA_NUM_PARALLEL:1`, Ollama 0.40.13, `commit=9c7c334`.
+  - Command: `uv run python scripts/probe_end_to_end.py --model <model> --num-gpu 0 --keep-alive 0 --answer-prompt v3 --query-prompt v2`, once per model.
+  - Files: `runs/e2e34_{qwen3_0_6b,gemma3_1b}_cold_and_v1_query_v2_answer_v3.txt`.
+  - The gemma3:1b header says `commit=9c7c334-dirty`. Only docs (0004, 0005, the data plan) were being edited during the run; no code, prompt, case or seed file differed from `9c7c334`.
+  - Baselines: as in the entry below (qwen3:0.6b `c48922a`; gemma3:1b `777ad51`/`13ffdb7`).
+
+  | | qwen3:0.6b v1 | qwen3:0.6b date-in-user | gemma3:1b v1 | gemma3:1b date-in-user |
+  |---|---|---|---|---|
+  | Failed after guards | 8/34 | 7/34 | 10/34 | **11/34** |
+  | Unsafe before / after guards | 0 / 0 | 0 / 0 | 3 / 1 | 2 / 1 |
+  | Unhelpful before / after guards | 8 / 8 | 7 / 7 | 7 / 9 | **9 / 10** |
+  | Retrieval hit | 27/34 | 30/34 | 28/34 | 26/34 |
+
+  - **Decision rule: v3 replaces v1 only if neither model gets worse on failures, unsafe or unhelpful.** gemma3:1b got worse on failures and unhelpful. **So v3 and query v2 do not replace v1.**
+  - **Where the changes came from:**
+    - gemma3:1b: the query call wrote different queries in 7 cases. Three new retrieval misses: e2e-012 (`typhoon signal` → `school closures`), e2e-028 (`second tuition installment` → `tuition payment`) and e2e-032 (`library database` → `library updates`). One fixed: e2e-014 (`graduation`). On the answer side, e2e-009 went from FAIL to PASS (no "8th").
+    - qwen3:0.6b: different queries in 11 cases.
+      - New hits: e2e-003, 021, 028.
+      - e2e-001 went from the not-found message to a correct answer with the same query.
+      - e2e-030 went the other way: the not-found message, with the same query and results as before.
+    - Both prompts changed in the same run, so the share of the query change and of the answer change in each model's result is not separated.
+  - **The query call sometimes uses the moved text:**
+    - qwen3:0.6b's e2e-020 query was `{"query": "Monday"}`, the weekday from the date line.
+    - Its e2e-021 query was `{"query": "swimming pool"}`, the query prompt's own example.
+    - Both cases still passed.
+  - **System turn tokens** (raw `/api/generate` counts; gemma3:1b's include `<bos>`):
+
+    | | Answer v1 | Answer v3 | Query v1 | Query v2 |
+    |---|---|---|---|---|
+    | qwen3:0.6b | 197 | 176 | 213 | 192 |
+    | gemma3:1b | 209 | 187 | 227 | 205 |
+
+    - The prompt totals are unchanged (query delta 0 in every case; qwen3:0.6b's answer max is 591 in both).
+    - So the moved tokens (21 for qwen3:0.6b, 22 for gemma3:1b) join the uncached case part. With session files that is about +0.75 s per call on the Redmi at 28 tokens/s, about +1.5 s per question (estimate). In exchange, the session files would no longer expire each day.
+- **Result cap of 3: measurement only, no contract change.**
+  - From the v1 cold baselines (qwen3:0.6b `c48922a`, gemma3:1b `13ffdb7`), assuming newest-first order:
+    - **No answer call retrieved more than 3 rows** (max 3: e2e-009 and e2e-021), so a cap of 3 changes no prompt.
+    - **No case would lose its source row.** The only source not in first place is qwen3:0.6b's e2e-032 (position 2 of 2).
+  - Case parts 200 tokens or fewer: **qwen3:0.6b 16/20, gemma3:1b 16/19**, unchanged by the cap.
+  - Over 200:
+    - qwen3:0.6b: e2e-002 (2 rows, 304), 009 (3, 394), 021 (3, 408), 032 (2, 274)
+    - gemma3:1b: e2e-002 (2, 321), 003 (1, 214), 009 (3, 422)
+  - The contract's default limit is 5, but these queries never fill it.
+- **Why:** to record the session-file result, define "cold" for it, and test whether moving the date out of the system turn costs quality.
+- **Commits:** `9c7c334` (code, prompts, tests) and this `docs:` commit (devlog, 0004, 0005, data plan). Not pushed.
+- **Open questions / next:**
+  - e2e-009 is over the bar by about 5 s, and its 394-token case part is three rows. Neither v2's format nor a cap of 3 is an available lever now.
+  - Separating the query-v2 and answer-v3 effects would need one run per change (answer v3 with query v1, and the reverse). Not run.
+  - The Spring search call's time on the phone is unmeasured.
+  - The team's decision on 0004.
+
 ## 2026-10-31: Answer prompt v2 (compact results), cold runs, and ADR 0004 draft
 
 - **Date:** 2026-10-31 (ended about 11:50 +08:00; start time unverified)
