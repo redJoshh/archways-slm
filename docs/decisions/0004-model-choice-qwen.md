@@ -32,6 +32,25 @@ ADR 0002's cold settings: one `ollama serve` with `OLLAMA_NUM_PARALLEL=1`, `--nu
 ### Taglish smoke test (9 scored cases, answer v1, query v1, `and_v1`, cold)
 
 - On 9 Filipino/Taglish dev cases (`evals/taglish_cases.jsonl`, written by the user), qwen3:0.6b and gemma3:1b both failed 3. This is a smoke test only: nine cases, one run each (devlog, 2026-10-31).
+- **Under `and_v2`: no improvement for either model** (both still fail 3).
+  - gemma3:1b's taglish-04 miss is tied to keeping "may" in its query ("klase kapag may bagyo"). "may" is not a stopword, by decision.
+  - qwen3:0.6b's taglish-04 miss comes from a truncated query word ("kailan sinusus").
+
+### Cold dev results under `and_v2` (search contract v2, now the default matcher)
+
+Same settings as the baselines above: answer v1, query v1, one cold run each, `commit=e4e6959` (devlog, 2026-10-31). Scored with the current scorer: the stale-check fix and the wrong-row rule on every case.
+
+| | qwen3:0.6b | gemma3:1b |
+|---|---|---|
+| Failed after guards | 6/34 | 5/34 |
+| Unsafe before / after guards | 0/34 / 0/34 | 3/34 / 1/34 |
+| Unhelpful before / after guards | 6/34 / 6/34 | 2/34 / 4/34 |
+| Retrieval hit | 30/34 | 33/34 |
+| Trap retrieval (10 not-found cases) | 8/10 | 10/10 |
+
+- **gemma3:1b fails 5 and qwen3:0.6b fails 6** (unsafe after guards: 1 vs 0). A difference of one case in 34 is within noise, so the dev set does not separate the two models.
+- **The case for qwen3:0.6b now rests mainly on Redmi 10C speed:** the e2e-009 answer call took about 24–26 s on qwen3:0.6b against about 40–43 s on gemma3:1b (below). It no longer rests on dev-set quality.
+- The `and_v2` synonym map was built from dev-set failures, so both models' gains overstate held-out gains.
 
 ### Redmi 10C (4 GB RAM), llama.rn 0.13.0-rc.8, CPU, development build
 
@@ -78,7 +97,7 @@ ADR 0002's cold settings: one `ollama serve` with `OLLAMA_NUM_PARALLEL=1`, `--nu
 - **The regression set (e2e-025 to 034) was written after seeing retrieval failures**, so its hit rates are not evidence of general retrieval quality.
 - **Gate 1 is still FAIL for both models.** This record does not claim either one passes.
 - Phone numbers come from one development build on one Redmi 10C; release-build behaviour is unverified.
-- The differences on the dev set are small (8 vs 10 failures, 27 vs 28 retrieval hits) and may not hold on the held-out set.
+- The differences on the dev set are small (`and_v1`: 8 vs 10 failures, 27 vs 28 retrieval hits; `and_v2`: 6 vs 5 failures, 30 vs 33 retrieval hits, qwen3:0.6b first) and may not hold on the held-out set.
 
 ## Consequences if accepted
 
@@ -86,7 +105,7 @@ ADR 0002's cold settings: one `ollama serve` with `OLLAMA_NUM_PARALLEL=1`, `--nu
   - the training render must follow qwen3:0.6b's template, including the empty `<think>` block that `"think": false` produces (`render.py` has only `render_gemma3()`)
   - the `<bos>` rule (Decision 3) does not apply as written, because Ollama adds no start-of-text token for qwen3:0.6b
   - the export path's Q4_K_M check, template copy and stop strings (`<|im_end|>`, `<|im_start|>`) change
-- **qwen3:0.6b's retrieval misses become the main quality risk.** 7/34 cases miss because of the query it writes in the query call. Five of them fail; the other two (e2e-003, 021) are not-found traps whose replies still passed. Meanwhile the data plan trains the answer call only (Decision 1). Options include training the query call too, or changing the matcher (`fts_v3` is deferred).
+- **qwen3:0.6b's retrieval misses become the main quality risk.** 7/34 cases miss because of the query it writes in the query call. Five of them fail; the other two (e2e-003, 021) are not-found traps whose replies still passed. Meanwhile the data plan trains the answer call only (Decision 1). Options include training the query call too, or changing the matcher (`fts_v3` is deferred). Under `and_v2` (now the default), 4/34 cases miss (e2e-003, 014, 021, 023). Two of them fail (e2e-014, 023); e2e-003 and 021 are not-found traps whose replies still passed.
 - 0002's Gate 2 metrics and protocol are unchanged; only the model and its control change.
 - Gate 1 must still be passed on the Redmi 10C with the chosen model.
 
