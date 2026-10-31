@@ -16,6 +16,17 @@ Rules, in order:
      are dropped. Every remaining word must appear in the title or in the
      body as a plain substring (AND across words), like
      ILIKE '%word%' ESCAPE '\\' per word.
+   - and_v2 (search contract v2): and_v1 plus the frozen map in
+     contracts/search_synonyms_v1.json. The map's extra_stopwords
+     ("kapag") are dropped too (AND_V2_STOPWORDS; and_v1 and prefix_v2
+     keep STOPWORDS). Each remaining word becomes a group: the word, then
+     its synonyms (SYNONYMS; keys are whole lowercased query words). A
+     group matches if any member is a plain substring of the title or body
+     (OR within a group); every group must match (AND across groups).
+     The map was built from dev-set retrieval failures and is never tuned
+     afterwards: a change is a new map file and a new matcher. Spring must
+     load the same file and pass tests/vectors/search_vectors_and_v2.json.
+     Untested on real announcements: "due" also matches "due to".
    - prefix_v2: query, title and body are lowercased and split into words
      (runs of letters and digits; anything else separates words), and
      STOPWORDS are dropped from the query. Each query word of 5 or more
@@ -24,7 +35,7 @@ Rules, in order:
      start some word of the title or body. A stem that starts a title word
      scores 2, otherwise one that starts a body word scores 1.
    No query words left means no results.
-4. Highest score first (and_v1 scores every match 0), then newest
+4. Highest score first (and_v1 and and_v2 score every match 0), then newest
    published_at, then id ascending; then limit.
 5. Each row is returned in the contract's announcement shape: published_at
    gets STORED_ZONE and becomes posted_at, and the body is cut to
@@ -34,12 +45,15 @@ Seed rows store published_at as a naive timestamp, like the database column.
 Python's str.lower() stands in for Postgres case folding; they can differ
 for some non-ASCII letters.
 
-Pure: no I/O and no clock; `now` is always passed in.
+Pure apart from reading the frozen synonym map once at import: no other
+I/O and no clock; `now` is always passed in.
 """
 
+import json
 import math
 import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
@@ -94,7 +108,13 @@ STOPWORDS = frozenset(
 )
 
 
-MATCHERS = ("and_v1", "prefix_v2")
+SYNONYMS_PATH = (
+    Path(__file__).resolve().parents[2] / "contracts" / "search_synonyms_v1.json"
+)
+_SYNONYM_MAP = json.loads(SYNONYMS_PATH.read_text(encoding="utf-8"))
+SYNONYMS: dict[str, list[str]] = _SYNONYM_MAP["synonyms"]
+AND_V2_STOPWORDS = STOPWORDS | frozenset(_SYNONYM_MAP["extra_stopwords"])
+MATCHERS = ("and_v1", "prefix_v2", "and_v2")
 DEFAULT_MATCHER = "and_v1"
 # prefix_v2: words this long or longer are cut to their first STEM_CHARS.
 STEM_MIN_CHARS = 5
@@ -114,6 +134,12 @@ def ilike_pattern(word: str) -> str:
 
 def query_words(query: str) -> list[str]:
     return [word for word in query.lower().split() if word not in STOPWORDS]
+
+
+def synonym_groups(query: str) -> list[list[str]]:
+    """and_v2 groups, in query order: each word, then its synonyms."""
+    words = [word for word in query.lower().split() if word not in AND_V2_STOPWORDS]
+    return [[word, *SYNONYMS.get(word, [])] for word in words]
 
 
 def prefix_stems(query: str) -> list[str]:
@@ -191,6 +217,8 @@ def search_announcements(
     limit = arguments.get("limit", properties["limit"]["default"])
     if matcher == "and_v1":
         words = query_words(arguments["query"])
+    elif matcher == "and_v2":
+        words = synonym_groups(arguments["query"])
     else:
         words = prefix_stems(arguments["query"])
     if not words:
@@ -204,6 +232,12 @@ def search_announcements(
         if matcher == "and_v1":
             title, body = row["title"].lower(), row["body"].lower()
             if all(word in title or word in body for word in words):
+                matches.append((0, row))
+        elif matcher == "and_v2":
+            title, body = row["title"].lower(), row["body"].lower()
+            if all(
+                any(alt in title or alt in body for alt in group) for group in words
+            ):
                 matches.append((0, row))
         else:
             score = prefix_score(words, row["title"], row["body"])

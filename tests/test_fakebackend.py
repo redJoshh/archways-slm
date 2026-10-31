@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
@@ -7,14 +8,17 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
 from archways_assistant.fakebackend import (
+    AND_V2_STOPWORDS,
     DEFAULT_MATCHER,
     EXCERPT_CHARS,
     STOPWORDS,
+    SYNONYMS,
     InvalidArguments,
     ilike_pattern,
     prefix_stems,
     query_words,
     search_announcements,
+    synonym_groups,
 )
 from archways_assistant.tooldef import SCHEMA_PATH
 
@@ -182,3 +186,72 @@ def test_unknown_matcher_is_rejected():
         search_announcements(
             VECTORS["rows"], {"query": "library"}, VECTOR_NOW, CONTRACT, matcher="x"
         )
+
+
+# and_v2 matcher (tests/vectors/search_vectors_and_v2.json).
+
+VECTORS_AND_V2 = json.loads(
+    (ROOT / "tests" / "vectors" / "search_vectors_and_v2.json").read_text(
+        encoding="utf-8"
+    )
+)
+SYNONYMS_FILE = ROOT / "contracts" / "search_synonyms_v1.json"
+# Frozen: a change to the map is a new file and a new matcher, never an edit.
+SYNONYMS_SHA256 = "287fb773f77c98fd8059039bc6dbbb2934decddb5fb8428d1c9d728a2d774c22"
+
+
+def test_synonym_map_file_is_frozen():
+    digest = hashlib.sha256(SYNONYMS_FILE.read_bytes()).hexdigest()
+    assert digest == SYNONYMS_SHA256
+
+
+def test_backend_uses_the_map_file():
+    data = json.loads(SYNONYMS_FILE.read_text(encoding="utf-8"))
+    assert data["matcher"] == "and_v2"
+    assert SYNONYMS == data["synonyms"]
+    assert AND_V2_STOPWORDS == STOPWORDS | set(data["extra_stopwords"])
+
+
+def test_and_v1_stopwords_are_unchanged_by_and_v2():
+    assert "kapag" not in STOPWORDS
+    assert "kapag" in AND_V2_STOPWORDS
+    assert "may" not in AND_V2_STOPWORDS
+
+
+def run_and_v2(arguments, rows=None):
+    return search_announcements(
+        VECTORS_AND_V2["rows"] if rows is None else rows,
+        arguments,
+        datetime.fromisoformat(VECTORS_AND_V2["now"]),
+        CONTRACT,
+        matcher="and_v2",
+    )
+
+
+@pytest.mark.parametrize("vector", VECTORS_AND_V2["vectors"], ids=lambda v: v["name"])
+def test_search_vector_and_v2(vector):
+    assert [r["id"] for r in run_and_v2(vector["arguments"])] == vector["expected_ids"]
+    groups = synonym_groups(vector["arguments"]["query"])
+    assert [[ilike_pattern(alt) for alt in group] for group in groups] == vector[
+        "expected_patterns"
+    ]
+
+
+def test_and_v2_vectors_share_the_stopwords_and_v1_rows():
+    assert VECTORS_AND_V2["matcher"] == "and_v2"
+    assert VECTORS_AND_V2["synonyms_file"] == "contracts/search_synonyms_v1.json"
+    assert VECTORS_AND_V2["stopwords"] == sorted(AND_V2_STOPWORDS)
+    assert VECTORS_AND_V2["rows"][: len(VECTORS["rows"])] == VECTORS["rows"]
+
+
+@pytest.mark.parametrize("vector", VECTORS["vectors"], ids=lambda v: v["name"])
+def test_and_v2_matches_and_v1_without_mapped_words(vector):
+    words = vector["arguments"].get("query", "").lower().split()
+    if set(words) & (set(SYNONYMS) | AND_V2_STOPWORDS - STOPWORDS):
+        pytest.skip("uses a mapped word or an and_v2 stopword")
+    if vector.get("expected_error"):
+        with pytest.raises(InvalidArguments):
+            run_and_v2(vector["arguments"], rows=VECTORS["rows"])
+        return
+    got = run_and_v2(vector["arguments"], rows=VECTORS["rows"])
+    assert [r["id"] for r in got] == vector["expected_ids"]

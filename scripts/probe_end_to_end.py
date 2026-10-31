@@ -3,7 +3,7 @@
 Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
     [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--repeat 5]
     [--summary-only]
-    [--num-gpu 0] [--keep-alive 0] [--matcher and_v1|prefix_v2]
+    [--num-gpu 0] [--keep-alive 0] [--matcher and_v1|prefix_v2|and_v2]
     [--answer-prompt v1|v2|v3] [--query-prompt v1|v2|v3]
 
 For each case:

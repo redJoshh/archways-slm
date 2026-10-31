@@ -1,0 +1,15 @@
+{
+  "$comment": "Frozen synonym map for the and_v2 matcher (search contract v2: same arguments and results as v1, different matching). Never edit this file; a change is a new file (search_synonyms_v2.json) and a new matcher. Built on 2026-10-31 from dev-set retrieval failures only (evals/e2e_cases.jsonl, evals/taglish_cases.jsonl), so dev gains overstate held-out gains. The Spring app must implement the same map from this same file and pass tests/vectors/search_vectors_and_v2.json. Rules: lowercase the query, split on whitespace, drop the and_v1 stopwords plus extra_stopwords; each remaining word matches a row if the word or any of its synonyms is a plain substring of the title or body (ILIKE '%alt%' ESCAPE '\\', OR within a word); every word must match (AND across words). Keys are whole query words. Untested on real announcements: 'due' also matches phrases such as 'due to'.",
+  "name": "search_synonyms_v1",
+  "matcher": "and_v2",
+  "extra_stopwords": ["kapag"],
+  "synonyms": {
+    "payment": ["due"],
+    "enrolment": ["enrollment"],
+    "second-term": ["second term"],
+    "registration": ["sign up"],
+    "examinations": ["examination"],
+    "bagyo": ["typhoon"],
+    "klase": ["class"]
+  }
+}
