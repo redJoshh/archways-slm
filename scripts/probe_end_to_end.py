@@ -36,7 +36,8 @@ For each case:
    summary counts. A case's optional "exclusion" ("outdated" or
    "injection") says why its must_not_include phrases are wrong. The
    summary also reports unsafe and unhelpful rates (e2escore.UNSAFE and
-   UNHELPFUL) before and after the guard.
+   UNHELPFUL) before and after the guard. A case's optional "wrong_rows"
+   (seed ids) applies e2escore's wrong-topic rule to model-written replies.
 
 Retrieval hit is scored apart from the reply: a case with source_ids hits
 if all of them were retrieved; a case without source_ids hits if nothing
@@ -103,6 +104,7 @@ from archways_assistant.e2escore import (
     is_fabrication,
     supported,
     unsupported_claims,
+    wrong_row_claims,
 )
 from archways_assistant.fakebackend import (
     DEFAULT_MATCHER,
@@ -139,8 +141,9 @@ CASE_FIELDS = {
 EXCLUSIONS = {None, "outdated", "injection"}
 # Other optional case fields: superseded {"current": [...], "old": [...]},
 # wrong_claims [...], label (e.g. which batch of cases it was added in),
-# out_of_scope (bool, default false: see the module docstring), note. The
-# summary splits retrieval hit by label.
+# out_of_scope (bool, default false: see the module docstring),
+# wrong_rows [seed ids] (e2escore.wrong_row_claims), note. The summary splits
+# retrieval hit by label.
 NO_LABEL = "(no label)"
 
 
@@ -150,6 +153,7 @@ def load_cases(path: Path) -> list[dict]:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as error:
         sys.exit(f"Cannot read cases file {path}: {error}")
+    seed_ids = {row["id"] for row in json.loads(SEED_DATA.read_text(encoding="utf-8"))}
     cases = []
     seen_ids = set()
     for line_number, line in enumerate(lines, start=1):
@@ -188,6 +192,9 @@ def load_cases(path: Path) -> list[dict]:
             sys.exit(f"{where}: 'label' must be a string")
         if not isinstance(case.get("out_of_scope", False), bool):
             sys.exit(f"{where}: 'out_of_scope' must be a bool")
+        wrong_rows = case.get("wrong_rows", [])
+        if not (isinstance(wrong_rows, list) and set(wrong_rows) <= seed_ids):
+            sys.exit(f"{where}: 'wrong_rows' must be a list of seed ids")
         if case["id"] in seen_ids:
             sys.exit(f"{where}: duplicate id {case['id']!r}")
         seen_ids.add(case["id"])
@@ -309,6 +316,7 @@ def main() -> None:
     contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     query_format = contract["$defs"]["arguments"]
     rows = json.loads(SEED_DATA.read_text(encoding="utf-8"))
+    rows_by_id = {row["id"]: row for row in rows}
     cases = load_cases(args.cases)
     selected_ids = None
     if args.ids is not None:
@@ -343,7 +351,14 @@ def main() -> None:
         # (case id, guard line) for out_of_scope cases, which are not scored.
         "out_of_scope": [],
     }
-    kinds = ("unsupported", "contains", "filtered text", "stale", "misattributed")
+    kinds = (
+        "unsupported",
+        "contains",
+        "filtered text",
+        "stale",
+        "misattributed",
+        "wrong row",
+    )
     kind_counts = {stage: dict.fromkeys(kinds, 0) for stage in ("before", "after")}
     # stage -> group -> case ids with any category in that group.
     groups = {stage: {"unsafe": [], "unhelpful": []} for stage in kind_counts}
@@ -521,11 +536,20 @@ def main() -> None:
                 "wrong_claims": case.get("wrong_claims", []),
             }
             retrieved_text = "\n".join(f"{r['title']}\n{r['excerpt']}" for r in results)
+            wrong_rows = [rows_by_id[id_] for id_ in case.get("wrong_rows", [])]
+            source_rows = [rows_by_id[id_] for id_ in case["source_ids"]]
             for stage, reply, unsupported, code_built, fallback_used in (
                 ("before", raw, raw_unsupported, not results, False),
                 ("after", final, final_unsupported, not results or fired, fired),
             ):
-                problems = failures(reply, **expected, unsupported=unsupported)
+                wrong_row = (
+                    []
+                    if code_built
+                    else wrong_row_claims(reply, wrong_rows, source_rows)
+                )
+                problems = failures(
+                    reply, **expected, unsupported=unsupported, wrong_row=wrong_row
+                )
                 problems += context_problems
                 categories = categorize(
                     reply,

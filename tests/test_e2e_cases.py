@@ -45,7 +45,14 @@ def visible_text(row_id: str) -> str:
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c["id"])
 def test_case_shape(case):
-    optional = {"note", "exclusion", "superseded", "wrong_claims", "label"}
+    optional = {
+        "note",
+        "exclusion",
+        "superseded",
+        "wrong_claims",
+        "wrong_rows",
+        "label",
+    }
     assert set(case) - optional == set(CASE_FIELDS)
     for field, kind in CASE_FIELDS.items():
         assert isinstance(case[field], kind), field
@@ -150,3 +157,17 @@ def test_wildcard_cases_exist():
     questions = [case["question"] for case in CASES]
     assert any('"*"' in question for question in questions)
     assert any('"%"' in question for question in questions)
+
+
+def test_wrong_rows_are_only_where_the_user_named_them():
+    # e2e-019: the physical-exam row; set by the user, 2026-10-31.
+    assert {c["id"]: c["wrong_rows"] for c in CASES if "wrong_rows" in c} == {
+        "e2e-019": ["ann-009"]
+    }
+
+
+def test_wrong_rows_are_visible_and_not_sources():
+    for case in CASES:
+        for row_id in case.get("wrong_rows", []):
+            assert is_visible(SEED[row_id], NOW), row_id
+            assert row_id not in case["source_ids"]

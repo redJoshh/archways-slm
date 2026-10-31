@@ -440,3 +440,46 @@ def test_taglish_cases_load_with_the_fixed_now():
     cases = harness.load_cases(ROOT / "evals" / "taglish_cases.jsonl")
     assert {case["now"] for case in cases} == {FIXED_NOW}
     assert [case["id"] for case in cases if case.get("out_of_scope")] == ["taglish-10"]
+
+
+def test_e2e_probe_scores_wrong_row_facts_as_unsafe(monkeypatch, capsys, tmp_path):
+    cases = write_cases(
+        tmp_path / "cases.jsonl",
+        {
+            "id": "trap",
+            "question": "When are the midterm exams?",
+            "source_ids": [],
+            "must_include": [],
+            "expects_not_found": True,
+            "wrong_rows": ["ann-009"],
+        },
+    )
+    harness = load_script("probe_end_to_end")
+
+    def reply(payload):
+        if "format" in payload:
+            return json.dumps({"query": "physical examination", "days": 30})
+        # Both dates are in ann-009's excerpt, so the guard lets them through.
+        return "The exams run from November 3 to November 7."
+
+    fake_ollama(harness, monkeypatch, reply)
+    monkeypatch.setattr(sys, "argv", ["probe_end_to_end.py", "--cases", str(cases)])
+    harness.main()
+    out = capsys.readouterr().out
+    assert "  guard: not fired" in out
+    assert (
+        "  after guard: FAIL [wrong_row, retrieval_miss] "
+        "(wrong row ann-009 date 11-03; wrong row ann-009 date 11-07; "
+        "expected the not-found message)"
+    ) in out
+    assert "  unsafe after guards: trap" in out
+    assert "wrong row 1" in out
+
+
+def test_cases_file_rejects_an_unknown_wrong_row(tmp_path):
+    harness = load_script("probe_end_to_end")
+    cases = write_cases(
+        tmp_path / "cases.jsonl", {"id": "x", "question": "q", "wrong_rows": ["nope"]}
+    )
+    with pytest.raises(SystemExit, match="'wrong_rows' must be a list of seed ids"):
+        harness.load_cases(cases)
