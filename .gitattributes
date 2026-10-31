@@ -1,0 +1,7 @@
+# Frozen prompts, contracts, vectors and eval files are pinned by SHA-256
+# tests, so they must keep Unix line endings on every checkout (Git for
+# Windows sets core.autocrlf=true system-wide).
+*.txt text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.md text eol=lf
