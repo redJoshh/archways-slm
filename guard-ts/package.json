@@ -1,0 +1,22 @@
+{
+  "name": "@archways/guard-ts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Answer guard for the Archways assistant, ported from src/archways_assistant/e2escore.py. Zero runtime dependencies.",
+  "type": "module",
+  "main": "dist/src/guard.js",
+  "types": "dist/src/guard.d.ts",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "tsc -p . && node --test \"dist/test/*.test.js\"",
+    "test:hermes": "tsc -p . && node scripts/hermes-vectors.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "hermes-engine-cli": "0.12.0",
+    "typescript": "7.0.2"
+  }
+}
