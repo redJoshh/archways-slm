@@ -566,3 +566,93 @@ def test_non_ascii_digit_ranges_match_unicode_nd():
     # A newer Unicode with more digits means extending the frozen list,
     # which is a guard change (update guard-ts and the vectors too).
     assert nd <= listed, f"new Nd digits not in the frozen list: {sorted(nd - listed)}"
+
+
+# Reason codes, the contract posted_at parser and the last-resort reply.
+def test_guard_codes_name_every_reason_in_order():
+    from archways_assistant.e2escore import LAST_RESORT_MESSAGE  # noqa: F401
+
+    reply = "Secret Draft: November 6, room 7, day ٥."
+    result = guard(reply, RESULTS, "When?", ["Other", "secret draft", "SECRET DRAFT"])
+    assert result.codes == (
+        "unsupported_date:11-06",
+        "unsupported_number:7",
+        "non_ascii_digit",
+        "filtered_text:1",
+        "filtered_text:2",
+    )
+    assert len(result.reasons) == len(result.codes)
+
+
+def test_guard_codes_are_empty_when_it_does_not_fire():
+    assert guard("The last day is November 13.", RESULTS, "When?", []).codes == ()
+
+
+def test_number_codes_are_canonical():
+    result = guard("Call 007 or 000.", RESULTS, "When?", [])
+    assert result.codes == ("unsupported_number:7",)  # 0 is supported (4:00)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("2026-10-29T10:00:00+08:00", (2026, 10, 29)),
+        ("2026-10-29t10:00:00z", (2026, 10, 29)),
+        ("2026-10-29T23:59:59.1234567-05:30", (2026, 10, 29)),
+        ("2028-02-29T00:00:00Z", (2028, 2, 29)),
+        ("0001-01-01T00:00:00+23:59", (1, 1, 1)),
+    ],
+)
+def test_posted_date_reads_the_contract_format(text, expected):
+    from archways_assistant.e2escore import posted_date
+
+    found = posted_date(text)
+    assert (found.year, found.month, found.day) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "2026-11-03",
+        "2026-W45-2",
+        "20261103T080000+0800",
+        "2026-11-03 08:00:00+08:00",
+        "2026-11-03T08:00:00",
+        "2026-11-03T08:00:00+08",
+        "2026-11-03T08:00:00+08:00\n",
+        "2026-02-29T00:00:00Z",
+        "2026-13-01T00:00:00Z",
+        "0000-01-01T00:00:00Z",
+        "2026-11-03T24:00:00Z",
+        "2026-11-03T08:60:00Z",
+        "2026-11-03T08:00:60Z",
+        "2026-11-03T08:00:00+24:00",
+        "2026-11-03T08:00:00+08:60",
+        "２026-11-03T08:00:00Z",
+    ],
+)
+def test_posted_date_rejects_everything_else(text):
+    from archways_assistant.e2escore import posted_date
+
+    with pytest.raises(ValueError):
+        posted_date(text)
+
+
+def test_fired_guard_with_an_unreadable_posted_at_gives_the_last_resort():
+    from archways_assistant.e2escore import LAST_RESORT_MESSAGE
+
+    results = [{**RESULTS[0], "posted_at": "2026-10-29"}]
+    result = guard("The last day is November 6.", results, "When?", [])
+    assert result.fired
+    assert result.text == LAST_RESORT_MESSAGE
+    assert LAST_RESORT_MESSAGE == (
+        "Sorry, I can't show an answer right now. "
+        "Please check the Announcements page for the official details."
+    )
+
+
+def test_unfired_guard_never_reads_posted_at():
+    results = [{**RESULTS[0], "posted_at": "not a date"}]
+    result = guard("The last day is November 13.", results, "When?", [])
+    assert not result.fired
+    assert result.text == "The last day is November 13."

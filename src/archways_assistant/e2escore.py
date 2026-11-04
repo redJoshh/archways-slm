@@ -38,10 +38,35 @@ Pure: no I/O, no clock, standard library only.
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date
 
 NOT_FOUND_MESSAGE = "No official announcement was found for your question."
 FALLBACK_HEADER = "I found these announcements:"
+# Shown when the guard fires but fallback() can't be built (an unreadable
+# posted_at). guard-ts has the same text.
+LAST_RESORT_MESSAGE = (
+    "Sorry, I can't show an answer right now. "
+    "Please check the Announcements page for the official details."
+)
+MONTH_NAMES = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+# The contract's posted_at (RFC 3339 with an offset), ASCII digits only.
+POSTED_AT = re.compile(
+    r"([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})"
+    r"(?:\.[0-9]+)?(?:[Zz]|[+-]([0-9]{2}):([0-9]{2}))"
+)
 
 MONTHS = {
     "jan": 1,
@@ -163,6 +188,10 @@ class GuardResult:
     text: str
     fired: bool
     reasons: tuple[str, ...]
+    # Stable reason codes, one per reason (guard-ts gives the same codes):
+    # unsupported_date:MM-DD, unsupported_number:N, non_ascii_digit,
+    # filtered_text:I (I indexes forbidden).
+    codes: tuple[str, ...] = ()
 
 
 def month_number(text: str) -> int:
@@ -266,13 +295,36 @@ def missing_groups(reply: str, groups: list[list[str]]) -> list[list[str]]:
     return [group for group in groups if not present(reply, group)]
 
 
+def posted_date(text: str) -> date:
+    """The wall-clock date of a contract posted_at; ValueError for anything else.
+
+    Accepted: YYYY-MM-DDTHH:MM:SS, an optional fraction, then Z or +/-HH:MM
+    (T and Z in either case, ASCII digits). Year 1 or later, a real
+    calendar day, hour up to 23, minute and second up to 59 (no leap
+    second), offset up to 23:59. No time-zone conversion.
+    """
+    match = POSTED_AT.fullmatch(text)
+    if not match:
+        raise ValueError(f"not a contract posted_at: {text!r}")
+    year, month, day, hour, minute, second = (int(g) for g in match.groups()[:6])
+    offset_hours, offset_minutes = match.groups()[6:]
+    if hour > 23 or minute > 59 or second > 59:
+        raise ValueError(f"time out of range: {text!r}")
+    if offset_hours is not None and (
+        int(offset_hours) > 23 or int(offset_minutes) > 59
+    ):
+        raise ValueError(f"offset out of range: {text!r}")
+    return date(year, month, day)
+
+
 def fallback(results: list[dict]) -> str:
     """A reply built only from retrieved titles and posted dates."""
     lines = [FALLBACK_HEADER]
     for result in results:
-        posted = datetime.fromisoformat(result["posted_at"])
+        posted = posted_date(result["posted_at"])
         lines.append(
-            f"- {result['title']} (posted {posted:%B} {posted.day}, {posted.year})"
+            f"- {result['title']} (posted {MONTH_NAMES[posted.month - 1]} "
+            f"{posted.day}, {posted.year})"
         )
     return "\n".join(lines)
 
@@ -283,15 +335,30 @@ def guard(
     """Replace the reply with fallback(results) if it has unsupported claims,
     a non-ASCII digit or forbidden text.
 
-    forbidden is the titles of rows that must never reach the model.
+    forbidden is the titles of rows that must never reach the model. The
+    fallback is built only when the guard fires; if it can't be built, the
+    reply is LAST_RESORT_MESSAGE.
     """
-    reasons = unsupported_claims(reply, supported(results, question))
+    found = [
+        (f"unsupported_{claim.replace(' ', ':', 1)}", claim)
+        for claim in unsupported_claims(reply, supported(results, question))
+    ]
     if NON_ASCII_DIGIT.search(reply):
-        reasons.append("non-ASCII digit")
-    reasons += [f"filtered text {title!r}" for title in present(reply, forbidden)]
-    if not reasons:
-        return GuardResult(reply, False, ())
-    return GuardResult(fallback(results), True, tuple(reasons))
+        found.append(("non_ascii_digit", "non-ASCII digit"))
+    lowered = reply.lower()
+    found += [
+        (f"filtered_text:{index}", f"filtered text {title!r}")
+        for index, title in enumerate(forbidden)
+        if title.lower() in lowered
+    ]
+    if not found:
+        return GuardResult(reply, False, (), ())
+    try:
+        text = fallback(results)
+    except (KeyError, TypeError, ValueError):
+        text = LAST_RESORT_MESSAGE
+    codes, reasons = zip(*found, strict=True)
+    return GuardResult(text, True, reasons, codes)
 
 
 SUPERSESSION_CUES = re.compile(
