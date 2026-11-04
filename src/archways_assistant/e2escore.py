@@ -24,6 +24,15 @@ Known limits: spelled-out numbers ("fifteenth") aren't checked; a range
 written "November 16 to 28" supports (11, 16) and the number 28 but not the
 date (11, 28); "may" followed by a number is read as the month May.
 
+Guard spec (guard-ts/ ports it; tests/vectors/guard_vectors.json checks
+both): matching is ASCII only (re.ASCII), so \\d is 0-9, \\s is
+[ \\t\\n\\r\\f\\v], \\b is ASCII and month names fold ASCII case only. Before
+claims are read, every character in GUARD_SPACES becomes a space, so a
+date split by a no-break space is still a date; the text shown never
+changes. A reply with a decimal digit outside 0-9 (NON_ASCII_DIGIT_RANGES)
+fires the guard, since its number cannot be checked. Both lists are
+frozen: changing one is a guard change.
+
 Pure: no I/O, no clock, standard library only.
 """
 
@@ -58,17 +67,89 @@ DATE_PATTERNS = [
     # November 6, Nov. 6th, November 6, 2026
     re.compile(
         rf"\b(?P<month>{MONTH})\.?\s+(?P<day>\d{{1,2}}){ORDINAL}\b{YEAR}",
-        re.IGNORECASE,
+        re.IGNORECASE | re.ASCII,
     ),
     # 6 November, 6th of Nov 2026
     re.compile(
         rf"\b(?P<day>\d{{1,2}}){ORDINAL}\s+(?:of\s+)?(?P<month>{MONTH})\b\.?{YEAR}",
-        re.IGNORECASE,
+        re.IGNORECASE | re.ASCII,
     ),
     # 2026-11-06
-    re.compile(r"\b(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\b"),
+    re.compile(r"\b(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})\b", re.ASCII),
 ]
-NUMBER = re.compile(r"\d+")
+NUMBER = re.compile(r"\d+", re.ASCII)
+# Frozen spec lists (see the module docstring); guard-ts has the same lists.
+GUARD_SPACES = "\x85\xa0                　"
+SPACE_TABLE = str.maketrans(dict.fromkeys(GUARD_SPACES, " "))
+# Unicode 15.0 general category Nd, minus 0-9: (first, last) code points.
+NON_ASCII_DIGIT_RANGES = (
+    (0x0660, 0x0669),
+    (0x06F0, 0x06F9),
+    (0x07C0, 0x07C9),
+    (0x0966, 0x096F),
+    (0x09E6, 0x09EF),
+    (0x0A66, 0x0A6F),
+    (0x0AE6, 0x0AEF),
+    (0x0B66, 0x0B6F),
+    (0x0BE6, 0x0BEF),
+    (0x0C66, 0x0C6F),
+    (0x0CE6, 0x0CEF),
+    (0x0D66, 0x0D6F),
+    (0x0DE6, 0x0DEF),
+    (0x0E50, 0x0E59),
+    (0x0ED0, 0x0ED9),
+    (0x0F20, 0x0F29),
+    (0x1040, 0x1049),
+    (0x1090, 0x1099),
+    (0x17E0, 0x17E9),
+    (0x1810, 0x1819),
+    (0x1946, 0x194F),
+    (0x19D0, 0x19D9),
+    (0x1A80, 0x1A89),
+    (0x1A90, 0x1A99),
+    (0x1B50, 0x1B59),
+    (0x1BB0, 0x1BB9),
+    (0x1C40, 0x1C49),
+    (0x1C50, 0x1C59),
+    (0xA620, 0xA629),
+    (0xA8D0, 0xA8D9),
+    (0xA900, 0xA909),
+    (0xA9D0, 0xA9D9),
+    (0xA9F0, 0xA9F9),
+    (0xAA50, 0xAA59),
+    (0xABF0, 0xABF9),
+    (0xFF10, 0xFF19),
+    (0x104A0, 0x104A9),
+    (0x10D30, 0x10D39),
+    (0x11066, 0x1106F),
+    (0x110F0, 0x110F9),
+    (0x11136, 0x1113F),
+    (0x111D0, 0x111D9),
+    (0x112F0, 0x112F9),
+    (0x11450, 0x11459),
+    (0x114D0, 0x114D9),
+    (0x11650, 0x11659),
+    (0x116C0, 0x116C9),
+    (0x11730, 0x11739),
+    (0x118E0, 0x118E9),
+    (0x11950, 0x11959),
+    (0x11C50, 0x11C59),
+    (0x11D50, 0x11D59),
+    (0x11DA0, 0x11DA9),
+    (0x11F50, 0x11F59),
+    (0x16A60, 0x16A69),
+    (0x16AC0, 0x16AC9),
+    (0x16B50, 0x16B59),
+    (0x1D7CE, 0x1D7FF),
+    (0x1E140, 0x1E149),
+    (0x1E2F0, 0x1E2F9),
+    (0x1E4F0, 0x1E4F9),
+    (0x1E950, 0x1E959),
+    (0x1FBF0, 0x1FBF9),
+)
+NON_ASCII_DIGIT = re.compile(
+    "[" + "".join(f"\\U{lo:08x}-\\U{hi:08x}" for lo, hi in NON_ASCII_DIGIT_RANGES) + "]"
+)
 
 
 @dataclass(frozen=True)
@@ -95,7 +176,7 @@ def claims(text: str) -> Claims:
     """
     dates = set()
     numbers = set()
-    chars = list(text)
+    chars = list(text.translate(SPACE_TABLE))
     for pattern in DATE_PATTERNS:
         for match in pattern.finditer("".join(chars)):
             month, day = month_number(match["month"]), int(match["day"])
@@ -199,11 +280,14 @@ def fallback(results: list[dict]) -> str:
 def guard(
     reply: str, results: list[dict], question: str, forbidden: list[str]
 ) -> GuardResult:
-    """Replace the reply with fallback(results) if it has unsupported claims or forbidden text.
+    """Replace the reply with fallback(results) if it has unsupported claims,
+    a non-ASCII digit or forbidden text.
 
     forbidden is the titles of rows that must never reach the model.
     """
     reasons = unsupported_claims(reply, supported(results, question))
+    if NON_ASCII_DIGIT.search(reply):
+        reasons.append("non-ASCII digit")
     reasons += [f"filtered text {title!r}" for title in present(reply, forbidden)]
     if not reasons:
         return GuardResult(reply, False, ())

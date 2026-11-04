@@ -494,3 +494,75 @@ def test_a_wrong_row_fact_also_in_the_question_is_not_flagged():
     assert wrong_row_claims(reply, [LIBRARY_ROW], [], question=question) == [
         "ann-007 number 9"
     ]
+
+
+# Guard spec: ASCII matching, normalized spaces, non-ASCII digits fail closed.
+DEC_6_RESULTS = [
+    {
+        **RESULTS[1],
+        "title": "Career Fair",
+        "excerpt": "The fair is on December 6 from 4:00 PM.",
+    }
+]
+
+
+def test_long_s_month_does_not_crash_and_its_number_is_checked():
+    # U+017F matched "s" under Unicode IGNORECASE, then MONTHS["ſep"]
+    # raised KeyError. Under re.ASCII it is no month; the 5 is still checked.
+    assert claims("ſep 5") == claims("5")
+    result = guard("ſep 5", RESULTS, "When?", [])
+    assert result.fired
+    assert result.reasons == ("number 5",)
+
+
+def test_non_ascii_digit_fails_closed():
+    # (11, 7) is supported, but the guard cannot verify a fullwidth 7.
+    results = [{**RESULTS[0], "excerpt": "The last day is November 7."}]
+    result = guard("The last day is November ７.", results, "When?", [])
+    assert result.fired
+    assert result.reasons == ("non-ASCII digit",)
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "The deadline is November 6.",
+        "The deadline is Nov 6.",
+        "The deadline is Nov 6 at 4:00 PM.",
+    ],
+)
+def test_dates_split_by_non_ascii_spaces_are_still_dates(reply):
+    # Only December 6 has day 6, so a bare 6 would wrongly pass.
+    result = guard(reply, DEC_6_RESULTS, "When?", [])
+    assert result.fired
+    assert result.reasons == ("date 11-06",)
+
+
+def test_time_with_a_narrow_no_break_space_does_not_fire():
+    result = guard("It starts at 4:00 PM.", DEC_6_RESULTS, "When?", [])
+    assert not result.fired
+
+
+def test_guard_spaces_is_the_frozen_list():
+    from archways_assistant.e2escore import GUARD_SPACES
+
+    expected = [0x85, 0xA0, 0x1680, *range(0x2000, 0x200B), 0x2028, 0x2029]
+    expected += [0x202F, 0x205F, 0x3000]
+    assert [ord(ch) for ch in GUARD_SPACES] == expected
+
+
+def test_non_ascii_digit_ranges_match_unicode_nd():
+    import unicodedata
+
+    from archways_assistant.e2escore import NON_ASCII_DIGIT_RANGES
+
+    listed = {c for lo, hi in NON_ASCII_DIGIT_RANGES for c in range(lo, hi + 1)}
+    nd = {
+        c
+        for c in range(0x110000)
+        if unicodedata.category(chr(c)) == "Nd" and not 0x30 <= c <= 0x39
+    }
+    assert listed <= nd, "a listed code point is not a decimal digit"
+    # A newer Unicode with more digits means extending the frozen list,
+    # which is a guard change (update guard-ts and the vectors too).
+    assert nd <= listed, f"new Nd digits not in the frozen list: {sorted(nd - listed)}"
