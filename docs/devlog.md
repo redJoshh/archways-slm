@@ -19,6 +19,89 @@ Template:
 
 ---
 
+## 2026-11-04: Guard made an explicit spec; parity vectors; guard-ts (TypeScript port)
+
+- **Date:** 2026-11-04 (commits 09:07–09:21 +08:00, entry about 09:25; start time unverified)
+- **Decisions (user, 2026-11-04):**
+  - Port the guard's *specified* behaviour, not CPython's incidental Unicode semantics.
+  - Parity is on `fired`, the reason **codes** and the final text; the reason strings may differ.
+  - posted_at: contract format only.
+  - `LAST_RESORT_MESSAGE`: "Sorry, I can't show an answer right now. Please check the Announcements page for the official details."
+- **Guard bug found during the port:**
+  - A reply containing "ſep 5" (U+017F long s) made `guard()` raise `KeyError: 'ſep'`. Unicode `re.IGNORECASE` matched ſ as s, then `MONTHS[text[:3].lower()]` had no such key.
+  - **Audit:** this was the only place where an IGNORECASE match was used as a dict or set key. IGNORECASE is used only in `e2escore.py`, and `SUPERSESSION_CUES` is only searched.
+  - Python's `re.I` matches four non-ASCII characters to ASCII letters: U+0130 İ and U+0131 ı (to i), U+017F ſ (to s), and U+212A Kelvin sign (to k). Only ſ can reach the month key ("sep"); no month has i or k in its first three letters.
+  - Fixed by `re.ASCII` (below), not by `casefold()`. Under `re.ASCII`, "ſep" is no month and the 5 is checked as a number.
+- **Regression found during planning, before any code:**
+  - Plain `re.ASCII` would stop reading "November\u00a06" (NBSP) or "Nov\u202f6" (narrow NBSP) as a date. The 6 would then pass as a bare number whenever any supported date has day 6.
+  - Fix: normalize a frozen space list (below).
+  - Failing closed on those characters was rejected, because it would send every "4:00\u202fPM" reply to the fallback.
+- **What changed:**
+  - **`d905934` (`fix:`), `e2escore.py`:**
+    - `DATE_PATTERNS` and `NUMBER` use `re.ASCII`.
+    - `claims()` first maps the frozen `GUARD_SPACES` (U+0085, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000) to a space. This applies to the reply, the question, the titles and excerpts, and the scorer's row text. The text shown never changes.
+    - A reply with a digit in the frozen `NON_ASCII_DIGIT_RANGES` (Unicode 15.0 Nd minus 0-9; 63 ranges) fires the guard (`non-ASCII digit`).
+    - Tests:
+      - "ſep 5" and "November ７" fail on the old guard.
+      - The three NBSP/NNBSP date tests pass on the old guard, fail under `re.ASCII` alone (checked, not committed), and pass after the normalization.
+      - Exact-list tests for both frozen lists. The digit test also fails if a newer Python's Unicode adds Nd digits.
+  - **`1646b5c` (`feat:`):**
+    - `GuardResult.codes`: `unsupported_date:MM-DD`, `unsupported_number:N`, `non_ascii_digit`, `filtered_text:I` (an index into forbidden).
+    - `posted_date()` replaces `datetime.fromisoformat`. It accepts the contract's RFC 3339 format only: ASCII digits, T/t, Z/z or ±HH:MM, explicit range checks, no leap second, no time-zone conversion.
+    - Month names are fixed English, not locale-dependent `%B`.
+    - A fired guard whose fallback can't be built returns `LAST_RESORT_MESSAGE`. The fallback is still built only when the guard fires.
+  - **`7b6d32a` (`test:`):**
+    - `scripts/export_guard_vectors.py` writes `tests/vectors/guard_vectors.json`: 453 vectors, 121 of which fire, deduplicated; ASCII, LF, about 590 KB.
+    - Vectors per source type (a vector can have several):
+      - unit 57 (the guard-related cases in `test_e2escore.py`)
+      - edge 122
+      - phone 4
+      - run 272 (every reply in all 42 saved probe runs, including the uncited repeat5 runs)
+    - `--refresh` recomputes the expected outputs without `runs/` and reproduces the file byte for byte.
+    - `scripts/saved_runs.py` reads the run files.
+    - `tests/test_guard_vectors.py` checks every vector against `guard()`, the spec lists, the contract shape of the results, no lone surrogates, and ASCII/LF.
+  - **`a3aa28e` (`feat:`):** `guard-ts/`, zero runtime dependencies.
+    - Exact dev dependencies, each published by 2026-10-21: `typescript` 7.0.2, `@types/node` 22.20.5 and `hermes-engine-cli` 0.12.0.
+    - ASCII patterns with an explicit `[ \t\n\r\f\v]`; no classes, lookbehind, named groups, `\p{}` or `u` flag.
+    - Numbers are canonical strings, sorted by (length, lex).
+  - **Gate 1 app** (`C:\throw-away-app\gate1-llm`, its own git, commit `4378bfc`, not pushed):
+    - New `GuardVectors.tsx`: a dev-only (`__DEV__`) "Run guard vectors" button that imports guard-ts and the vectors and shows the pass/fail counts and the Hermes version.
+    - Wiring: `index.ts` wraps `App`; `metro.config.js` watches `guard-ts/src` and `tests/vectors`; `tsconfig.json` adds `allowImportingTsExtensions`.
+    - `App.tsx` was not touched; its uncommitted changes are left as they were.
+    - No new native modules: restart Metro (new config) and reload. No rebuild needed.
+- **Re-score with the changed guard:** all 42 saved probe runs, 656 replies (logged, plus the restored-newline form where it differs), compared against HEAD's e2escore on the guard result and the before/after verdicts.
+  - **0 changes**, after each of the two guard commits.
+  - Sanity check: an always-firing mutant changed 613 of the 656.
+- **Run reconstruction caveats:**
+  - The run files are UTF-8, or cp1252 for 23 gemma files with curly quotes. Reading them is lossless, since the probe would have crashed on characters cp1252 can't encode.
+  - The probe logged `\n` as " | ", so both forms are in the vectors. No logged reply reached the 400-character cut.
+  - Results were rebuilt from the logged ids and the current seed.
+  - The current guard agrees with the logged guard line on 632 of 634 replies. The 2 that differ (`e2e34_gemma3_1b.txt` e2e-003 and `e2e34_gemma3_1b_cpu_run2.txt` e2e-032) predate later guard and scorer fixes.
+- **Phone replies:** the Redmi gemma3:1b cold and warm replies, the Nothing gemma3:1b cold reply, and the Redmi qwen3:0.6b reply for e2e-009, all quoted in this devlog. None fires, as recorded.
+  - The Redmi warm reply was rebuilt from the devlog's description: the cold reply with a different last sentence.
+- **Parity domain:** any reply, question and forbidden strings, and contract-shaped results.
+  - **Gaps:** lowercasing of forbidden titles (plain `lower()` vs `toLowerCase()`: İ, final sigma, newer Unicode), lone surrogates, results that don't match the contract, and numbers over 4,300 digits.
+  - **New finding, not fixed:** the Python guard raises `ValueError` on a reply with a number over 4,300 digits (CPython's int-string limit). Fixing it would be another guard change and needs a decision.
+- **How it was verified:**
+  - `uv run pytest` → 1023 passed; `uv run ruff check .` → clean; `uv run ruff format --check .` → 40 files already formatted.
+  - `cd guard-ts; npm ci; npm test` → 461 tests, 0 failed (all 453 vectors).
+  - `npm run test:hermes` → "453/453 passed, 0 failed; spec problems: none" under Hermes 0.12 (Windows CLI).
+  - Mutation check in TS:
+    - native `\s`: 3 tests fail (the U+FEFF vectors);
+    - no space normalization: 23 fail.
+    - Both mutations were reverted.
+  - Gate 1 app: `npx tsc --noEmit` → clean. `npx expo export --platform android` (to the scratchpad) bundled to Hermes bytecode. `npx expo lint` not run: the app has no lint config, and running it would add one.
+  - **Parity verified on Node only.** Node and the Hermes 0.12 CLI are smoke tests. The real Hermes check is the phone run (Nothing Phone 3a Pro, same Hermes as the Redmi), which has not run yet.
+- **For the mobile team:**
+  - **Copy or import `guard-ts/`. Any guard change updates the Python guard, guard-ts and the vectors (`--refresh`) together, and `uv run pytest` and `npm test` must both pass.**
+  - **Always wrap the guard in try/catch. On any error show `fallback(results)`, or `LAST_RESORT_MESSAGE` if that throws too** (guard-ts README). This is defense in depth, in case another crash exists.
+  - The vectors hold dev questions and seed data. They are test data; never use them as prompts or training data.
+- **Commits:** `d905934`, `1646b5c`, `7b6d32a`, `a3aa28e`, and this docs commit. Not pushed.
+- **Open questions / next:**
+  - Press "Run guard vectors" on the Nothing Phone 3a Pro and record the counts and Hermes version. Until then, "parity verified on Node only".
+  - The over-4,300-digit crash.
+  - Whether `present()`/`categorize()` (scorer) should share the guard's lowercasing spec.
+
 ## 2026-10-31: .gitattributes (LF), contract v2 docs, ADR 0004 and_v2 results
 
 - **Date:** 2026-10-31 (ended about 16:05 +08:00; start time unverified)

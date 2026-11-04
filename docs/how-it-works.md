@@ -31,6 +31,8 @@ The model never touches the database and never "knows" announcements from traini
 | `contracts/search_announcements.schema.json` | **The source of truth.** A JSON Schema describing the tool's arguments and its results. |
 | `contracts/search_synonyms_v1.json` | Frozen synonym map for search contract v2 (the and_v2 matcher). Spring loads the same file. |
 | `tests/vectors/search_vectors_and_v2.json` | Search vectors that Spring's and_v2 implementation must pass. |
+| `guard-ts/` | TypeScript port of the answer guard (`e2escore.guard()`), for the mobile app. Zero runtime dependencies; see its README. Any guard change updates both versions and the guard vectors. |
+| `tests/vectors/guard_vectors.json` | Guard parity vectors: unit cases, edge cases, phone replies and every saved run reply. Python (`tests/test_guard_vectors.py`) and guard-ts must both match them. Built by `scripts/export_guard_vectors.py` (`--refresh` after a guard change). |
 | `src/archways_assistant/tooldef.py` | Generator that turns the contract into the tool definition Ollama understands. |
 | `generated/search_announcements.tool.json` | Output of the generator. Never edit by hand. |
 | `scripts/probe_tool_call.py` | Sends test questions to a local Ollama model and checks whether it calls the tool correctly. |
