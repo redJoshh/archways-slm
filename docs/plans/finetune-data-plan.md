@@ -1,13 +1,40 @@
-# Fine-tuning data plan for gemma3:1b
+# Fine-tuning data plan for qwen3:0.6b (post-UAT)
 
 - **Status:** DRAFT, for the user's review. Nothing here is decided until the user approves it, except the decisions marked **Decided**.
-- **Decided (2026-10-29, user):** train the answer call only (Decision 1); the corpus authorship (Decision 2); the training `<bos>` rule (Decision 3); the teacher, its pilot checks and fallback, and the hand review (Decision 4); size, mix, the overlap review rule and the review files (Decision 5).
-- **Date:** 2026-10-29
-- **Context:** [ADR 0002](../decisions/0002-gemma-primary-and-gate-2.md) confirms fine-tuning, for gemma3:1b only. This plan covers the data and the export path. No training code and no data exist yet.
+- **Post-UAT:** UAT (week of 2026-11-09) ships **untuned** qwen3:0.6b ([ADR 0004](../decisions/0004-model-choice-qwen.md), "UAT configuration"). Fine-tuning starts after UAT. Nothing in this plan is needed for UAT.
+- **Retargeted 2026-11-06 (DRAFT changes, for the user's review):**
+  - the model, from gemma3:1b to qwen3:0.6b
+  - the qwen3 training render
+  - the compact training format and the Gate 2 comparison
+  - a Taglish share proposal
+  - export
+  - the removal of the gemma-specific parts (see "Removed for qwen3:0.6b")
+  - the blocked list
+- **Decided (2026-10-29, user):** train the answer call only (Decision 1); the corpus authorship (Decision 2); the teacher, its pilot checks and fallback, and the hand review (Decision 4); size, mix, the overlap review rule and the review files (Decision 5). Decision 3's `<bos>` rule was also decided then; it is removed for qwen3:0.6b (below).
+- **Decided (2026-11-06, user):** the loss covers the reply plus the closing `<|im_end|>`, and nothing before it (Decision 3).
+- **Date:** 2026-10-29; retargeted 2026-11-06
+- **Context:** [ADR 0004](../decisions/0004-model-choice-qwen.md) (accepted 2026-11-06) makes qwen3:0.6b the primary on-device model and the fine-tuning target, superseding [ADR 0002](../decisions/0002-gemma-primary-and-gate-2.md)'s gemma3:1b. This plan covers the data and the export path. No training code and no data exist yet.
 
 "Unverified" marks anything the repo or the runs don't show.
 
-## Evidence: where gemma3:1b fails today
+## Evidence: where qwen3:0.6b fails today
+
+Source: ADR 0004 and the devlog of 2026-10-31. These are cold runs on 34 dev cases with answer v1 and query v1, one run each.
+
+| Run | Failed after guards | What failed |
+|---|---|---|
+| `and_v2` (default matcher), `commit=e4e6959` | 6/34 | All unhelpful, none unsafe (0/34 before and after guards). Retrieval misses in the query call: e2e-014, 023 (and e2e-003, 021, not-found traps that still passed). The rest are not-found replies although the right row was retrieved. |
+| `and_v1`, `commit=c48922a` | 8/34 | Not-found despite the right result: e2e-001, 005, 012. Retrieval misses: e2e-014, 023, 027, 028, 029. |
+| `and_v1`, compact answer v2, `commit=9481071` | 13/34 | Five new not-found replies with the right row retrieved (e2e-007, 009, 011, 032) and one `invented` (e2e-030, which copied the result block). |
+
+- **qwen3:0.6b's answer-call failure is over-declining**, not inventing: it gives the not-found sentence when the answer is in the results. The compact format made this worse when untuned. So the "Single relevant result" share (Decision 5) is what the compact-format training must fix.
+- **The query call's retrieval misses are ADR 0004's main quality risk.** This plan still trains the answer call only (Decision 1).
+- Taglish: 3/9 failed (devlog, 2026-10-31).
+- Scope: our own 34-case dev set, 10 of its cases written after seeing failures. The `and_v2` synonym map was built from dev failures.
+
+## Historical: where gemma3:1b failed (2026-10-29)
+
+Kept for comparison only; gemma3:1b is no longer the target.
 
 Source: the two identical cold baseline runs (devlog, 2026-10-29), `runs/e2e34_greedy_gemma3_1b_cpu_parallel1_keepalive0{,_run2}.txt`, 34 dev cases, matcher `and_v1`. Failed after guards: 10/34. Unsafe 3/34 before guards, 1/34 after. Unhelpful 7/34 before guards, 9/34 after.
 
@@ -33,6 +60,8 @@ Source: the two identical cold baseline runs (devlog, 2026-10-29), `runs/e2e34_g
 **Decided (2026-10-29, user): A.** Train the answer call only for the first LoRA. Fix retrieval in the matcher and Spring, where it can be tested with shared vectors. Revisit C only if query-call failures remain after the matcher decision.
 
 Also unverified: whether an answer-only LoRA changes the query call's outputs. The query call runs through the same weights, so Gate 2 must re-measure both calls.
+
+Note (2026-11-06): for qwen3:0.6b, ADR 0004 names the query call's retrieval misses as the main quality risk (under `and_v2`: e2e-003, 014, 021, 023). Decision A is unchanged. Option C is the one to revisit if those misses remain on real announcements.
 
 ## Decision 2: training announcements
 
@@ -64,22 +93,40 @@ Also unverified: whether an answer-only LoRA changes the query call's outputs. T
 
 Inputs must look exactly like evaluation inputs. Build them with the real code, not a copy of it:
 
-- the frozen prompt `prompts/e2e_answer_v1.txt` via `load_prompt` (and `e2e_query_v1.txt` if the query call is ever trained)
-- `fakebackend.search_announcements` with the default matcher, at the example's `now`: visibility filter, 500-character excerpt truncation, ranking
-- `announcements_message` from `scripts/probe_end_to_end.py`: the `Question:` line, the `<announcements>` delimiters, and the `<` escaping
+- **the compact format (DRAFT, 2026-11-06):** the frozen prompt `prompts/e2e_answer_v2.txt` via `load_prompt`, with the user message from `compact_announcements_message` in `scripts/probe_end_to_end.py`. This format is the Gate 1 lever: it shortens the case part (e2e-009: 394 → 215 tokens). See "Decided: the compact results format moves into fine-tuning" below. (`e2e_query_v1.txt` applies if the query call is ever trained.)
+- `fakebackend.search_announcements` with the default matcher (`and_v2`), at the example's `now`: visibility filter, 500-character excerpt truncation, newest-first order
 - no answer-call example when retrieval returns nothing, because the pipeline sends the fixed not-found message without a model call
 
-**Chat template risk.** The `ollama show gemma3:1b --modelfile` template renders a system message as its own `<start_of_turn>user` turn. So our system prompt and user message become two consecutive user turns. A training library's own Gemma template may render this differently (for example, by merging system into the first user turn; unverified). **Built:** `archways_assistant.render.render_gemma3()` reproduces the Ollama template exactly. Training text must be rendered with it, not with a library's own Gemma template.
-- The template is saved as `tests/fixtures/ollama_gemma3_1b_template.txt`.
-- Evidence from `scripts/check_render.py` (devlog, 2026-10-29): over the 19 e2e answer calls, raw `/api/generate` with the rendered text gave the same `prompt_eval_count` and the same reply as `/api/chat` in 19/19.
-- In raw mode, Ollama 0.40.13 adds one start-of-text token, and doesn't add a second one when the text already starts with `<bos>`.
-- **Decided (2026-10-29, user): `render_gemma3()` never adds `<bos>`, and the training notebook must assert exactly one `<bos>` per tokenized example.** How the chosen training library adds `<bos>` is unverified, which is why the assert is required.
+**Training render (DRAFT, 2026-11-06).** Training text is rendered with `archways_assistant.render.render_qwen3_example()`, never with a training library's own Qwen3 chat template. The library's template may differ from Ollama's (unverified); for example, Ollama appends ` /no_think`.
+
+- `render_qwen3()` reproduces what Ollama's qwen3:0.6b template sends with `"think": false`:
+
+  ```
+  <|im_start|>system\n\n{system}<|im_end|>\n<|im_start|>user\n{user} /no_think<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n
+  ```
+
+  - the blank line after `system`, which the template prints
+  - ` /no_think` on the user turn
+  - the open assistant turn with the empty think block
+  - no start-of-text token
+- `render_qwen3_example(messages, reply)` returns `(prompt, target)`:
+  - `prompt` is the text above, exactly what the model sees at inference.
+  - `target` is the reply followed by `<|im_end|>`, exactly what the model emits with thinking off.
+  - This is deliberately not Ollama's rendering of a three-message history, which would leave out the empty think block that the model sees at inference.
+- **Decided (2026-11-06, user): loss only on the target, the reply tokens plus the closing `<|im_end|>`.** Nothing before it is trained on, including the empty think block.
+- **The training notebook must assert, per tokenized example:**
+  - no start-of-text token was added, and the first token is `<|im_start|>`
+  - the target ends with exactly one `<|im_end|>`, and it is the only `<|im_end|>` in the target
+  - the loss mask covers exactly the target tokens
+  - tokenizing prompt + target gives the same tokens as tokenizing the prompt and the target separately and joining them (the prompt ends with `\n\n` and the reply starts with text, so the split is expected to be clean; unverified until checked)
+- The template is saved as `tests/fixtures/ollama_qwen3_0_6b_template.txt` (Ollama 0.40.14, pinned by SHA-256 in `tests/test_render.py`).
+- Evidence: `scripts/check_render_qwen3.py` compares `/api/chat` with raw `/api/generate` of the rendered text, cold, for every e2e query and answer call (devlog, 2026-11-06).
 
 ## Decision 4: targets
 
 **Decided (2026-10-29, user):**
 - **Teacher for real data: Qwen3-14B on a Kaggle GPU.**
-  - It gets the frozen e2e answer prompt plus teacher-only instructions.
+  - It gets the frozen e2e answer prompt plus teacher-only instructions. With the compact format, that is `prompts/e2e_answer_v2.txt` and the compact user message (DRAFT, 2026-11-06).
   - The training input uses the frozen prompt only. The teacher-only instructions never appear in it.
   - **Decided: checked during the pilot phase, before any real data:** whether Qwen3-14B fits the Kaggle GPU at a useful speed, and whether `"think": false` keeps thinking text out of its replies. If Qwen3-14B doesn't fit, the fallback is **Qwen3-8B**, and the switch is logged in the devlog.
   - Still not checked: Kaggle's session and quota limits.
@@ -102,6 +149,8 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
 
 **Qwen3:** quoted from `ollama show qwen3:1.7b --license` (the local qwen3:1.7b, used for the pilot). **Qwen3-14B's own license text was not checked, so it is unverified that it is the same.**
 
+**qwen3:0.6b** (the fine-tuned model): `ollama show qwen3:0.6b --license`, checked 2026-11-06. It is the Apache License, Version 2.0, January 2004, with the same section 2 text and the same "Copyright 2024 Alibaba Cloud" line as quoted below, and no occurrence of "output". Shipping the tuned model means following the Apache 2.0 redistribution conditions (section 4: a copy of the License, notices on modified files, and the NOTICE text if any). This is a reading of the text, not verified legal advice.
+
 > Apache License
 > Version 2.0, January 2004
 
@@ -112,33 +161,7 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
 - **Decided (2026-10-29, user):** the quoted Apache License 2.0 text has no clause about model outputs (no occurrence of "output"). This is recorded as **"no restriction found"**.
 - This is a reading of the license text, not verified legal advice.
 
-**Gemma Terms of Use:** quoted from `ollama show gemma3:1b --license` ("Last modified: February 21, 2024"). The fine-tuned model is gemma3:1b, so these terms govern it.
-
-> (b) "Distribution" or "Distribute" means any transmission, publication, or other sharing of Gemma or Model Derivatives to a third party, including by providing or making Gemma or its functionality available as a hosted service via API, web access, or any other electronic or remote means ("Hosted Service").
-
-> (e) "Model Derivatives" means all (i) modifications to Gemma, (ii) works based on Gemma, or (iii) any other machine learning model which is created by transfer of patterns of the weights, parameters, operations, or Output of Gemma, to that model in order to cause that model to perform similarly to Gemma, including distillation methods that use intermediate data representations or methods based on the generation of synthetic data Outputs by Gemma for training that model. For clarity, Outputs are not deemed Model Derivatives.
-
-> 3.1 Distribution and Redistribution
-> You may reproduce or Distribute copies of Gemma or Model Derivatives if you meet all of the following conditions:
->
-> You must include the use restrictions referenced in Section 3.2 as an enforceable provision in any agreement (e.g., license agreement, terms of use, etc.) governing the use and/or distribution of Gemma or Model Derivatives and you must provide notice to subsequent users you Distribute to that Gemma or Model Derivatives are subject to the use restrictions in Section 3.2.
-> You must provide all third party recipients of Gemma or Model Derivatives a copy of this Agreement.
-> You must cause any modified files to carry prominent notices stating that you modified the files.
-> All Distributions (other than through a Hosted Service) must be accompanied by a "Notice" text file that contains the following notice: "Gemma is provided under and subject to the Gemma Terms of Use found at ai.google.dev/gemma/terms".
-
-> 3.2 Use Restrictions
-> You must not use any of the Gemma Services:
->
-> for the restricted uses set forth in the Gemma Prohibited Use Policy at ai.google.dev/gemma/prohibited_use_policy ("Prohibited Use Policy"), which is hereby incorporated by reference into this Agreement; or
-> in violation of applicable laws and regulations.
-
-> 3.3 Generated Output
-> Google claims no rights in Outputs you generate using Gemma. You and your users are solely responsible for Outputs and their subsequent uses.
-
-- The fine-tuned gemma3:1b is a modification of Gemma, so it is a Model Derivative under (e)(i).
-- **Decided (2026-10-29, user):** shipping the tuned model inside the mobile app likely counts as Distribution under (b): "any transmission, publication, or other sharing of … Model Derivatives to a third party". So the quoted 3.1 conditions apply: the 3.2 use restrictions in the app's terms, notice that the model is subject to them, a copy of the Agreement, modified-file notices, and the Notice file. This is not verified legal advice.
-- **Open (team to confirm):** the mobile app's Terms and Conditions page needs the Gemma notice and the 3.2 use restrictions.
-- The Prohibited Use Policy is incorporated by reference, but its text was not checked (unverified).
+**Gemma Terms of Use:** removed 2026-11-06; gemma3:1b is not fine-tuned or shipped (see "Removed for qwen3:0.6b"). The quoted text is in git history (`docs/plans/finetune-data-plan.md` at `c8db288`).
 
 **Kaggle:** no Kaggle terms text was available to quote. Whether Kaggle's terms allow this use of its free GPUs is unverified.
 
@@ -157,7 +180,7 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
     | Injection | 5% | Ignores the instruction |
     | year_level | 5% | Keeps the stated year level |
 
-  - Filipino or Taglish questions: about 10%, spread across the categories, always answered in English.
+  - Filipino or Taglish questions: about 10%, spread across the categories, always answered in English. **Proposed change (DRAFT, 2026-11-06), see "Taglish questions" below: 15%.**
   - The shares add up to 100% (decided 2026-10-29: distractor/wrong-topic 25%, injection 5%).
   - **Zero empty-retrieval examples.** With no results the pipeline sends the fixed not-found message without a model call.
   - **The fixed `now` varies across examples.**
@@ -183,21 +206,55 @@ Quoted verbatim from what is on this machine. Anything not quoted is unverified.
 
 ## Decision 6: export and evaluation path
 
-1. **LoRA** on gemma3:1b, trained on the free GPU. The library (for example Hugging Face PEFT, or Unsloth) and its versions are unverified. Record base model revision, library versions, hyperparameters, data file hashes and the git commit.
+Retargeted to qwen3:0.6b (DRAFT, 2026-11-06).
+
+1. **LoRA** on qwen3:0.6b, trained on the free GPU. The library (for example Hugging Face PEFT, or Unsloth) and its versions are unverified. Record base model revision, library versions, hyperparameters, data file hashes and the git commit.
 2. **Merge** the LoRA into the base weights.
-3. **Convert to GGUF** with llama.cpp's converter, then quantize to **Q4_K_M**, the quantization `ollama show gemma3:1b` reports for the base. That way the control and the tuned model differ only in the weights. Whether the converter supports this Gemma 3 checkpoint is unverified.
+3. **Convert to GGUF** with llama.cpp's converter, then quantize to **Q4_K_M**, the quantization `ollama show qwen3:0.6b` reports for the base (751.63M parameters; blob `sha256-7f4030143c1c…`, 522,640,096 bytes). That way the control and the tuned model differ only in the weights. Whether the converter supports this Qwen3 checkpoint is unverified.
 4. **`ollama create`** from a Modelfile with:
    - `FROM` the merged GGUF
-   - the `TEMPLATE` copied verbatim from `ollama show gemma3:1b --modelfile`
-   - `PARAMETER stop "<end_of_turn>"`
+   - the `TEMPLATE` copied verbatim from `ollama show qwen3:0.6b --modelfile`
+   - `PARAMETER stop "<|im_end|>"` and `PARAMETER stop "<|im_start|>"` (`render.QWEN3_STOP`)
 
-   Check that `ollama show <tuned> --template` and `ollama show gemma3:1b --template` print identical text.
+   Check that `ollama show <tuned> --template` and `ollama show qwen3:0.6b --template` print identical text, and run `scripts/check_render_qwen3.py --model <tuned>`.
 5. **Evaluate with ADR 0002's cold settings:**
    - one `ollama serve` with `OLLAMA_NUM_PARALLEL=1`, `--num-gpu 0`, `--keep-alive 0`, the greedy options, one recorded Ollama version
-   - the tuned model and the untuned gemma3:1b control
+   - **Gate 2 compares the tuned qwen3:0.6b on the compact format (answer v2) against the untuned qwen3:0.6b control on v1** ([ADR 0004](../decisions/0004-model-choice-qwen.md)), **each on its best configuration**.
+     - "Best configuration" (answer and query prompt versions, matcher) is chosen on the dev cases only.
+     - It is then written down and frozen before any held-out run, together with the e2e prompts (CLAUDE.md). It is never chosen or changed after seeing held-out results.
    - first the 34 dev e2e cases, then the held-out set once
    - one warm run reported alongside, not gated
-6. **Phone:** GGUF through Ollama is the evaluation path. Whether the phone runtime chosen in Gate 1 can load this GGUF, or needs another export of the same weights, is unverified.
+6. **Phone:** llama.rn 0.13.0-rc.8 loads the base qwen3:0.6b GGUF on the Redmi 10C (measured, devlog 2026-10-31). Whether it loads the tuned GGUF the same way is unverified. Gate 1 must be re-measured with the tuned model on the compact format.
+
+## Taglish questions (DRAFT proposal, 2026-11-06)
+
+- **Share: 15%** of answer-call examples, about 120 training and 15 validation examples, up from the 10% decided on 2026-10-29. It is spread across the behaviour categories in Decision 5, and the target is always in English.
+  - Why: on the 9 Taglish dev cases, qwen3:0.6b fails 3 (devlog, 2026-10-31). 15% is a judgement call, not a measured optimum; nothing shows whether 10% or 15% is better.
+- **How they are written:**
+  - By hand, by a Filipino-speaking team member, from scratch, against the synthetic announcement rows.
+  - Never paraphrased or translated from a held-out, dev, e2e or Taglish dev question (`evals/taglish_cases.jsonl`).
+  - The teacher writes only the English targets, never the questions. Claude Code writes none of them.
+- **Checks:** the overlap check in Decision 5 also runs these questions against `evals/taglish_cases.jsonl`, and the user's held-out check covers them.
+- Unverified: whether the lexical overlap check works as well on Taglish, where short function words ("kailan", "ang", "sa") are shared by most questions.
+
+## Removed for qwen3:0.6b (2026-11-06)
+
+These gemma3:1b-specific parts were removed when the plan was retargeted. The text is in git history (this file at `c8db288`).
+
+- **The `<bos>` rule** (Decision 3, decided 2026-10-29): "`render_gemma3()` never adds `<bos>`, and the training notebook must assert exactly one `<bos>` per tokenized example". Removed because Ollama adds no start-of-text token for qwen3:0.6b (raw `<|im_start|>` → 1 token), and llama.rn counted the same 591 tokens as Ollama for e2e-009's answer prompt. The notebook asserts in Decision 3 replace it.
+- **Rendering with `render_gemma3()`** and its chat-template risk (a system message as its own user turn). Replaced by `render_qwen3_example()`.
+- **The `<end_of_turn>` stop** and the gemma3:1b template copy in the export path. Replaced in Decision 6.
+- **The Gemma Terms of Use quotes**, the Distribution reading, and the open question about the Gemma notice in the app's Terms and Conditions. gemma3:1b is not fine-tuned or shipped (ADR 0004), so the Gemma terms do not apply to the app.
+- **gemma3:1b as the Gate 2 control.** Superseded by untuned qwen3:0.6b (ADR 0004).
+
+## Blocked
+
+- **Anchors:** the 20–30 hand-written style anchors from the teammate (Decision 2). The corpus generator can't run without them.
+- **Held-out set:** real published announcements are needed before the held-out run (ADR 0002). The user's out-of-scope list for the held-out set must be written down before that run.
+- **Probe scoring:** the probe doesn't yet score out-of-scope cases on safety only, or recognize a safe decline (ADR 0002).
+- **Kaggle:** session and quota limits, and the terms, are unchecked (Decision 4).
+- **Taglish questions:** need a Filipino-speaking writer (above).
+- **UAT:** fine-tuning starts after UAT (ADR 0004).
 
 ## Deferred: raw-question retrieval and snippet excerpts (2026-10-31, user)
 
@@ -224,6 +281,7 @@ No new dependency and no network fetch were made for either. Training inputs kee
 - **Training data may use the compact format.** Its effect is measured as tuned versus untuned:
   - the tuned model on the compact format
   - the untuned control on v1, with the protocol of Decision 6
+  - Retargeted 2026-11-06: both are qwen3:0.6b (ADR 0004). This is the Gate 1 lever: the compact format shortens the answer call's case part.
   - Using it in training means the training inputs and the tuned model's evaluation prompt both use that format.
 
 ## Open questions for the user
@@ -232,4 +290,6 @@ No new dependency and no network fetch were made for either. Training inputs kee
 2. ~~Teacher choice.~~ Decided 2026-10-29: Qwen3-14B on Kaggle, with a qwen3:1.7b pilot; GPU fit and `"think": false` checked in the pilot phase; fallback Qwen3-8B, logged.
 3. ~~Size, mix and hand review.~~ Decided 2026-10-29.
 4. ~~Who writes the corpus.~~ Decided 2026-10-29: teammate-written anchors, teacher expansion, code-inserted traps.
-5. Open (team to confirm): the mobile app's Terms and Conditions page needs the Gemma notice and use restrictions.
+5. ~~Open (team to confirm): the mobile app's Terms and Conditions page needs the Gemma notice and use restrictions.~~ No longer applies (2026-11-06): gemma3:1b is not shipped. The app needs the Apache 2.0 notice for qwen3:0.6b instead.
+6. Open (DRAFT, 2026-11-06): the Taglish share (15%) and who writes those questions.
+7. Open (DRAFT, 2026-11-06): the retargeted Decisions 3 and 6 and the removals.

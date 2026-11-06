@@ -19,6 +19,88 @@ Template:
 
 ---
 
+## 2026-11-06: ADR 0004 accepted, UAT configuration, render_qwen3 and its evidence, data plan retargeted (post-UAT)
+
+- **Date:** 2026-11-06 (commits 15:54–16:05 +08:00, entry about 16:35; start time unverified)
+- **Decisions (team and user, 2026-11-06):**
+  - **Team:** qwen3:0.6b is the primary model, on-device. ADR 0004 is ACCEPTED.
+  - **UAT is next week and ships untuned qwen3:0.6b:**
+    - answer v1, query v1, `and_v2`
+    - session-file caches
+    - the guard
+    - the budget fallback
+  - Fine-tuning continues after UAT.
+  - **The Gate 2 control is untuned qwen3:0.6b**, with the same prompts and settings. This supersedes that part of 0002; only 0002's status line changed.
+  - **gemma3:1b is no longer a fallback.** A larger, slower model can't serve as an on-device fallback, so the no-model fallback replaces it. gemma3:1b stays only as a historical comparison.
+  - **Training loss:** the reply plus the closing `<|im_end|>`. Nothing before it is trained on, including the empty think block.
+  - **Gate 1: a fallback reply does NOT count as passing.** e2e-009 stays FAIL. In UAT, long-result questions get the no-model fallback instantly.
+  - **Taglish 15%:** stays DRAFT, to be decided after UAT.
+- **What changed:**
+  - **`c8db288` (`docs:`), ADR 0004:**
+    - Status ACCEPTED; "Supersedes" lists the 0002 parts.
+    - Decision section.
+    - A plain Gate 1 status: still FAIL on e2e-009, about 20 s against 15 s. The planned fix is fine-tuning on the compact format, though e2e-009's compact case part (215) is still over 200.
+    - New section "Fallback if Gate 1 is not met" (OPEN, team to confirm). It has the budget rule, a blank cutoff date and the UAT configuration.
+    - ADR 0002: only the status line changed.
+  - **`3939614` (`docs:`), ADR 0004:** the Gate 1 open point is closed as above.
+  - **`e58466a` (`feat:`):**
+    - `render.py`: `QWEN3_OLLAMA_TEMPLATE`, `QWEN3_STOP` (`<|im_end|>`, `<|im_start|>`), `render_qwen3()` and `render_qwen3_example()`.
+    - `render_qwen3()` accepts only `[system, user]`, the one shape the pipeline sends and the evidence covers. It renders `<|im_start|>system\n\n{S}<|im_end|>\n<|im_start|>user\n{U} /no_think<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n`.
+    - **Found while reading the template:** with `"think": false`, Ollama appends ` /no_think` to the last user message, as well as printing the empty think block. The training text must have both.
+    - `render_qwen3_example()` returns `(prompt, target)` with `target = reply + "<|im_end|>"`. It is deliberately not Ollama's rendering of a three-message history, which would drop the empty think block.
+    - Fixture `tests/fixtures/ollama_qwen3_0_6b_template.txt`: `/api/show`'s `template` field (Ollama 0.40.14), written from the JSON, 1,723 characters, LF. It is pinned by SHA-256 `ae370d88…dfc4` in `tests/test_render.py`.
+    - `tests/test_render.py` +15 tests (32 in the file).
+    - `scripts/check_render_qwen3.py`: the evidence script below; not in pytest.
+  - **Data plan** (`docs/plans/finetune-data-plan.md`, this commit). These are DRAFT changes for the user's review:
+    - Retitled "for qwen3:0.6b (post-UAT)".
+    - qwen3:0.6b evidence; the gemma3:1b evidence is kept as historical.
+    - Decision 3: compact training inputs, the qwen3 render, the decided loss span and the notebook asserts.
+    - Decision 6: the qwen3:0.6b export, and Gate 2 as tuned (compact) vs untuned (v1), each on its best configuration chosen on dev and frozen before held-out.
+    - A Taglish proposal (15%, hand-written by a Filipino-speaking team member, never paraphrased from held-out or any eval file).
+    - "Removed for qwen3:0.6b": the `<bos>` rule, `render_gemma3`, `<end_of_turn>`, the Gemma terms and their open question.
+    - A "Blocked" list.
+    - qwen3:0.6b's own license text was checked (`ollama show qwen3:0.6b --license`): Apache 2.0, the same section 2, "Copyright 2024 Alibaba Cloud", no "output".
+- **Ollama version change:** the server is now **0.40.14**. Every earlier baseline, phone prompt and token count in this log was on **0.40.13**. The evidence below is on 0.40.14. The baselines were not rerun on 0.40.14, so whether the version changes any earlier result is unverified.
+- **Evidence** (`ollama serve` with `OLLAMA_NUM_PARALLEL=1` per the user, cold: `SAMPLING_OPTIONS`, `num_ctx` 4096, `num_gpu` 0, `keep_alive` 0, matcher `and_v2`):
+  - Commands:
+    - `uv run python scripts/check_render_qwen3.py`
+    - `uv run python scripts/check_render_qwen3.py --answer-prompt v2`
+  - Headers: `commit=e58466a-dirty` and `commit=3939614-dirty`. Only docs (the ADR edit and the data plan) were uncommitted; no code, prompt, case or seed file differed.
+
+    | Check | v1/v1 (UAT prompts) | answer v2 (compact) |
+    |---|---|---|
+    | Template == `QWEN3_OLLAMA_TEMPLATE` | identical | identical |
+    | Stop parameters | `<|im_start|>`, `<|im_end|>` | same |
+    | Raw `<|im_start|>` / doubled | 1 / 2 tokens | 1 / 2 |
+    | Query calls, chat vs raw: same count and reply | **34/34** | **34/34** |
+    | Answer calls, chat vs raw: same count and reply | **23/23** | **23/23** |
+    | No answer call (no results) | 11 | 11 |
+
+    - No difference, so neither run stopped early (exit 0 both).
+    - The query calls sent the arguments schema as `format` in both chat and raw.
+  - **Answer case parts under `and_v2`** (scratch script: each answer call's count minus the system turn measured raw on its date, 197 for v1 and 251 for v2 on 2026-11-02, the date of every case):
+    - v1: min 142, median 166, max 408. **Over 200: 4/23**: e2e-002 (304), 009 (394), 021 (408), 032 (274). This settles the set ADR 0004 lists as unverified under `and_v2`: it is the same four.
+    - v2 compact: min 81, median 105, max 229. Over 200: 2/23: e2e-009 (215), 021 (229).
+- **Calibration caveat (user):**
+  - The ~200-token budget rule was calibrated on the seed announcements. 24 of the 25 have bodies under 500 characters (checked: the longest are 824, 220 and 206).
+  - Real announcements are likely longer. An excerpt is up to 500 characters, and a few full excerpts would put one case part well over 200 tokens.
+  - **So the fallback rate on real data is unknown, and it must be measured before UAT.**
+- **How it was verified:**
+  - `uv run pytest -q` → `1047 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `40 files already formatted`.
+  - Mutation checks, each reverted (`32 passed` again after):
+
+    | Change | Failed tests in `test_render.py` |
+    |---|---|
+    | ` /no_think` dropped | 5 |
+    | Blank line after `system` dropped | 5 |
+    | One fixture byte flipped | 2 (the template equality and the SHA-256 pin) |
+
+- **Commits:** `c8db288`, `e58466a`, `3939614`, and this `docs:` commit (data plan and devlog). Not pushed.
+- **Open questions / next:**
+  - Measure the budget fallback rate on real (or realistically long) announcements before UAT.
+  - The team's confirmation of the fallback section and its cutoff date.
+  - assistant-ts (the on-device flow), next.
+
 ## 2026-11-04: Guard made an explicit spec; parity vectors; guard-ts (TypeScript port)
 
 - **Date:** 2026-11-04 (commits 09:07–09:21 +08:00, entry about 09:25; start time unverified)
@@ -1024,7 +1106,8 @@ The other e2e files (v2, date-in-user) are unchanged by both fixes.
   - No model was called.
   - It is written as UTF-8 bytes with LF line endings: 2,127 characters, starting `<start_of_turn>user` and ending `<start_of_turn>model` and a newline. There is no `<bos>`; Ollama adds it.
 - **Why:** The user asked for the exact longest prompt Ollama receives, for the phone feasibility test.
-- **How it was verified:** The file has no `` and does not start with `<bos>`. That it tokenizes to 631 tokens on the phone runtime is unverified; on Ollama 0.40.13 the same rendering gave 631 tokens including `<bos>` (render evidence entry below).
+- **How it was verified:** The file has no `
+` and does not start with `<bos>`. That it tokenizes to 631 tokens on the phone runtime is unverified; on Ollama 0.40.13 the same rendering gave 631 tokens including `<bos>` (render evidence entry below).
 - **Commits:** this `docs:` commit (devlog only). Not pushed.
 - **Open questions / next:** Gate 1 measures response time and memory with this prompt on the phone runtime.
 
