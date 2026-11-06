@@ -19,6 +19,84 @@ Template:
 
 ---
 
+## 2026-11-06: assistant-ts (on-device UAT flow), its Python reference and parity vectors
+
+- **Date:** 2026-11-06 (after the entry below; commits 16:51 +08:00, entry about 16:55)
+- **What changed:**
+  - **`e3415aa` (`test:`):**
+    - `src/archways_assistant/assistant.py`: the Python reference (spec) for the UAT flow in ADR 0004. It covers:
+      - the Manila date (fixed UTC+08:00, English weekday names)
+      - the qwen3 prompts for both calls, via `render_qwen3()`
+      - the answer message in the contract's key order
+      - strict query-reply parsing and hand-written contract checks
+      - the 200-token budget
+      - ASCII-only trimming of the reply, then `guard()`
+      - one outcome per failure
+    - The probe is unchanged.
+    - `scripts/export_assistant_vectors.py` → `tests/vectors/assistant_vectors.json` (ASCII, LF, about 456 KB):
+      - today: 8 instants around midnight
+      - render: 47 prompts (34 e2e, 10 Taglish, 3 edge)
+      - 47 query replies and 28 result arrays
+      - 24 scripted questions covering all 9 paths
+    - `scripts/export_assistant_ts.py` → `assistant-ts/src/generated.ts`: the prompt texts with their SHA-256, the contract bounds and the messages. Never hand-edited.
+    - `tests/test_assistant.py` (14 tests) checks that:
+      - both files are up to date
+      - the render vectors equal the probe's `load_prompt` + `announcements_message` + `render_qwen3()`, on canonical-order rows
+      - `results_json` equals `json.dumps(…, indent=1)`
+      - the argument checks agree with the contract's jsonschema except four documented gaps: U+0085 and U+001C alone (valid under ECMA `\S`), U+FEFF alone and a lone surrogate (invalid)
+      - the results check never accepts what the contract rejects
+      - the flow vectors reproduce
+      - model text appears only on the `answer` path
+  - **`e7b47e4` (`feat:`): `assistant-ts/`.** It has zero runtime dependencies, imports guard-ts by relative path and never imports llama.rn. Its dev dependencies match guard-ts's lockfile entries exactly (versions and integrity).
+    - `render.ts`, `contract.ts` and `text.ts`: the ports.
+    - `flow.ts`: a synchronous stepper, driven directly by the vectors, plus `askAssistant()`, the async driver that never rejects.
+    - `session.ts`: `primeSessions()`, `makeComplete()` and session file names that encode the kind, prompt SHA-256, Manila date, model SHA-256, llama.rn version, `n_ctx` and threads.
+    - `README.md`: usage, the path table, and what the app and Spring must do. It also lists what is unverified.
+- **Decisions taken in the code (proposals; the user can change them):**
+  - **An invalid query reply shows `LAST_RESORT_MESSAGE`**, not the not-found message, because "not found" would be untrue when the model failed. The probe scores it as not found.
+  - **`QUESTION_MAX_CHARS` = 500 code points**, so a pasted text can't overflow `n_ctx` 2048. Not measured.
+  - **`n_predict`: query 64, answer 200**, the Gate 1 app's values.
+  - **Priming completes `prefix + casePart("")`** with 1 token, then saves `tokenSize = tokens(prefix)`. The Gate 1 app primed with a real question; the empty user turn is unverified on the phone.
+- **Budget-check evidence** (Ollama 0.40.14, raw counts over the 47 render vectors' answer prompts, scratch script):
+  - **System turn + case part = whole prompt in 47/47** (the system turn is 197 tokens). Counting only the case part is exact.
+  - **UTF-8 bytes per Qwen token:** min 2.28 (the escape-heavy edge row), median 3.23, max 4.45; Taglish min 3.13.
+    - A safe byte proxy for 200 tokens would be about 456 bytes. Almost every one-row case part (482 bytes and up) would then go to the fallback, so a proxy doesn't work at this budget.
+    - **The flow uses exact `tokenize()` counts** (llama.rn 0.13.0-rc.8 `cpp/rn-llama.cpp:828`: `add_special=false`, `parse_special=true`).
+  - These render vectors use each case's source rows, not retrieved results, so their case parts differ from the probe's (e2e-009 here is one row, 158).
+- **How it was verified:**
+  - `uv run pytest -q` → `1061 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `46 files already formatted`.
+  - Both generators `--check` → up to date.
+  - `cd assistant-ts && npm test` → `tests 188, pass 188, fail 0`. `npm run test:hermes` → `154/154 passed` and `askAssistant answer: answer (as expected)`. Hermes 0.12 runs the async driver with `-Xmicrotask-queue`.
+  - guard-ts `npm test` → `pass 461`, unchanged.
+  - Mutation checks on the TS port, each reverted (188 passed again after):
+
+    | Change | Failed |
+    |---|---|
+    | ` /no_think` dropped | 68 |
+    | Blank line after `system` dropped | 68 |
+    | `<` not escaped | 4 |
+    | Control-character escape padding wrong | 4 |
+    | Weekday index off by one | 77 |
+    | Manila offset 0 | 9 |
+    | Budget `>=` instead of `>` | 3 |
+    | Reply not trimmed | 3 |
+    | `String.trim()` instead of ASCII-only trimming | 3 (after adding the `answer-unicode-edges` vector; 0 before) |
+    | Code points counted as UTF-16 units | 3 |
+    | Query lone surrogate allowed | 2 |
+    | `-0` year_level passed through | 1 (after adding the `-0.0` vector; 0 before) |
+    | `query.trim() === ""` instead of the ECMA set | 0: equivalent, since JS `trim()` strips exactly ECMA whitespace |
+
+- **Commits:** `e3415aa`, `e7b47e4` and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - **Before UAT:** measure the budget fallback rate on realistically long announcements (entry below).
+  - **Phone checks:**
+    - `tokenize(casePart(e2e-009))` returns 394, and how long it takes
+    - priming with the empty user turn
+    - session files across an app restart, and their size
+    - `top_k`/`seed` in llama.rn completion
+  - **Spring:** contract v2, the allowlist, and the endpoint path and auth.
+  - The user's call on the invalid-query message and the 500-character question limit.
+
 ## 2026-11-06: ADR 0004 accepted, UAT configuration, render_qwen3 and its evidence, data plan retargeted (post-UAT)
 
 - **Date:** 2026-11-06 (commits 15:54–16:05 +08:00, entry about 16:35; start time unverified)
