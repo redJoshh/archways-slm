@@ -91,6 +91,18 @@ The search contract is now **version 2** (2026-10-31). The arguments and results
 - **No new schema file:** the schema's `$id` stays `...:v1`, because the arguments and results did not change. "Version 2" names the matching behaviour. `src/archways_assistant/fakebackend.py` is the reference implementation (`DEFAULT_MATCHER = "and_v2"`).
 - **Caveats:** the map was built from dev-set retrieval failures, so it is not evidence of held-out quality. It is untested on real announcements; for example, "due" also matches "due to".
 
+**Added to contract v2 on 2026-11-06 (user decisions; Spring requirements):**
+
+- **Visibility: `PUBLISHED` only, FOR_DELETION excluded.** The Spring mobile feed (`AnnouncementRepository.MOBILE_VISIBLE`) also shows `FOR_DELETION` rows. The assistant's search is deliberately more conservative: only `status = 'PUBLISHED'`, not archived, in a student-visible academic year (ACTIVE or PREVIOUS), published at or before now. Filter with an allowlist in the query, as before.
+- **Excerpts are plain text.** The stored body is sanitized rich-text HTML. Spring builds `excerpt` in this order:
+  1. Strip tags. A tag is `<` followed by a letter, `/` or `!`, up to the next `>`. The editor's inline tags (`a b strong i em u s strike`) are removed; every other tag becomes one space.
+  2. Decode character references, only with a closing `;`: HTML5 named references, and `&#NNN;`/`&#xHH;`. A code point of 0, a surrogate or one above U+10FFFF becomes U+FFFD. Anything else stays as written.
+  3. Collapse each run of whitespace (ASCII whitespace and U+00A0) to one space, and trim both ends.
+  4. **Then** cut to the excerpt length (500 code points).
+  - The reference is `src/archways_assistant/excerpt.py` (`plain_text()`), tested in `tests/test_excerpt.py`. Every seed body is already plain text under this rule, so `fakebackend` is unchanged. Whether Jsoup's `Element.text()` gives the same output is unverified; Spring should test against the cases in `tests/test_excerpt.py`.
+  - Open: whether the and_v2 ILIKE should match the HTML column or the plain text. Over HTML, a query word like "strong" could match a tag.
+- **Time zone: unconfirmed.** `published_at` is written with the JVM's `LocalDateTime.now()`, and contract v1 attaches `+08:00`. The user is checking this with a test announcement.
+
 ## 2. The generator (`src/archways_assistant/tooldef.py`)
 
 Ollama expects tools in a simpler "function tool" format, and small models do better with plain-English hints than with JSON Schema keywords. The generator bridges the two.
