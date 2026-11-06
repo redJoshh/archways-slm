@@ -7,3 +7,4 @@ models/*.gguf
 data/generated/
 runs/
 throw-away-app/
+data/local/
