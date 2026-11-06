@@ -1,0 +1,27 @@
+-- Export every announcement a student can see right now as one JSON array,
+-- for scripts/measure_snapshot_budget.py and archways_assistant.snapshot.
+-- The person who has database access runs it, never this repo's code:
+--   psql -d <database> -f scripts/snapshot_export.psql
+-- (or paste the \copy line into psql; it must stay on one line).
+--
+-- Read from archways-backend b1b6396 (2026-11-03): Announcement.java,
+-- AnnouncementRepository.MOBILE_VISIBLE, migrations V5, V9, V15, V16.
+-- - status = 'PUBLISHED' only. Spring's mobile feed also shows FOR_DELETION;
+--   CLAUDE.md allows only PUBLISHED to reach the model.
+-- - is_archived = false.
+-- - academic year ACTIVE or PREVIOUS (Spring's student-visible rule; UPCOMING
+--   and ARCHIVED years are hidden from students).
+-- - targeted at the Student role (announcement_target_role).
+-- - published_at <= now in Manila. published_at is a TIMESTAMP written with
+--   the JVM's LocalDateTime.now(); that the JVM runs in Asia/Manila is
+--   unverified.
+-- - Every year_level is kept (any student); year_level is exported.
+-- Fields: what the search contract's result needs (body is cut to the
+-- excerpt later); priority is a contract field too.
+--
+-- Why this form: COPY's text format would write jsonb's text with escaped
+-- backslashes, and the client encoding may not be UTF-8. jsonb text has no
+-- line breaks, and CSV with control-character delimiter and quote writes it
+-- verbatim; ENCODING 'UTF8' fixes the file's encoding. COALESCE gives [] for
+-- no rows.
+\copy (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', a.announcement_id::text, 'title', a.title, 'body', a.body, 'office', o.office_name, 'priority', a.priority, 'year_level', a.year_level, 'published_at', to_char(a.published_at, 'YYYY-MM-DD"T"HH24:MI:SS')) ORDER BY a.published_at DESC, a.announcement_id), '[]'::jsonb) FROM announcement a JOIN office o ON o.office_id = a.office_id JOIN academic_year y ON y.academic_year_id = a.academic_year_id WHERE a.status = 'PUBLISHED' AND a.is_archived = false AND y.status IN ('ACTIVE', 'PREVIOUS') AND a.published_at <= (now() AT TIME ZONE 'Asia/Manila') AND EXISTS (SELECT 1 FROM announcement_target_role t JOIN role r ON r.role_id = t.role_id WHERE t.announcement_id = a.announcement_id AND r.role_name = 'Student')) TO 'C:/archways-assistant/data/local/announcements_snapshot.json' WITH (FORMAT csv, DELIMITER E'\x01', QUOTE E'\x02', ENCODING 'UTF8')
