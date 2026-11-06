@@ -61,13 +61,32 @@ def changed(index: int, **fields) -> bytes:
     return dump(rows)
 
 
+PLAIN_0 = SECRET + " ñ, with a tag and a \\ backslash and a line break."
+
+
 def test_maps_to_seed_rows(tmp_path):
-    rows = load_snapshot(write(tmp_path, dump(FAKE)))
+    snapshot = load_snapshot(write(tmp_path, dump(FAKE)))
+    rows = snapshot.rows
     assert rows == [
-        {**FAKE[0], "status": "PUBLISHED", "is_archived": False, "scheduled": False},
+        {
+            **FAKE[0],
+            "body": PLAIN_0,
+            "status": "PUBLISHED",
+            "is_archived": False,
+            "scheduled": False,
+        },
         {**FAKE[1], "status": "PUBLISHED", "is_archived": False, "scheduled": False},
     ]
     assert all(tuple(row) == SEED_KEYS for row in rows)
+    assert snapshot.tagged_ids == ["101"]
+    assert snapshot.reference_ids == []
+
+
+def test_reports_references(tmp_path):
+    snapshot = load_snapshot(write(tmp_path, changed(1, body="A&nbsp;B &amp; C")))
+    assert snapshot.tagged_ids == ["101"]
+    assert snapshot.reference_ids == ["102"]
+    assert snapshot.rows[1]["body"] == "A B & C"
 
 
 def test_seed_keys_match_the_seed_file():
@@ -78,16 +97,17 @@ def test_seed_keys_match_the_seed_file():
 
 
 def test_rows_work_with_fakebackend(tmp_path):
-    rows = load_snapshot(write(tmp_path, dump(FAKE)))
+    rows = load_snapshot(write(tmp_path, dump(FAKE))).rows
     now = datetime(2026, 11, 6, 12, tzinfo=STORED_ZONE)
     assert all(is_visible(row, now) for row in rows)
     result = to_announcement(rows[0])
     assert result["posted_at"] == "2026-11-02T08:30:00+08:00"
-    assert result["excerpt"] == FAKE[0]["body"]
+    assert result["excerpt"] == PLAIN_0
 
 
 def test_empty_array(tmp_path):
-    assert load_snapshot(write(tmp_path, b"[]\n")) == []
+    snapshot = load_snapshot(write(tmp_path, b"[]\n"))
+    assert (snapshot.rows, snapshot.tagged_ids, snapshot.reference_ids) == ([], [], [])
 
 
 def test_rejects_non_utf8(tmp_path):

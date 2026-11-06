@@ -4,8 +4,9 @@ Evidence, not pytest. Measurement only: no prompt or contract change.
 
 The case part is assistant.case_part() of the answer v1 call: the user turn
 plus the empty think block, the part the UAT budget rule compares with
-BUDGET_CASE_TOKENS (200). Each row becomes a result with
-fakebackend.to_announcement() (excerpt = body cut to 500 characters,
+BUDGET_CASE_TOKENS (200). Each row (body already plain text by the
+contract v2 excerpt rule, see archways_assistant.excerpt) becomes a result
+with fakebackend.to_announcement() (excerpt = body cut to 500 characters,
 posted_at with +08:00), and the user message is
 assistant.answer_user_message(question, results).
 
@@ -88,7 +89,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
-    rows = search_order(load_snapshot(args.snapshot))
+    snapshot = load_snapshot(args.snapshot)
+    rows = search_order(snapshot.rows)
     if len(rows) < 3:
         sys.exit(f"need at least 3 rows, the snapshot has {len(rows)}")
     now = datetime.now(MANILA)
@@ -124,9 +126,13 @@ def main() -> None:
         )
         bodies = [len(row["body"]) for row in rows]
         print(
-            f"body characters: {spread(bodies)}; over {EXCERPT_CHARS} (cut): "
-            f"{sum(b > EXCERPT_CHARS for b in bodies)}; containing '<': "
-            f"{sum('<' in row['body'] for row in rows)}"
+            f"bodies with tags: {len(snapshot.tagged_ids)} {snapshot.tagged_ids}; "
+            f"with character references: {len(snapshot.reference_ids)} "
+            f"{snapshot.reference_ids}"
+        )
+        print(
+            f"plain-text body characters: {spread(bodies)}; over {EXCERPT_CHARS} "
+            f"(cut): {sum(b > EXCERPT_CHARS for b in bodies)}"
         )
 
         # 1. System turn + case part = whole prompt.
@@ -221,6 +227,8 @@ def main() -> None:
         "model": args.model,
         "question": args.question,
         "rows": len(rows),
+        "tagged_ids": snapshot.tagged_ids,
+        "reference_ids": snapshot.reference_ids,
         "check": dict(zip(("system", "case_part", "whole"), parts, strict=True)),
         "single": single,
         "c": c,

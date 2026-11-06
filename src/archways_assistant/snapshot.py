@@ -19,7 +19,11 @@ COPY's text format, which writes json_agg's line breaks as a literal
 backslash-n and doubles backslashes.
 
 Rows come back in the shape of data/seed/announcements.json, so fakebackend
-can serve them. The export already applied the visibility allowlist
+can serve them. Each body is replaced by excerpt.plain_text(body), the
+contract v2 excerpt rule (tags stripped, references decoded, whitespace
+collapsed); fakebackend.to_announcement then cuts it to the excerpt length.
+Snapshot.tagged_ids and Snapshot.reference_ids name the bodies that had tags
+or character references before that. The export already applied the visibility allowlist
 (PUBLISHED, not archived, a student-visible academic year, published), so
 status, is_archived and scheduled only restate it.
 
@@ -28,9 +32,11 @@ Error messages name the element index, id and key, never announcement text.
 
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from archways_assistant.excerpt import has_references, has_tags, plain_text
 from archways_assistant.fakebackend import PUBLISHED
 
 SNAPSHOT_KEYS = (
@@ -62,6 +68,13 @@ COPY_TEXT_ARTIFACT = re.compile(r"\}, \\n \{")
 
 class SnapshotError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    rows: list[dict]
+    tagged_ids: list[str]
+    reference_ids: list[str]
 
 
 def no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict:
@@ -124,7 +137,7 @@ def to_seed_row(index: int, item: object) -> dict:
     return {
         "id": item["id"],
         "title": item["title"],
-        "body": item["body"],
+        "body": plain_text(item["body"]),
         "office": item["office"],
         "priority": item["priority"],
         "year_level": year,
@@ -135,10 +148,15 @@ def to_seed_row(index: int, item: object) -> dict:
     }
 
 
-def load_snapshot(path: Path) -> list[dict]:
-    rows = [to_seed_row(i, item) for i, item in enumerate(decode(path.read_bytes()))]
+def load_snapshot(path: Path) -> Snapshot:
+    items = decode(path.read_bytes())
+    rows = [to_seed_row(i, item) for i, item in enumerate(items)]
     ids = [row["id"] for row in rows]
     duplicates = sorted({row_id for row_id in ids if ids.count(row_id) > 1})
     if duplicates:
         raise SnapshotError(f"duplicate ids: {duplicates}")
-    return rows
+    return Snapshot(
+        rows=rows,
+        tagged_ids=[item["id"] for item in items if has_tags(item["body"])],
+        reference_ids=[item["id"] for item in items if has_references(item["body"])],
+    )
