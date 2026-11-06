@@ -110,9 +110,9 @@ Same settings as the baselines above: answer v1, query v1, one cold run each, `c
   - The budget: the answer call's case part (the answer prompt minus its system turn) is over about 200 tokens, counted with Qwen's tokenizer.
   - The ~200 figure is the 2026-10-31 estimate for the Redmi 10C (devlog). The session-file run agreed with it: the estimate predicted about 19.4 s for e2e-009, and 20.2 s was measured.
 - **Cutoff date:** ____
-- **Open points:**
-  - Whether a question answered by the no-model fallback counts towards Gate 1.
-  - Under the UAT configuration, e2e-009, the Gate 1 test case, gets the no-model fallback (394-token case part).
+- **Resolved 2026-11-06 (user): a fallback reply does NOT count as passing Gate 1.**
+  - e2e-009, the Gate 1 test case, **stays FAIL**.
+  - In UAT, long-result questions get the no-model fallback instantly. e2e-009 is one of them (394-token case part).
 
 ### UAT configuration (2026-11-06)
 
