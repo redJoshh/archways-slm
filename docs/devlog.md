@@ -19,6 +19,52 @@ Template:
 
 ---
 
+## 2026-11-06: contract v2 decisions, plain-text excerpts, and the budget measured on the real snapshot
+
+- **Date:** 2026-11-06 (about 18:20–18:40 +08:00)
+- **Decisions (user, 2026-11-06):**
+  - **FOR_DELETION rows are excluded** from the assistant's search, which may be more conservative than the app's feed. Recorded in the contract v2 section of `docs/how-it-works.md`.
+  - **Contract v2 excerpts are plain text:** strip tags, decode character references, collapse whitespace, **then** cut to the excerpt length. Recorded there as a Spring requirement, with the exact spec.
+  - **Time zone:** still unconfirmed. The user will check it with a test announcement.
+- **What changed:**
+  - **`1cecf42` (`feat:`):**
+    - `src/archways_assistant/excerpt.py`, `plain_text()`: the reference for the excerpt rule.
+      - A tag is `<` followed by a letter, `/` or `!`, up to `>`. The editor's inline tags (`a b strong i em u s strike`) are removed; any other tag becomes a space.
+      - Only references with a closing `;` are decoded: HTML5 named, and decimal or hex numeric. 0, a surrogate or a code point over U+10FFFF becomes U+FFFD.
+      - Runs of ASCII whitespace and U+00A0 become one space, and both ends are trimmed.
+      - `tests/test_excerpt.py` has 29 hand-worked cases. Every seed body is already plain text under the rule, so `fakebackend` is unchanged.
+    - `load_snapshot()` returns `Snapshot(rows, tagged_ids, reference_ids)`, and each row's body is `plain_text(body)`.
+    - The measurement script prints the tag and character-reference counts.
+  - **`66ab965` (`docs:`):** the contract v2 additions. It also opens a question: should the and_v2 ILIKE match the HTML column or the plain text?
+- **Measurement on the real snapshot** (`data/local/announcements_snapshot.json`, re-exported by the user with `scripts/snapshot_export.psql`, 18:18):
+  - Setup: Ollama 0.40.14, cold, qwen3:0.6b, answer v1, question "What are the latest announcements?". Report: `runs/snapshot_budget_20261106T182308.json` (ids and numbers only).
+  - **49 rows.** Bodies with tags: **0**. With character references: **2** (ids 18, 14; `&nbsp;`).
+  - **Plain-text body length:** min 186, median 262, max 350 characters. None over 500, so no excerpt was cut.
+  - Check: system 197 + case part 169 = whole 366.
+  - **1 result, exact, all 49 rows:** min **161**, median **176**, max **219**. Over 200: **2/49** (id 39: 219, id 10: 208). Next largest: id 17 200, id 34 198, id 35 196.
+  - **c = 34** in all 50 sampled pairs. Estimate error 0 on 50 pairs and 50 triples.
+  - **Exact samples:**
+    - 2 results: min 298, median 324, max 360; 50/50 over 200
+    - 3 results: min 437, median 465, max 514; 50/50 over 200
+  - **Estimate at the median:** 1 result 176, 2 results 318, 3 results 460.
+  - **Combinations over 200:**
+    - 1-result: **2/49** (exact)
+    - 2-result: **1176/1176**
+    - 3-result: **18424/18424** (by the estimate, whose sample error is 0)
+  - **Conclusion:** under the fixed 200-token rule, on real announcements, every question with 2 or more results gets the no-model fallback. About 4% of 1-result questions do too.
+    - Real bodies are short (≤ 350 characters), so the excerpt length doesn't cause this. The per-result JSON wrapper, title, office and date do.
+    - The seed calibration was not optimistic for single results: real median 176 against seed 158.
+- **How it was verified:**
+  - `uv run pytest -q` → `1122 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `51 files already formatted`.
+  - `uv run python scripts/measure_snapshot_budget.py` → the numbers above (exit 0).
+- **Commits:** `1cecf42`, `66ab965`, and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The adaptive time budget and the excerpt-length/cut-date measurement are planned next (plan only, awaiting approval).
+  - The time zone check (user).
+  - Whether Spring's Jsoup gives the same plain text as `excerpt.py` (unverified).
+
+---
+
 ## 2026-11-06: snapshot export, its loader, and the case-part budget measurement (seed dry run)
 
 - **Date:** 2026-11-06 (about 17:55–18:20 +08:00)
