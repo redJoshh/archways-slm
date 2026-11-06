@@ -1,6 +1,6 @@
 # 0002: gemma3:1b as the primary model, fine-tuning, and Gate 2 on end-to-end metrics
 
-- **Status:** ACCEPTED (team decision)
+- **Status:** ACCEPTED (team decision); partly superseded by [0004](0004-model-choice-qwen.md) (the primary model, the fine-tuning target, the Gate 2 control and the qwen3:0.6b fallback role)
 - **Date:** 2026-10-29
 - **Supersedes:** the Decision section and Gate 2 of [0001](0001-model-choice.md). Gate 1 and the rest of 0001 still apply.
 

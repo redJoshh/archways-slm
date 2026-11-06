@@ -1,8 +1,13 @@
 # 0004: qwen3:0.6b as the primary model
 
-- **Status:** PROPOSED. Not accepted; the team decides.
-- **Date:** 2026-10-31
-- **Would supersede, if accepted:** in [0002](0002-gemma-primary-and-gate-2.md), "gemma3:1b is the primary model", "fine-tuning is confirmed, for gemma3:1b only", the untuned gemma3:1b Gate 2 control, and qwen3:0.6b as the untuned fallback. Gate 2's metrics and protocol in 0002, and Gate 1 in [0001](0001-model-choice.md) with its pass bar in [0003](0003-gate-1-pass-bar.md), would still apply.
+- **Status:** ACCEPTED (team decision, 2026-11-06). The section "Fallback if Gate 1 is not met" is still OPEN.
+- **Date:** proposed 2026-10-31; accepted 2026-11-06
+- **Supersedes:** these parts of [0002](0002-gemma-primary-and-gate-2.md):
+  - "gemma3:1b is the primary model"
+  - "fine-tuning is confirmed, for gemma3:1b only"
+  - the Gate 2 control: **it becomes untuned qwen3:0.6b**, evaluated with the same prompts and settings as the tuned model, in place of untuned gemma3:1b
+  - qwen3:0.6b as the untuned fallback
+- **Still applies:** Gate 2's metrics and protocol in 0002, and Gate 1 in [0001](0001-model-choice.md) with its pass bar in [0003](0003-gate-1-pass-bar.md) and the cold definition in [0005](0005-gate-1-cold-definition.md).
 
 ## Context
 
@@ -84,11 +89,43 @@ Same settings as the baselines above: answer v1, query v1, one cold run each, `c
 - qwen3 models: Apache License 2.0; the quoted text has no output clause ("no restriction found", data plan).
 - gemma3:1b: the Gemma Terms of Use. Shipping it in the app likely counts as Distribution, which needs the Gemma notice and use restrictions in the app (data plan).
 
-## Proposal
+## Decision (team, 2026-11-06)
 
-- **qwen3:0.6b becomes the primary on-device model** and the fine-tuning target.
-- **The Gate 2 control becomes untuned qwen3:0.6b**, evaluated with the same prompts and settings as the tuned model.
-- **gemma3:1b becomes the untuned fallback.**
+- **qwen3:0.6b is the primary model, and it runs on-device.**
+- **qwen3:0.6b is the fine-tuning target.** Fine-tuning happens after UAT (see "UAT configuration" below).
+- **The Gate 2 control is untuned qwen3:0.6b**, evaluated with the same prompts and settings as the tuned model. This supersedes the untuned gemma3:1b control in 0002.
+- **gemma3:1b is no longer a fallback.** The draft of this record proposed it as the untuned fallback. This was dropped as a consequence of the team's choice: a larger, slower model (about 40–43 s against 24–26 s for the e2e-009 answer call on the Redmi 10C) can't serve as an on-device fallback. The no-model fallback below replaces it. gemma3:1b stays only as a historical comparison.
+
+## Gate 1 status (2026-11-06)
+
+- **Gate 1 is still FAIL on the test case.** e2e-009 takes about 20 s for a whole question on the Redmi 10C (20.2 s with session files, [0005](0005-gate-1-cold-definition.md)), against the 15 s bar.
+- **The planned fix is fine-tuning on the compact results format** (answer prompt v2's format), which shortens the case part.
+- Not shown to be enough: e2e-009's compact case part measured 215 tokens on 2026-10-31. That is still over the ~200-token budget below. Whether the tuned model on the compact format passes is unverified.
+
+## Fallback if Gate 1 is not met
+
+- **Status: OPEN, for the team to confirm.**
+- **On-device stays.** No server-side model is used. [0001](0001-model-choice.md)'s second fallback (qwen3:1.7b server-side) is not part of this plan.
+- **Budget rule:** if a question's answer prompt would exceed the budget, the app does not call the model. It shows the no-model fallback instead: the matching titles and their posted dates (`fallback()` in `e2escore.py`, ported in guard-ts).
+  - The budget: the answer call's case part (the answer prompt minus its system turn) is over about 200 tokens, counted with Qwen's tokenizer.
+  - The ~200 figure is the 2026-10-31 estimate for the Redmi 10C (devlog). The session-file run agreed with it: the estimate predicted about 19.4 s for e2e-009, and 20.2 s was measured.
+- **Cutoff date:** ____
+- **Open points:**
+  - Whether a question answered by the no-model fallback counts towards Gate 1.
+  - Under the UAT configuration, e2e-009, the Gate 1 test case, gets the no-model fallback (394-token case part).
+
+### UAT configuration (2026-11-06)
+
+UAT is in the week after this record; fine-tuning continues after UAT. UAT ships:
+
+- **untuned qwen3:0.6b**, on-device
+- answer prompt v1 (`prompts/e2e_answer_v1.txt`) and query prompt v1 (`prompts/e2e_query_v1.txt`)
+- the `and_v2` matcher (search contract v2) in Spring
+- session-file caches, one per system turn ([0005](0005-gate-1-cold-definition.md))
+- the guard (guard-ts) on the device
+- the budget fallback: if the answer prompt's case part is over 200 Qwen tokens, the no-model fallback is shown instead of calling the model
+
+Dev-set effect, from the qwen3:0.6b v1 `and_v1` baseline: 4 of 20 answer calls have case parts over 200 tokens (e2e-002 304, e2e-009 394, e2e-021 408, e2e-032 274). These would get the no-model fallback. The set under `and_v2` is unverified.
 
 ## Caveats
 
@@ -99,7 +136,7 @@ Same settings as the baselines above: answer v1, query v1, one cold run each, `c
 - Phone numbers come from one development build on one Redmi 10C; release-build behaviour is unverified.
 - The differences on the dev set are small (`and_v1`: 8 vs 10 failures, 27 vs 28 retrieval hits; `and_v2`: 6 vs 5 failures, 30 vs 33 retrieval hits, qwen3:0.6b first) and may not hold on the held-out set.
 
-## Consequences if accepted
+## Consequences
 
 - **The fine-tuning target becomes qwen3:0.6b.** `docs/plans/finetune-data-plan.md` is written for gemma3:1b and needs rework:
   - the training render must follow qwen3:0.6b's template, including the empty `<think>` block that `"think": false` produces (`render.py` has only `render_gemma3()`)
