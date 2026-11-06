@@ -19,6 +19,96 @@ Template:
 
 ---
 
+## 2026-11-06: adaptive time budget for UAT, and case parts at excerpt lengths 500/350/250
+
+- **Date:** 2026-11-06 (about 18:45–20:00 +08:00)
+- **Decisions (user, 2026-11-06; plan approved with five changes):**
+  - **The UAT budget becomes a predicted-time rule.**
+    - The app predicts the whole question's time before the answer call and falls back only above 15 s.
+    - **Gate 1 is unchanged:** Redmi 10C, 15 s, e2e-009 still FAIL; a fallback reply does not pass. This is a UAT product setting, not a new bar. Recorded in ADR 0004, "Adaptive time budget".
+  - **No speed file.** When the speed is unknown (for example after an app restart with existing session files), the 200-token rule applies until the first answer call reports timings.
+  - **The date cut-off analysis (`datefind.py`) is dropped from this task.** No plain-text body in the snapshot is over 350 characters, so a 500 cut never applies.
+    - **Post-UAT idea:** a date/time finder (English and Filipino month and weekday names, numeric dates, times) to count how many announcements would lose a date or time at a shorter excerpt length.
+  - **Overrun logging:** for every question, the app logs the predicted time, the actual time, the rule used and the result count, never the question or any text. The README says the app must keep this log for UAT.
+- **What changed:**
+  - **`2980e38` (`docs:`):** ADR 0004 gets the "Adaptive time budget" subsection. The old 200-token bullet is marked as amended, not deleted.
+  - **`8de96f1` (`feat:`):**
+    - `assistant.py`: `Speed`, `Budget`, `update_speed()`, `predict_ms()` and `decide_budget()`. `flow()` takes `elapsed_ms` and `speed`. `Outcome` gains `budget` and `result_count`.
+    - **The rule:** `elapsed + 200 + case × 1000 / prompt_tps + GEN_TOKENS × 1000 / gen_tps + 300`, falling back if over 15 000 ms.
+      - The speed unknown → the 200-token rule.
+      - A case part over 1548 tokens → the n_ctx guard (2048 − 200 `n_predict` − 300 system ceiling).
+      - Accepted rates are finite, 1–1000 tokens/s, from ≥ 100 prompt or ≥ 10 generated tokens.
+    - The vectors gain 11 time-rule flow vectors and 23 speed-update vectors (now 35 flow and 23 speed). The tests add the boundary (15 000.0 answers, 15 001.0 falls back) and non-finite rates.
+    - `scripts/measure_reply_tokens.py` sets `GEN_TOKENS` (below). `export_assistant_ts.py` exports the new constants.
+  - **`dbcbee6` (`feat:`), assistant-ts:**
+    - `src/budget.ts`: the port, plus `speedState()`, which holds the speed in memory only.
+    - `flow.ts`:
+      - The count step takes `elapsedMs`.
+      - `complete` returns `{ text, timings }`.
+      - Only answer calls update the speed. Query replies generate faster: 14.6 against 10.4 tokens/s on the Redmi.
+      - `deps.log` gets a `QuestionLog` per question; a throwing log is ignored.
+    - `session.ts`:
+      - The last priming call generates `MEASURE_TOKENS` (16) with `ignore_eos` and no stop strings.
+      - `speedFromPriming()` folds the reports, so the last call wins. It returns null if nothing was primed.
+    - README: the rule, the UAT log the app must keep, and the unverified items.
+  - **`366991d` (`feat:`):** `scripts/measure_snapshot_budget.py --excerpt-chars`.
+    - Each plain-text body is cut to the given length, and every length uses the same samples.
+    - It adds counts over 15 s at the Redmi rates (28 and 10.4 tokens/s, 2.2 s elapsed).
+- **`GEN_TOKENS` = 51** (`scripts/measure_reply_tokens.py`; Ollama 0.40.14, qwen3:0.6b, query v1, answer v1, `and_v2`, cold, raw generate):
+  - **44 dev cases** (34 e2e, 10 Taglish). **29 answer calls** (23 e2e, 6 Taglish); none hit `n_predict` 200.
+  - **Reply tokens:** min 10, median 26, **p90 (nearest rank) 51**, max 53. Largest: e2e-031 53, e2e-024 52, taglish-02 51, e2e-004 43, taglish-05 41.
+  - The script reran the cases instead of reading `runs/e2e34_qwen3_0_6b_cold_and_v2.txt` and `runs/taglish10_qwen3_0_6b_cold_and_v2.txt`. Those keep only a 400-character reply preview, with line breaks replaced, and no `eval_count`.
+  - Sanity check against the phone (37 and 41 tokens): p90 is in range. e2e-009 gave 39 here against 37 on the phone.
+- **Replay of the 2026-10-31 Redmi runs through the rule** (28 and 10.4 tokens/s, 2.2 s elapsed):
+  - e2e-009: predicted 21 675 ms (measured 20.2 s) → falls back
+  - e2e-004: 13 925 ms (measured 11.9 s) → answers
+  - Both err slow by about 1.5–2 s, mostly because p90 = 51 against phone replies of 37–41.
+- **Excerpt lengths on the real snapshot** (49 rows; ids and numbers only; report ``runs/snapshot_budget_20261106T184931.json``):
+
+  | Excerpt | Bodies cut | 1 result: min / median / max | Over 200 tokens (1 / 2 / 3 results) | Over 15 s at Redmi rates (1 / 2 / 3) | Median estimate, tokens (1 / 2 / 3) | Predicted at Redmi, ms (1 / 2 / 3) |
+  |---|---|---|---|---|---|---|
+  | 500 | 0/49 | 161 / 176 / 219 | 2/49, 1176/1176, 18424/18424 | 2/49 (ids 39, 10), 1176/1176, 18424/18424 | 176 / 318 / 460 | 13 890 / 18 961 / 24 032 |
+  | 350 | 0/49 | identical to 500 | identical | identical | identical | identical |
+  | 250 | 30/49 | 161 / 175 / 201 | 2/49 (ids 39, 10 at 201), 1176/1176, 18424/18424 | 0/49, 1176/1176, 18424/18424 | 175 / 316 / 457 | 13 854 / 18 890 / 23 925 |
+
+  - c = 34 at every length. The estimate error was 0 on 50 pairs and 50 triples at each length.
+    - Exact 2-result samples: 298–360 tokens (500) and 294–348 (250).
+    - Exact 3-result samples: 437–514 (500) and 434–498 (250).
+  - **What it shows:**
+    - At the Redmi rates the time rule is about a 207-token rule. So on the Redmi, multi-result questions still all fall back, at every excerpt length.
+    - Shortening the excerpt to 250 saves at most 18 tokens per result (id 39: 219 → 201) and brings the two over-15 s single results under. It cannot make 2 results fit: the smallest 2-result case part at 250 is 294.
+    - The gain from the time rule is on phones faster than the Redmi, where the speed is measured.
+  - No contract change.
+
+- **Caveat: the snapshot is optimistic.**
+  - Its bodies are short (at most **350 plain-text characters**, median 262) compared with typical real announcements, so every number above is optimistic.
+  - A stress check with longer announcements is pending; the user will add some to the database.
+- **Unverified:**
+  - **The slow first priming call:** on the Redmi 10C (2026-10-31), the first priming call after model load measured about **9 prompt tokens/s against about 28** for the second. The likely cause is the model being read in after load; this is not confirmed. The rule takes the last priming call's rates.
+  - `ignore_eos` on the phone; llama.rn `timings` in a release build; the prediction error on other phones.
+  - The time zone of `published_at` (the user is checking).
+- **Correction to the entry "contract v2 decisions, plain-text excerpts, …" below:** `tests/test_excerpt.py` has **28** tests, not 29.
+- **How it was verified:**
+  - `uv run pytest -q` → `1127 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `52 files already formatted`. Both generators `--check` → up to date.
+  - `cd assistant-ts && npm test` → `tests 218, pass 218, fail 0`. `npm run test:hermes` → `188/188 passed`, `askAssistant answer: answer (as expected)`. guard-ts `npm test` → `pass 461`.
+  - Mutation checks on the TS port, each reverted, all caught:
+
+    | Change | Failed |
+    |---|---|
+    | Time rule `>` → `>=` | 3 |
+    | The first priming call measures instead of the last | 2 |
+    | `speedFromPriming` folds in reverse | 1 |
+    | Answer-call timings ignored | 1 |
+    | Query-call timings also update the speed | 1 (after adding "query-call timings alone never change the speed"; 0 before) |
+
+- **Commits:** `2980e38`, `8de96f1`, `dbcbee6`, `366991d`, and this `docs:` commit. Not pushed. Note: at `8de96f1`, assistant-ts's tests fail on the new time vectors until `dbcbee6` ports the rule.
+- **Open questions / next:**
+  - The stress check with longer announcements, and its rerun of `measure_snapshot_budget.py --excerpt-chars 500,350,250`.
+  - Phone checks: the speed sample from priming (`ignore_eos`), and predicted against actual from the UAT log for 5–10 questions.
+  - The post-UAT date-finder idea (above).
+
+---
+
 ## 2026-11-06: contract v2 decisions, plain-text excerpts, and the budget measured on the real snapshot
 
 - **Date:** 2026-11-06 (about 18:20–18:40 +08:00)
