@@ -6,10 +6,12 @@ import { ANSWER_PROMPT_SHA256, QUERY_PROMPT_SHA256 } from "../src/generated.ts";
 import { casePart } from "../src/render.ts";
 import {
   makeComplete,
+  MEASURE_TOKENS,
   N_PREDICT,
   primeSessions,
   sessionFile,
   sessionPrefix,
+  speedFromPriming,
   type LlamaAdapter,
   type SessionSettings,
 } from "../src/session.ts";
@@ -39,9 +41,16 @@ function fakeLlama(options: { shortLoad?: number } = {}): FakeLlama {
     files,
     log,
     countTokens: async (text) => Math.ceil(text.length / 4),
-    completion: async (prompt, nPredict) => {
-      log.push("completion " + nPredict + " " + prompt.length);
-      return prompt.indexOf("search") !== -1 && nPredict === N_PREDICT.query ? '{"query": "x"}' : "ok";
+    completion: async (prompt, nPredict, measure) => {
+      log.push("completion " + nPredict + " " + prompt.length + (measure ? " measure" : ""));
+      const text = prompt.indexOf("search") !== -1 && nPredict === N_PREDICT.query ? '{"query": "x"}' : "ok";
+      const timings = {
+        prompt_n: Math.ceil(prompt.length / 4),
+        prompt_per_second: measure ? 28 : 9,
+        predicted_n: nPredict,
+        predicted_per_second: 10.4,
+      };
+      return { text: text, timings: timings };
     },
     saveSession: async (path, tokenSize) => {
       log.push("save " + path + " " + tokenSize);
@@ -90,10 +99,48 @@ test("primeSessions saves both prefixes once, with their own token counts", asyn
     assert.equal(report.tokens, Math.ceil(sessionPrefix(report.kind, FRIDAY).length / 4));
     assert.equal(llama.files[report.file], report.tokens);
   }
-  // Primed with the prefix plus an empty user turn, one token generated.
+  // Primed with the prefix plus an empty user turn: one token for the first
+  // call, MEASURE_TOKENS with ignore_eos for the last (it measures the speed).
   assert.ok(llama.log.indexOf("completion 1 " + (sessionPrefix("answer", FRIDAY) + casePart("")).length) !== -1);
+  assert.ok(
+    llama.log.indexOf(
+      "completion " + MEASURE_TOKENS + " " + (sessionPrefix("query", FRIDAY) + casePart("")).length + " measure",
+    ) !== -1,
+  );
   assert.deepEqual(await primeSessions(llama, SETTINGS, FRIDAY), []);
   assert.equal((await primeSessions(llama, SETTINGS, SATURDAY_MIDNIGHT)).length, 2);
+});
+
+test("speedFromPriming takes the last priming call's rates", async () => {
+  const llama = fakeLlama();
+  const reports = await primeSessions(llama, SETTINGS, FRIDAY);
+  // The fake reports 9 prompt tokens/s for the first call (like the Redmi's
+  // first call after load) and 28 for the measuring one.
+  assert.deepEqual(speedFromPriming(reports), { promptTps: 28, genTps: 10.4 });
+  // Files already there (an app restart): nothing primed, speed unknown.
+  const again = await primeSessions(llama, SETTINGS, FRIDAY);
+  assert.equal(speedFromPriming(again), null);
+});
+
+test("when only one kind needs priming, that call measures", async () => {
+  const llama = fakeLlama();
+  await primeSessions(llama, SETTINGS, FRIDAY);
+  delete llama.files[sessionFile("answer", SETTINGS, FRIDAY)];
+  llama.log.length = 0;
+  const reports = await primeSessions(llama, SETTINGS, FRIDAY);
+  assert.deepEqual(
+    reports.map((r) => r.kind),
+    ["answer"],
+  );
+  assert.ok(llama.log.some((line) => line.endsWith(" measure")));
+  assert.deepEqual(speedFromPriming(reports), { promptTps: 28, genTps: 10.4 });
+});
+
+test("priming without timings leaves the speed unknown", async () => {
+  const llama = fakeLlama();
+  const plain = { ...llama, completion: async () => ({ text: "ok" }) };
+  const reports = await primeSessions(plain, SETTINGS, FRIDAY);
+  assert.deepEqual(speedFromPriming(reports), { promptTps: null, genTps: null });
 });
 
 test("makeComplete loads the call's own session, then runs the whole prompt", async () => {
@@ -130,7 +177,7 @@ test("makeComplete re-primes once when a load comes back short, then gives up", 
 
   const once = fakeLlama({ shortLoad: 1 });
   await primeSessions(once, SETTINGS, FRIDAY);
-  assert.equal(await makeComplete(once, SETTINGS)(step.call), '{"query": "x"}');
+  assert.equal((await makeComplete(once, SETTINGS)(step.call)).text, '{"query": "x"}');
 
   const always = fakeLlama({ shortLoad: 2 });
   await primeSessions(always, SETTINGS, FRIDAY);

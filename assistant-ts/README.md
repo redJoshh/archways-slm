@@ -6,7 +6,7 @@ The UAT configuration:
 - untuned qwen3:0.6b
 - query prompt v1 and answer prompt v1
 - the guard (from [guard-ts](../guard-ts))
-- the budget fallback
+- the budget fallback, with the adaptive time budget (`budget.ts`)
 
 The port follows `src/archways_assistant/assistant.py`. It has **zero runtime dependencies**: it imports guard-ts by relative path and never imports llama.rn. It reads no I/O; the app passes in everything that touches the outside world.
 
@@ -17,7 +17,9 @@ question -> query call -> search (Spring) -> budget check -> answer call -> guar
 ## Use
 
 ```ts
-import { askAssistant, makeComplete, primeSessions } from "./assistant-ts/src/index.ts";
+import {
+  askAssistant, makeComplete, primeSessions, speedFromPriming, speedState,
+} from "./assistant-ts/src/index.ts";
 
 const settings = {
   dir: permanentModelDir,          // not a cache the OS may clear
@@ -28,24 +30,33 @@ const settings = {
 };
 const llama = {
   countTokens: async (text) => (await ctx.tokenize(text)).tokens.length,
-  completion: async (prompt, nPredict) =>
-    (await ctx.completion({ prompt, n_predict: nPredict, temperature: 0, top_k: 1, top_p: 1, seed: 42,
-                            stop: ["<|im_end|>", "<|im_start|>"] })).text,
+  completion: async (prompt, nPredict, measure) => {
+    const result = await ctx.completion({
+      prompt, n_predict: nPredict, temperature: 0, top_k: 1, top_p: 1, seed: 42,
+      // measure: the one priming call a day that times generation.
+      stop: measure ? [] : ["<|im_end|>", "<|im_start|>"],
+      ignore_eos: !!measure,
+    });
+    return { text: result.text, timings: result.timings };
+  },
   saveSession: (path, tokenSize) => ctx.saveSession(path, { tokenSize }),
   loadSession: async (path) => (await ctx.loadSession(path)).tokens_loaded,
   fileExists: (path) => FileSystem.getInfoAsync(path).then((info) => info.exists),
 };
 
 // On app start, and when the app returns to the foreground on a new Manila day:
-await primeSessions(llama, settings, Date.now());   // about 30 s on the Redmi 10C; show progress
+const reports = await primeSessions(llama, settings, Date.now());   // about 30 s on the Redmi 10C
+const speed = speedState(speedFromPriming(reports));   // in memory only; null if nothing was primed
 
 const result = await askAssistant(question, {
   nowMs: Date.now,
   complete: makeComplete(llama, settings),
   search: (args) => api.post("/…/search_announcements", args).then((r) => r.data),  // Spring; path TBD
   countTokens: llama.countTokens,
+  speed,
+  log: (entry) => uatLog.append(entry),   // REQUIRED for UAT, see "The UAT log"
 });
-show(result.text);   // only result.text; log result.path and result.timings, never the question
+show(result.text);   // only result.text, never log the question or any text
 ```
 
 `askAssistant()` never rejects, and every path returns text to show. The model's text is shown only after the guard has passed it.
@@ -54,7 +65,7 @@ show(result.text);   // only result.text; log result.path and result.timings, ne
 |---|---|---|
 | `answer` | The guard passed the reply | The reply (ASCII whitespace trimmed) |
 | `guard_fired` | The guard rejected the reply | The guard's fallback (titles and posted dates) |
-| `budget_fallback` | The answer case part is over 200 Qwen tokens: **no answer call** | `fallback(results)` |
+| `budget_fallback` | Over budget (below): **no answer call** | `fallback(results)` |
 | `answer_error` | Token counting, the answer call or the guard threw | `fallback(results)` |
 | `not_found` | Valid search, no results: no answer call | `NOT_FOUND_MESSAGE` |
 | `query_invalid` | The query reply isn't valid search arguments | `LAST_RESORT_MESSAGE` |
@@ -65,6 +76,47 @@ show(result.text);   // only result.text; log result.path and result.timings, ne
 If `fallback()` itself fails, the text is `LAST_RESORT_MESSAGE`. Put the timeout in `complete`/`search` (reject on timeout); the flow falls back as above.
 
 **Decision to confirm:** an invalid query reply shows `LAST_RESORT_MESSAGE`, not the not-found message. The probe scores it as not found, but "not found" would be untrue when the model failed. qwen3:0.6b had 0/34 invalid on dev.
+
+## The budget: adaptive time, with the 200-token rule as the fallback
+
+ADR 0004, "Adaptive time budget". This is a UAT product setting, not a Gate 1 bar: Gate 1 is still measured on the Redmi 10C (15 s, e2e-009, still FAIL).
+
+Before the answer call, after the search:
+
+```
+predicted = elapsed (query call, search, counting; measured)
+          + 200 ms (answer session load)
+          + caseTokens * 1000 / promptTps
+          + GEN_TOKENS (51) * 1000 / genTps
+          + 300 ms (guard, rendering)
+```
+
+| Rule (`budget.rule`) | When | Falls back if |
+|---|---|---|
+| `n_ctx` | the case part is over 1548 tokens (2048 − 200 `n_predict` − 300 system turn) | always |
+| `time` | this phone's speed is known | `predicted > 15000` |
+| `tokens` | the speed is unknown | the case part is over 200 Qwen tokens |
+
+- **`GEN_TOKENS` = 51:** the nearest-rank p90 of answer-reply tokens. It comes from 29 dev answer calls with the UAT prompts on Ollama (min 10, median 26, max 53; `scripts/measure_reply_tokens.py`). The phone replies were 37 and 41 tokens. A reply over 51 tokens overruns the prediction by about (extra tokens ÷ 10) s on the Redmi.
+- **Speed:**
+  - **From priming:** `primeSessions()` runs its last priming call with `MEASURE_TOKENS` (16) generated tokens, `ignore_eos` and no stop strings. `speedFromPriming()` folds the reports in order, so the last call's rates win.
+  - **From answer calls:** each answer call's llama.rn timings update the speed. Query calls never do, because their short replies generate faster (14.6 against 10.4 tokens/s on the Redmi).
+  - **Accepted rates:** a finite number in 1–1000 tokens/s, from at least 100 prompt or 10 generated tokens.
+- **Speed unknown:** the speed is never saved. After an app restart with existing session files, nothing is primed, so the 200-token rule applies until the first answer call reports timings. The same happens if llama.rn reports no timings.
+- **Replay of the 2026-10-31 Redmi runs** (28 and 10.4 tokens/s): e2e-009 is predicted at 21.7 s (measured 20.2 s) and falls back; e2e-004 is predicted at 13.9 s (measured 11.9 s) and answers.
+
+### The UAT log (the app must keep it)
+
+`deps.log` gets one entry per question:
+
+- `path`
+- `rule` (`time`, `tokens`, `n_ctx`, or null if no answer call was considered)
+- `predictedMs`
+- `actualMs` (from `askAssistant()` to the final text)
+- `resultCount`
+- `caseTokens`
+
+The entry never contains the question or any text. **The app must keep these entries for UAT**, so we can report how often 15 s held and how far the predictions were off. A log that throws never changes what the user sees.
 
 ## What is in here
 
@@ -102,6 +154,8 @@ Results are checked before they reach the model. A result must have exactly the 
   - Over the same 47 case parts, UTF-8 bytes per Qwen token ranged from 2.28 to 4.45 (median 3.23).
   - A safe proxy for 200 tokens would cap at about 456 bytes. Almost every one-row case part (482 bytes and up) would then go to the fallback.
   - So the flow needs `countTokens`. If it throws, the reply is the no-model fallback.
+
+**`budget.ts`: the adaptive time budget** (above), a port of `update_speed()`, `predict_ms()` and `decide_budget()` in `assistant.py`. The flow and speed vectors check it.
 
 **`session.ts`: session-file priming** ([ADR 0005](../docs/decisions/0005-gate-1-cold-definition.md)).
 - **Prefixes:** the query and answer system turns. Their token counts are 213 and 197 on a Monday on Ollama; they vary with the weekday name, so they are always counted, never hard-coded.
@@ -158,7 +212,9 @@ uv run python scripts/export_assistant_vectors.py   # after a reference change; 
   - Completion: a raw `prompt`; `temperature: 0`, `stop: ["<|im_end|>", "<|im_start|>"]`.
     - The Gate 1 app set only `temperature: 0`. Adding `top_k: 1`, `top_p: 1` and `seed: 42` (as in the evaluation) is a proposal; whether it changes phone replies is unverified.
   - No JSON grammar in UAT: none was used on the phone, and Ollama gave the same e2e-009 query reply with or without the schema.
-- **Priming:** on first use each Manila day, with a progress message (about 30 s, apart from model load: 1.0–2.5 s measured).
+- **Priming:** on first use each Manila day, with a progress message (about 30 s, apart from model load: 1.0–2.5 s measured). Keep `speedState(speedFromPriming(reports))` in memory and pass it to every `askAssistant()`.
+- **Timeouts:** don't add an app timeout under 15 s around `askAssistant()`. The budget already decides when to skip the model.
+- **The UAT log:** keep every `deps.log` entry (above).
 - **One context, kept loaded.** With `use_mmap`, the app survived being swapped out and still answered (Gate 1, development build).
 - **Licence:** ship the Apache License 2.0 text and notices for qwen3:0.6b.
 - **Logging:** paths and timings only, never questions or replies (no real user data in logs).
@@ -185,3 +241,8 @@ uv run python scripts/export_assistant_vectors.py   # after a reference change; 
 - Whether session files survive app restarts, and their size on disk.
 - A release build (every phone run used a development build), memory with other apps open (about 1.0 GB PSS measured), and iOS.
 - That 500 code points is a good question limit (a proposal; it keeps a pasted text from overflowing `n_ctx` 2048).
+- **Budget:**
+  - `ignore_eos` with `stop: []` on the measuring priming call (not yet run on the phone)
+  - that llama.rn reports `timings` in a release build
+  - how far predictions are off on other phones
+- **The slow first priming call:** on the Redmi 10C, the first call after model load measured about 9 prompt tokens/s against about 28 for the second (2026-10-31). The likely cause is the model being read in after load; this is not confirmed. If only one call is primed and it is slow, the prediction errs slow, so the app falls back more often.

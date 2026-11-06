@@ -6,7 +6,8 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { checkResults, parseQueryReply } from "../src/contract.ts";
-import { askAssistant, startQuestion, type Step, type StepInput } from "../src/flow.ts";
+import { speedState, updateSpeed } from "../src/budget.ts";
+import { askAssistant, startQuestion, type QuestionLog, type Step, type StepInput } from "../src/flow.ts";
 import { answerSystem, answerUserMessage, casePart, querySystem, systemTurn, todayText } from "../src/render.ts";
 import { runVectors, type VectorFile } from "../src/vectors.ts";
 
@@ -81,7 +82,8 @@ function input(value: unknown): StepInput {
 
 for (const vector of file.flow) {
   test(`flow stepper ${vector.id}`, () => {
-    let step: Step = startQuestion(vector.question, vector.now_ms);
+    const seed = vector.speed === null ? null : { promptTps: vector.speed.prompt_tps, genTps: vector.speed.gen_tps };
+    let step: Step = startQuestion(vector.question, vector.now_ms, seed);
     const sent: string[] = [];
     while (step.kind !== "done") {
       if (step.kind === "query") {
@@ -92,7 +94,7 @@ for (const vector of file.flow) {
         step = step.next(input(vector.search_reply));
       } else if (step.kind === "count") {
         assert.equal(step.casePart, vector.expected.answer_case_part);
-        step = step.next(input(vector.case_tokens));
+        step = step.next(input(vector.case_tokens), vector.elapsed_ms);
       } else {
         sent.push(step.call.prompt);
         assert.ok(step.call.prompt.indexOf(step.call.prefix) === 0);
@@ -111,17 +113,120 @@ for (const vector of file.flow) {
   test(`flow driver ${vector.id}`, async () => {
     const reply = (value: unknown) =>
       isThrows(value) ? Promise.reject(new Error("scripted")) : Promise.resolve(value);
+    // A scripted clock: the time so far becomes elapsed_ms once tokens are counted.
+    let now = 0;
+    const logs: QuestionLog[] = [];
+    const seed = vector.speed === null ? null : { promptTps: vector.speed.prompt_tps, genTps: vector.speed.gen_tps };
     const result = await askAssistant(vector.question, {
       nowMs: () => vector.now_ms,
-      complete: (call) => reply(call.kind === "query" ? vector.query_reply : vector.answer_reply) as Promise<string>,
+      clockMs: () => now,
+      complete: (call) =>
+        reply(call.kind === "query" ? vector.query_reply : vector.answer_reply).then((text) => ({
+          text: text as string,
+        })),
       search: () => reply(vector.search_reply),
-      countTokens: () => reply(vector.case_tokens) as Promise<number>,
+      countTokens: () => {
+        now = vector.elapsed_ms;
+        return reply(vector.case_tokens) as Promise<number>;
+      },
+      speed: speedState(seed),
+      log: (entry) => logs.push(entry),
     });
     assert.equal(result.path, vector.expected.path);
     assert.equal(result.text, vector.expected.text);
     assert.deepEqual(result.codes, vector.expected.codes);
+    const budget = vector.expected.budget;
+    assert.equal(result.budget ? result.budget.predictedMs : null, budget ? budget.predicted_ms : null);
+    assert.equal(result.resultCount, vector.expected.result_count);
+    assert.deepEqual(logs, [
+      {
+        path: vector.expected.path,
+        rule: budget ? budget.rule : null,
+        predictedMs: budget ? budget.predicted_ms : null,
+        actualMs: result.actualMs,
+        resultCount: vector.expected.result_count,
+        caseTokens: result.caseTokens,
+      },
+    ]);
   });
 }
+
+test("answer-call timings update the speed; query-call timings do not", async () => {
+  const vector = file.flow.find((v) => v.id === "time-fast-e2e-009")!;
+  const speed = speedState({ promptTps: 60, genTps: 20 });
+  const timings = { prompt_n: 394, prompt_per_second: 30, predicted_n: 39, predicted_per_second: 11 };
+  const result = await askAssistant(vector.question, {
+    nowMs: () => vector.now_ms,
+    complete: (call) =>
+      Promise.resolve(
+        call.kind === "query"
+          ? { text: vector.query_reply as string, timings: { ...timings, prompt_per_second: 999, prompt_n: 500 } }
+          : { text: vector.answer_reply as string, timings: timings },
+      ),
+    search: () => Promise.resolve(vector.search_reply),
+    countTokens: () => Promise.resolve(vector.case_tokens as number),
+    speed: speed,
+  });
+  assert.equal(result.path, "answer");
+  assert.deepEqual(speed.get(), { promptTps: 30, genTps: 11 });
+});
+
+test("query-call timings alone never change the speed", async () => {
+  const vector = file.flow.find((v) => v.id === "time-fast-e2e-009")!;
+  const speed = speedState({ promptTps: 60, genTps: 20 });
+  const timings = { prompt_n: 500, prompt_per_second: 99, predicted_n: 40, predicted_per_second: 99 };
+  await askAssistant(vector.question, {
+    nowMs: () => vector.now_ms,
+    complete: (call) =>
+      Promise.resolve(
+        call.kind === "query"
+          ? { text: vector.query_reply as string, timings: timings }
+          : { text: vector.answer_reply as string },
+      ),
+    search: () => Promise.resolve(vector.search_reply),
+    countTokens: () => Promise.resolve(vector.case_tokens as number),
+    speed: speed,
+  });
+  assert.deepEqual(speed.get(), { promptTps: 60, genTps: 20 });
+});
+
+test("no speed: the 200-token rule decides, and the log says so", async () => {
+  const vector = file.flow.find((v) => v.id === "time-fast-e2e-009")!;
+  const logs: QuestionLog[] = [];
+  const result = await askAssistant(vector.question, {
+    nowMs: () => vector.now_ms,
+    complete: (call) =>
+      Promise.resolve({ text: (call.kind === "query" ? vector.query_reply : vector.answer_reply) as string }),
+    search: () => Promise.resolve(vector.search_reply),
+    countTokens: () => Promise.resolve(vector.case_tokens as number),
+    log: (entry) => logs.push(entry),
+  });
+  assert.equal(result.path, "budget_fallback");
+  assert.equal(logs[0].rule, "tokens");
+  assert.equal(logs[0].predictedMs, null);
+  assert.equal(logs[0].resultCount, 3);
+});
+
+test("a throwing log never changes the result", async () => {
+  const result = await askAssistant("", {
+    nowMs: () => 0,
+    complete: () => Promise.resolve({ text: "" }),
+    search: () => Promise.resolve([]),
+    countTokens: () => Promise.resolve(0),
+    log: () => {
+      throw new Error("disk full");
+    },
+  });
+  assert.equal(result.path, "question_invalid");
+});
+
+test("non-finite rates are ignored (not expressible in the JSON vectors)", () => {
+  const redmi = { promptTps: 28, genTps: 10.4 };
+  for (const rate of [NaN, Infinity, -Infinity]) {
+    const timings = { prompt_n: 200, prompt_per_second: rate, predicted_n: 20, predicted_per_second: rate };
+    assert.deepEqual(updateSpeed(redmi, timings), redmi);
+  }
+});
 
 test("the driver never rejects, even if a dependency throws synchronously", async () => {
   const result = await askAssistant("When is the fair?", {

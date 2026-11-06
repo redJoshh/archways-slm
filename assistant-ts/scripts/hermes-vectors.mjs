@@ -37,7 +37,7 @@ var flowVector = VECTORS.flow[0];
 askAssistant(flowVector.question, {
   nowMs: function () { return flowVector.now_ms; },
   complete: function (call) {
-    return Promise.resolve(call.kind === "query" ? flowVector.query_reply : flowVector.answer_reply);
+    return Promise.resolve({ text: call.kind === "query" ? flowVector.query_reply : flowVector.answer_reply });
   },
   search: function () { return Promise.resolve(flowVector.search_reply); },
   countTokens: function () { return Promise.resolve(flowVector.case_tokens); },
@@ -56,6 +56,7 @@ const bundle = [
   plainScript("assistant-ts", "src", "text.js"),
   plainScript("assistant-ts", "src", "render.js"),
   plainScript("assistant-ts", "src", "contract.js"),
+  plainScript("assistant-ts", "src", "budget.js"),
   plainScript("assistant-ts", "src", "flow.js"),
   plainScript("assistant-ts", "src", "vectors.js"),
   "var VECTORS = " + readFileSync(vectorsPath, "utf8").trim() + ";",

@@ -4,6 +4,7 @@
  */
 
 import { checkResults, parseQueryReply } from "./contract.ts";
+import { updateSpeed, type Speed } from "./budget.ts";
 import { startQuestion, type Step, type StepInput } from "./flow.ts";
 import { answerSystem, answerUserMessage, casePart, querySystem, systemTurn, todayText } from "./render.ts";
 
@@ -15,6 +16,17 @@ export interface FlowExpected {
   query_prompt: string | null;
   answer_case_part: string | null;
   answer_prompt: string | null;
+  budget: { rule: string; fallback: boolean; predicted_ms: number | null } | null;
+  result_count: number | null;
+}
+
+export interface SpeedJson {
+  prompt_tps: number | null;
+  gen_tps: number | null;
+}
+
+function toSpeed(value: SpeedJson | null): Speed | null {
+  return value === null ? null : { promptTps: value.prompt_tps, genTps: value.gen_tps };
 }
 
 export interface VectorFile {
@@ -42,8 +54,11 @@ export interface VectorFile {
     search_reply: unknown;
     case_tokens: unknown;
     answer_reply: unknown;
+    elapsed_ms: number;
+    speed: SpeedJson | null;
     expected: FlowExpected;
   }[];
+  speed: { id: string; speed: SpeedJson | null; timings: unknown; expected: SpeedJson }[];
 }
 
 export interface VectorReport {
@@ -115,16 +130,24 @@ export function runVectors(file: VectorFile, maxFailures = 20): VectorReport {
     record("results " + JSON.stringify(v.value).slice(0, 80), got.ok === v.ok && same(got.value, v.rows));
   }
   for (const v of file.flow) {
-    let step: Step = startQuestion(v.question, v.now_ms);
+    let step: Step = startQuestion(v.question, v.now_ms, toSpeed(v.speed));
     while (step.kind !== "done") {
       if (step.kind === "query") step = step.next(input(v.query_reply));
       else if (step.kind === "search") step = step.next(input(v.search_reply));
-      else if (step.kind === "count") step = step.next(input(v.case_tokens));
+      else if (step.kind === "count") step = step.next(input(v.case_tokens), v.elapsed_ms);
       else step = step.next(input(v.answer_reply));
     }
     const e = v.expected;
+    const budget = step.outcome.budget;
     const ok =
       step.outcome.path === e.path &&
+      same(
+        budget === null
+          ? null
+          : { rule: budget.rule, fallback: budget.fallback, predicted_ms: budget.predictedMs },
+        e.budget,
+      ) &&
+      step.outcome.resultCount === e.result_count &&
       step.outcome.text === e.text &&
       same(step.outcome.codes, e.codes) &&
       same(step.trace.arguments, e.arguments) &&
@@ -132,6 +155,10 @@ export function runVectors(file: VectorFile, maxFailures = 20): VectorReport {
       step.trace.answerCasePart === e.answer_case_part &&
       step.trace.answerPrompt === e.answer_prompt;
     record("flow " + v.id, ok);
+  }
+  for (const v of file.speed) {
+    const got = updateSpeed(toSpeed(v.speed), v.timings);
+    record("speed " + v.id, got.promptTps === v.expected.prompt_tps && got.genTps === v.expected.gen_tps);
   }
   return { total: total, passed: total - failed, failed: failed, failures: failures };
 }
