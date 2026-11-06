@@ -123,9 +123,34 @@ UAT is in the week after this record; fine-tuning continues after UAT. UAT ships
 - the `and_v2` matcher (search contract v2) in Spring
 - session-file caches, one per system turn ([0005](0005-gate-1-cold-definition.md))
 - the guard (guard-ts) on the device
-- the budget fallback: if the answer prompt's case part is over 200 Qwen tokens, the no-model fallback is shown instead of calling the model
+- the budget fallback: if the answer prompt's case part is over 200 Qwen tokens, the no-model fallback is shown instead of calling the model. **Amended later the same day; see "Adaptive time budget" below.**
 
 Dev-set effect, from the qwen3:0.6b v1 `and_v1` baseline: 4 of 20 answer calls have case parts over 200 tokens (e2e-002 304, e2e-009 394, e2e-021 408, e2e-032 274). These would get the no-model fallback. The set under `and_v2` is unverified.
+
+#### Adaptive time budget (user decision, 2026-11-06)
+
+- **Why:** on the real snapshot (devlog 2026-11-06), every 2- or 3-result case part is over 200 tokens, so the fixed rule sends every multi-result question to the fallback, on every phone.
+- **The rule:**
+  - Before the answer call, the app predicts the whole question's time:
+    - the time already spent (query call and search, measured)
+    - plus the answer session load (200 ms)
+    - plus the case part's tokens at this phone's prompt speed
+    - plus `GEN_TOKENS` (51) at this phone's generation speed
+    - plus 300 ms for the guard and rendering
+  - **It falls back only if the prediction is over 15 s.**
+  - Where the speed comes from:
+    - priming (the last priming call; it generates 16 tokens to measure the generation rate)
+    - then each answer call's llama.rn timings
+  - `GEN_TOKENS` is the p90 of answer replies with the UAT prompts (29 dev answer calls on Ollama, min 10, median 26, max 53). The phone replies were 37 and 41 tokens.
+- **Speed unknown:** for example after an app restart with existing session files, or when timings are missing. The app then uses the **200-token rule** above until an answer call reports timings, so a missing measurement can only make it more conservative. The speed is never saved to disk.
+- **n_ctx guard:** a case part over 1548 tokens (2048 − 200 for the answer `n_predict` − 300 for the system turn) always falls back.
+- **Logging:** for every question, the app keeps the predicted time, the actual time, the rule used and the result count, never the question or the text. That way UAT can report how often 15 s held.
+- **Gate 1 is unchanged.** It is still measured on the Redmi 10C, with the 15 s bar and e2e-009 as the test case. **e2e-009 is still FAIL**, and a fallback reply still does not pass. The adaptive budget is a **UAT product setting, not a new bar**.
+- **Replay of the 2026-10-31 Redmi runs** (28 prompt tokens/s, 10.4 generated tokens/s): e2e-009 is predicted at 21.7 s (measured 20.2 s) and falls back; e2e-004 is predicted at 13.9 s (measured 11.9 s) and answers. Both predictions err on the slow side.
+- **Unverified:**
+  - The first priming call after model load measured about 9 prompt tokens/s against about 28 for the second (2026-10-31). The likely cause is the model being read in after load; this is not confirmed. The rule takes the last priming call's rate, so the slow first call does not set the speed when both run.
+  - `ignore_eos` for the measuring priming call has not been tried on the phone.
+  - The prediction error on other phones.
 
 ## Caveats
 
