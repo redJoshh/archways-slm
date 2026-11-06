@@ -1,0 +1,153 @@
+/**
+ * Session files: one saved system turn per call (ADR 0005), so a question
+ * processes only its own case part.
+ *
+ * - Prefixes: systemTurn(query prompt v1 at today) and systemTurn(answer
+ *   prompt v1 at today). Both prompts contain today's Manila date, so the
+ *   files are valid for one Manila day; their token counts also change with
+ *   the weekday name (213 query / 197 answer on Monday 2026-11-02, Ollama).
+ *   Counts are always taken from the tokenizer, never hard-coded.
+ * - The file name encodes everything the saved state depends on: call kind,
+ *   prompt SHA-256, Manila date, model SHA-256, llama.rn version, n_ctx and
+ *   threads. A change to any of them is a new file, so nothing is reused
+ *   across a change.
+ * - Priming a kind: complete(prefix + casePart(""), 1 token), then
+ *   saveSession(file, tokenSize = tokens(prefix)). This is what the Gate 1
+ *   app did on the Redmi 10C (full prompt, then saveSession with the system
+ *   turn's token count), except that its user turn was a real question.
+ * - Each model call: load the kind's file (prime it first if missing), check
+ *   tokens_loaded equals tokens(prefix) (re-prime once if not), then run the
+ *   whole prompt; llama.rn reuses the loaded prefix.
+ *
+ * This module never imports llama.rn: the app passes an adapter.
+ */
+
+import { ANSWER_PROMPT_SHA256, QUERY_PROMPT_SHA256 } from "./generated.ts";
+import type { ModelCall } from "./flow.ts";
+import { answerSystem, casePart, querySystem, systemTurn, todayText } from "./render.ts";
+
+/** n_predict per call: the values the Gate 1 app ran on the Redmi 10C. */
+export const N_PREDICT = { query: 64, answer: 200 };
+
+/** The app's thin wrapper around a llama.rn LlamaContext. */
+export interface LlamaAdapter {
+  /** (await ctx.tokenize(text)).tokens.length */
+  countTokens: (text: string) => Promise<number>;
+  /**
+   * ctx.completion({ prompt, n_predict, temperature: 0, stop: QWEN3_STOP, ... })
+   * resolving to result.text. Raw prompt only, no messages/jinja.
+   */
+  completion: (prompt: string, nPredict: number) => Promise<string>;
+  /** ctx.saveSession(path, { tokenSize }) -> tokens saved */
+  saveSession: (path: string, tokenSize: number) => Promise<number>;
+  /** (await ctx.loadSession(path)).tokens_loaded */
+  loadSession: (path: string) => Promise<number>;
+  fileExists: (path: string) => Promise<boolean>;
+}
+
+export interface SessionSettings {
+  /** A permanent app directory (not a cache the OS may clear mid-question). */
+  dir: string;
+  /** SHA-256 of the GGUF file, checked by the app at download. */
+  modelSha256: string;
+  llamaRnVersion: string;
+  nCtx: number;
+  nThreads: number;
+}
+
+export type Kind = "query" | "answer";
+
+export function sessionPrefix(kind: Kind, nowMs: number): string {
+  return systemTurn(kind === "query" ? querySystem(nowMs) : answerSystem(nowMs));
+}
+
+function safe(text: string): string {
+  return text.replace(/[^A-Za-z0-9.]/g, "_");
+}
+
+export function sessionFile(kind: Kind, settings: SessionSettings, nowMs: number): string {
+  const promptSha = kind === "query" ? QUERY_PROMPT_SHA256 : ANSWER_PROMPT_SHA256;
+  const date = todayText(nowMs).split(", ")[1];
+  const name = [
+    kind,
+    "p" + promptSha.slice(0, 12),
+    date,
+    "m" + settings.modelSha256.slice(0, 12),
+    "rn" + safe(settings.llamaRnVersion),
+    "c" + settings.nCtx,
+    "t" + settings.nThreads,
+  ].join("-");
+  const dir = settings.dir.replace(/\/+$/, "");
+  return dir + "/" + name + ".session";
+}
+
+export interface PrimeReport {
+  kind: Kind;
+  file: string;
+  tokens: number;
+  ms: number;
+}
+
+/** Process and save one kind's system turn. Throws if the save is short. */
+export async function primeOne(
+  llama: LlamaAdapter,
+  settings: SessionSettings,
+  kind: Kind,
+  nowMs: number,
+  clockMs: () => number = Date.now,
+): Promise<PrimeReport> {
+  const started = clockMs();
+  const prefix = sessionPrefix(kind, nowMs);
+  const tokens = await llama.countTokens(prefix);
+  const file = sessionFile(kind, settings, nowMs);
+  await llama.completion(prefix + casePart(""), 1);
+  const saved = await llama.saveSession(file, tokens);
+  if (saved !== tokens) throw new Error(kind + " session saved " + saved + " of " + tokens + " tokens");
+  return { kind: kind, file: file, tokens: tokens, ms: clockMs() - started };
+}
+
+/**
+ * Prime both kinds for the Manila day of nowMs, skipping files that exist.
+ * Call it when the app starts or returns to the foreground on a new day,
+ * with a progress message: about 30 s on the Redmi 10C (22.0 s answer +
+ * 7.7 s query, measured 2026-10-31).
+ */
+export async function primeSessions(
+  llama: LlamaAdapter,
+  settings: SessionSettings,
+  nowMs: number,
+  clockMs: () => number = Date.now,
+): Promise<PrimeReport[]> {
+  const reports: PrimeReport[] = [];
+  const kinds: Kind[] = ["answer", "query"];
+  for (const kind of kinds) {
+    if (await llama.fileExists(sessionFile(kind, settings, nowMs))) continue;
+    reports.push(await primeOne(llama, settings, kind, nowMs, clockMs));
+  }
+  return reports;
+}
+
+/**
+ * AssistantDeps.complete for askAssistant(): loads the call's session file
+ * (priming it if missing or if it loads the wrong number of tokens, once),
+ * then runs the whole prompt. Any failure rejects, and the flow falls back.
+ */
+export function makeComplete(
+  llama: LlamaAdapter,
+  settings: SessionSettings,
+): (call: ModelCall) => Promise<string> {
+  return async (call: ModelCall): Promise<string> => {
+    if (call.prompt.indexOf(call.prefix) !== 0) throw new Error("prompt does not start with its prefix");
+    if (call.prefix !== sessionPrefix(call.kind, call.nowMs)) throw new Error("unexpected prefix");
+    const file = sessionFile(call.kind, settings, call.nowMs);
+    const tokens = await llama.countTokens(call.prefix);
+    if (!(await llama.fileExists(file))) await primeOne(llama, settings, call.kind, call.nowMs);
+    let loaded = await llama.loadSession(file);
+    if (loaded !== tokens) {
+      await primeOne(llama, settings, call.kind, call.nowMs);
+      loaded = await llama.loadSession(file);
+      if (loaded !== tokens) throw new Error(call.kind + " session loaded " + loaded + " of " + tokens);
+    }
+    return llama.completion(call.prompt, N_PREDICT[call.kind]);
+  };
+}
