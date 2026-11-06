@@ -54,8 +54,35 @@ WEEKDAYS = (
 TODAY_PLACEHOLDER = "{today}"
 
 # ADR 0004, UAT configuration: an answer call's case part over this many Qwen
-# tokens gets the no-model fallback instead of a model call.
+# tokens gets the no-model fallback instead of a model call. Since
+# 2026-11-06 this is the rule only while the phone's speed is unknown (the
+# "tokens" rule); with a known speed the time rule below decides.
 BUDGET_CASE_TOKENS = 200
+
+# The adaptive time budget (ADR 0004, UAT configuration). A UAT product
+# setting, not a Gate 1 bar: Gate 1 is still measured on the Redmi 10C.
+BAR_MS = 15000
+# Answer session load, measured 0.1-0.2 s on the Redmi 10C (2026-10-31).
+ANSWER_LOAD_MS = 200
+# Guard and rendering after the answer call. Proposal, not measured.
+OVERHEAD_MS = 300
+# Generated answer tokens: the nearest-rank 90th percentile of eval_count over
+# every answer call of the e2e and Taglish dev cases with the UAT prompts
+# (scripts/measure_reply_tokens.py, 2026-11-06, Ollama 0.40.14: 29 answer
+# calls, min 10, median 26, p90 51, max 53; devlog). Phone replies: 37, 41.
+GEN_TOKENS = 51
+# n_ctx guard: the prompt plus the answer's n_predict must fit n_ctx. The two
+# v1 system turns measured 197 and 213 tokens; 300 bounds them.
+N_CTX = 2048
+ANSWER_N_PREDICT = 200
+SYSTEM_TOKENS_MAX = 300
+CASE_TOKENS_CTX_MAX = N_CTX - ANSWER_N_PREDICT - SYSTEM_TOKENS_MAX
+# A measured rate is used only if it is a finite number in this range
+# (tokens/s) and came from enough tokens.
+RATE_MIN = 1
+RATE_MAX = 1000
+PROMPT_N_MIN = 100
+PREDICTED_N_MIN = 10
 # Questions longer than this (code points) are refused before any call, so
 # a pasted text can't overflow n_ctx 2048. Proposal, not measured.
 QUESTION_MAX_CHARS = 500
@@ -297,10 +324,95 @@ class Calls:
 
 
 @dataclass(frozen=True)
+class Speed:
+    """This phone's measured rates in tokens/s; None means not measured."""
+
+    prompt_tps: float | None = None
+    gen_tps: float | None = None
+
+    @property
+    def known(self) -> bool:
+        return self.prompt_tps is not None and self.gen_tps is not None
+
+
+@dataclass(frozen=True)
+class Budget:
+    """Which rule decided the answer call, and the predicted whole question."""
+
+    rule: str  # "time", "tokens" (speed unknown) or "n_ctx"
+    fallback: bool
+    predicted_ms: float | None = None
+
+
+def is_number(value) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def accept_rate(rate, count, count_min: int) -> bool:
+    return (
+        is_number(rate)
+        and math.isfinite(rate)
+        and RATE_MIN <= rate <= RATE_MAX
+        and is_number(count)
+        and count >= count_min
+    )
+
+
+def update_speed(speed: Speed | None, timings) -> Speed:
+    """speed with each rate replaced by timings' rate if that one is usable.
+
+    timings is a llama.rn completion's timings object (prompt_n,
+    prompt_per_second, predicted_n, predicted_per_second), or anything else
+    (missing), which changes nothing. Priming folds its calls in order, so
+    the last priming call's rates win; each answer call then updates it.
+    """
+    speed = speed or Speed()
+    if not isinstance(timings, dict):
+        return speed
+    prompt, gen = speed.prompt_tps, speed.gen_tps
+    rate = timings.get("prompt_per_second")
+    if accept_rate(rate, timings.get("prompt_n"), PROMPT_N_MIN):
+        prompt = float(rate)
+    rate = timings.get("predicted_per_second")
+    if accept_rate(rate, timings.get("predicted_n"), PREDICTED_N_MIN):
+        gen = float(rate)
+    return Speed(prompt, gen)
+
+
+def predict_ms(case_tokens: int, elapsed_ms: int, speed: Speed) -> float:
+    """The whole question's predicted time if the answer call is made.
+
+    elapsed_ms is measured (session load, query call, search). The order of
+    operations is part of the spec, so Python and TypeScript agree exactly.
+    """
+    return (
+        elapsed_ms
+        + ANSWER_LOAD_MS
+        + case_tokens * 1000 / speed.prompt_tps
+        + GEN_TOKENS * 1000 / speed.gen_tps
+        + OVERHEAD_MS
+    )
+
+
+def decide_budget(case_tokens: int, elapsed_ms: int, speed: Speed | None) -> Budget:
+    if case_tokens > CASE_TOKENS_CTX_MAX:
+        return Budget("n_ctx", True)
+    if speed is None or not speed.known:
+        return Budget("tokens", case_tokens > BUDGET_CASE_TOKENS)
+    predicted = predict_ms(case_tokens, elapsed_ms, speed)
+    return Budget("time", predicted > BAR_MS, predicted)
+
+
+@dataclass(frozen=True)
 class Outcome:
     path: str
     text: str
     codes: tuple[str, ...] = ()
+    # Logged per question for UAT (never the question or the text): the
+    # budget decision (None if no answer call was considered) and the number
+    # of search results (None if no search result was accepted).
+    budget: Budget | None = None
+    result_count: int | None = None
 
 
 ERROR = object()  # a scripted step that throws
@@ -321,12 +433,16 @@ def flow(
     search_reply=None,
     case_tokens=None,
     answer_reply=None,
+    elapsed_ms: int = 0,
+    speed: Speed | None = None,
 ) -> tuple[Outcome, Calls | None, dict | None]:
     """One question through the UAT flow, with every step's result scripted.
 
     prompts: {"query": the query prompt file's text, "answer": the answer
     prompt file's text}. query_reply, search_reply, case_tokens and
     answer_reply are each the step's value, or ERROR if the step throws.
+    elapsed_ms is the time already spent when the budget is decided, and
+    speed this phone's measured rates (None: unknown, so the tokens rule).
     Returns the outcome, the prompts sent (None if no call was made) and the
     search arguments (None if no search was made).
     """
@@ -356,8 +472,9 @@ def flow(
         results = check_results(search_reply)
     except ContractError:
         return Outcome("search_error", LAST_RESORT_MESSAGE), calls, arguments
+    count = len(results)
     if not results:
-        return Outcome("not_found", NOT_FOUND_MESSAGE), calls, arguments
+        return Outcome("not_found", NOT_FOUND_MESSAGE, result_count=0), calls, arguments
 
     answer_system = fill_prompt(prompts["answer"], now)
     user = answer_user_message(question, results)
@@ -375,17 +492,23 @@ def flow(
         case_part(answer_system, user),
     )
     if not is_count(case_tokens):
-        return Outcome("answer_error", safe_fallback(results)), calls, arguments
-    if case_tokens > BUDGET_CASE_TOKENS:
-        return Outcome("budget_fallback", safe_fallback(results)), calls, arguments
+        outcome = Outcome("answer_error", safe_fallback(results), result_count=count)
+        return outcome, calls, arguments
+    budget = decide_budget(case_tokens, elapsed_ms, speed)
+    if budget.fallback:
+        outcome = Outcome("budget_fallback", safe_fallback(results), (), budget, count)
+        return outcome, calls, arguments
     if answer_reply is ERROR:
-        return Outcome("answer_error", safe_fallback(results)), calls, arguments
+        outcome = Outcome("answer_error", safe_fallback(results), (), budget, count)
+        return outcome, calls, arguments
     reply = answer_reply.strip(ASCII_WHITESPACE)
     try:
         guarded = guard(reply, results, question, [])
     # Defense in depth: results are contract-checked, so the guard should not
     # raise; if it does, never show the unguarded reply.
     except (ValueError, KeyError, TypeError):
-        return Outcome("answer_error", safe_fallback(results)), calls, arguments
+        outcome = Outcome("answer_error", safe_fallback(results), (), budget, count)
+        return outcome, calls, arguments
     path = "guard_fired" if guarded.fired else "answer"
-    return Outcome(path, guarded.text, tuple(guarded.codes)), calls, arguments
+    outcome = Outcome(path, guarded.text, tuple(guarded.codes), budget, count)
+    return outcome, calls, arguments

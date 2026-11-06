@@ -24,7 +24,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from archways_assistant import assistant
-from archways_assistant.assistant import ERROR, flow
+from archways_assistant.assistant import ERROR, Speed, flow, update_speed
 from archways_assistant.fakebackend import is_visible, to_announcement
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -323,15 +323,92 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
             None,
         ),
     ]
+    # The adaptive time budget: (id, question, query, search, tokens, answer,
+    # elapsed_ms, speed). REDMI is the 2026-10-31 phone run's rates.
+    redmi = Speed(28.0, 10.4)
+    fast = Speed(60.0, 20.0)
+    gen = float(assistant.GEN_TOKENS)  # GEN_TOKENS * 1000 / gen = 1000 exactly
+    timed = [
+        ("time-redmi-e2e-004", q004, query_004, e2e_004, 177, reply_004, 2200, redmi),
+        ("time-redmi-e2e-009", q009, query_009, e2e_009, 394, reply_009, 2200, redmi),
+        ("time-fast-e2e-009", q009, query_009, e2e_009, 394, reply_009, 2200, fast),
+        # 200 * 1000 / 20 = 10000; 3500 + 200 + 10000 + 1000 + 300 = 15000.
+        (
+            "time-at-bar",
+            q009,
+            query_009,
+            e2e_009,
+            200,
+            reply_009,
+            3500,
+            Speed(20.0, gen),
+        ),
+        (
+            "time-over-bar",
+            q009,
+            query_009,
+            e2e_009,
+            200,
+            reply_009,
+            3501,
+            Speed(20.0, gen),
+        ),
+        ("time-error", q009, query_009, e2e_009, 394, ERROR, 2200, fast),
+        ("time-guard-fired", q009, query_009, e2e_009, 394, invented, 2200, fast),
+        # Only one rate known: the tokens rule decides.
+        (
+            "tokens-partial-speed",
+            q009,
+            query_009,
+            e2e_009,
+            201,
+            reply_009,
+            0,
+            Speed(60.0),
+        ),
+        (
+            "tokens-partial-at-budget",
+            q009,
+            query_009,
+            e2e_009,
+            200,
+            reply_009,
+            0,
+            Speed(None, 20.0),
+        ),
+        # n_ctx guard, whatever the speed.
+        (
+            "n-ctx-at-limit",
+            q009,
+            query_009,
+            e2e_009,
+            assistant.CASE_TOKENS_CTX_MAX,
+            reply_009,
+            0,
+            Speed(1000.0, 1000.0),
+        ),
+        (
+            "n-ctx-over",
+            q009,
+            query_009,
+            e2e_009,
+            assistant.CASE_TOKENS_CTX_MAX + 1,
+            reply_009,
+            0,
+            Speed(1000.0, 1000.0),
+        ),
+    ]
+    scripts = [(*script, 0, None) for script in scripts] + timed
 
     def encode(value):
         return THROWS if value is ERROR else value
 
     out = []
-    for id_, question, query, search, tokens, answer in scripts:
+    for id_, question, query, search, tokens, answer, elapsed, speed in scripts:
         outcome, calls, arguments = flow(
-            question, now, PROMPTS, query, search, tokens, answer
+            question, now, PROMPTS, query, search, tokens, answer, elapsed, speed
         )
+        budget = outcome.budget
         out.append(
             {
                 "id": id_,
@@ -341,10 +418,20 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
                 "search_reply": encode(search),
                 "case_tokens": encode(tokens),
                 "answer_reply": encode(answer),
+                "elapsed_ms": elapsed,
+                "speed": speed_json(speed),
                 "expected": {
                     "path": outcome.path,
                     "text": outcome.text,
                     "codes": list(outcome.codes),
+                    "budget": None
+                    if budget is None
+                    else {
+                        "rule": budget.rule,
+                        "fallback": budget.fallback,
+                        "predicted_ms": budget.predicted_ms,
+                    },
+                    "result_count": outcome.result_count,
                     "arguments": arguments,
                     "query_prompt": calls.query_prompt if calls else None,
                     "answer_case_part": calls.answer_case_part if calls else None,
@@ -353,6 +440,66 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
             }
         )
     return out
+
+
+def speed_json(speed: Speed | None) -> dict | None:
+    if speed is None:
+        return None
+    return {"prompt_tps": speed.prompt_tps, "gen_tps": speed.gen_tps}
+
+
+def speed_vectors() -> list[dict]:
+    """update_speed(): (id, previous speed, timings)."""
+    redmi = Speed(28.0, 10.4)
+    priming = {
+        "prompt_n": 213,
+        "prompt_per_second": 27.7,
+        "predicted_n": 16,
+        "predicted_per_second": 10.1,
+    }
+    cases = [
+        ("priming-from-unknown", None, priming),
+        ("no-timings", redmi, None),
+        ("no-timings-unknown", None, None),
+        ("not-an-object", redmi, [1, 2]),
+        ("empty-object", redmi, {}),
+        ("prompt-n-below", redmi, {**priming, "prompt_n": 99}),
+        ("prompt-n-at-min", redmi, {**priming, "prompt_n": 100}),
+        ("predicted-n-below", redmi, {**priming, "predicted_n": 9}),
+        ("predicted-n-at-min", redmi, {**priming, "predicted_n": 10}),
+        ("rate-below-min", redmi, {**priming, "prompt_per_second": 0.99}),
+        ("rate-at-min", redmi, {**priming, "prompt_per_second": 1}),
+        ("rate-at-max", redmi, {**priming, "predicted_per_second": 1000}),
+        ("rate-above-max", redmi, {**priming, "predicted_per_second": 1000.5}),
+        ("rate-zero", redmi, {**priming, "prompt_per_second": 0}),
+        ("rate-negative", redmi, {**priming, "predicted_per_second": -5}),
+        ("rate-string", redmi, {**priming, "prompt_per_second": "27.7"}),
+        ("rate-bool", redmi, {**priming, "predicted_per_second": True}),
+        ("rate-null", redmi, {**priming, "prompt_per_second": None}),
+        ("count-string", redmi, {**priming, "prompt_n": "213"}),
+        ("count-bool", redmi, {**priming, "predicted_n": True}),
+        ("partial-prompt-only", None, {"prompt_n": 394, "prompt_per_second": 21.9}),
+        ("partial-gen-only", None, {"predicted_n": 37, "predicted_per_second": 10.4}),
+        (
+            "answer-call-short-reply",
+            redmi,
+            {
+                "prompt_n": 177,
+                "prompt_per_second": 25.0,
+                "predicted_n": 8,
+                "predicted_per_second": 14.0,
+            },
+        ),
+    ]
+    return [
+        {
+            "id": id_,
+            "speed": speed_json(previous),
+            "timings": timings,
+            "expected": speed_json(update_speed(previous, timings)),
+        }
+        for id_, previous, timings in cases
+    ]
 
 
 def build() -> str:
@@ -364,6 +511,9 @@ def build() -> str:
         "generator": "scripts/export_assistant_vectors.py",
         "constants": {
             "budget_case_tokens": assistant.BUDGET_CASE_TOKENS,
+            "bar_ms": assistant.BAR_MS,
+            "gen_tokens": assistant.GEN_TOKENS,
+            "case_tokens_ctx_max": assistant.CASE_TOKENS_CTX_MAX,
             "question_max_chars": assistant.QUESTION_MAX_CHARS,
             "paths": list(assistant.PATHS),
         },
@@ -372,6 +522,7 @@ def build() -> str:
         "query": query_vectors(),
         "results": results_vectors(rows),
         "flow": flow_vectors(rows),
+        "speed": speed_vectors(),
     }
     return json.dumps(data, ensure_ascii=True, indent=1) + "\n"
 

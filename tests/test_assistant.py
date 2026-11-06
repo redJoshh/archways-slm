@@ -180,8 +180,21 @@ def test_flow_vectors_reproduce():
             decode(vector["search_reply"]),
             decode(vector["case_tokens"]),
             decode(vector["answer_reply"]),
+            vector["elapsed_ms"],
+            speed_of(vector["speed"]),
         )
         expected = vector["expected"]
+        budget = outcome.budget
+        assert expected["budget"] == (
+            None
+            if budget is None
+            else {
+                "rule": budget.rule,
+                "fallback": budget.fallback,
+                "predicted_ms": budget.predicted_ms,
+            }
+        ), vector["id"]
+        assert outcome.result_count == expected["result_count"], vector["id"]
         assert outcome.path == expected["path"], vector["id"]
         assert outcome.text == expected["text"], vector["id"]
         assert list(outcome.codes) == expected["codes"], vector["id"]
@@ -201,12 +214,65 @@ def test_flow_shows_model_text_only_on_the_answer_path():
                 assert reply.strip() not in expected["text"], vector["id"]
 
 
+def speed_of(value) -> assistant.Speed | None:
+    return None if value is None else assistant.Speed(**value)
+
+
 def test_budget_boundary():
-    by_id = {vector["id"]: vector["expected"]["path"] for vector in DATA["flow"]}
+    by_id = {vector["id"]: vector["expected"] for vector in DATA["flow"]}
     assert assistant.BUDGET_CASE_TOKENS == 200
-    assert by_id["answer-at-budget"] == "answer"
-    assert by_id["budget-over-by-one"] == "budget_fallback"
-    assert by_id["budget-e2e-009"] == "budget_fallback"
+    assert by_id["answer-at-budget"]["path"] == "answer"
+    assert by_id["budget-over-by-one"]["path"] == "budget_fallback"
+    assert by_id["budget-e2e-009"]["path"] == "budget_fallback"
+    assert by_id["budget-e2e-009"]["budget"]["rule"] == "tokens"
+
+
+def test_time_budget_boundary_and_replay():
+    by_id = {vector["id"]: vector["expected"] for vector in DATA["flow"]}
+    assert assistant.BAR_MS == 15000
+    assert by_id["time-at-bar"]["budget"] == {
+        "rule": "time",
+        "fallback": False,
+        "predicted_ms": 15000.0,
+    }
+    assert by_id["time-at-bar"]["path"] == "answer"
+    assert by_id["time-over-bar"]["path"] == "budget_fallback"
+    # The 2026-10-31 Redmi runs: e2e-009 measured 20.2 s, e2e-004 11.9 s.
+    assert by_id["time-redmi-e2e-009"]["path"] == "budget_fallback"
+    assert by_id["time-redmi-e2e-009"]["budget"]["predicted_ms"] > 18000
+    assert by_id["time-redmi-e2e-004"]["path"] == "answer"
+    assert by_id["time-redmi-e2e-004"]["budget"]["predicted_ms"] < 15000
+    # A faster phone answers e2e-009, which the tokens rule never would.
+    assert by_id["time-fast-e2e-009"]["path"] == "answer"
+    assert by_id["tokens-partial-speed"]["path"] == "budget_fallback"
+    assert by_id["tokens-partial-at-budget"]["path"] == "answer"
+    assert by_id["n-ctx-at-limit"]["path"] == "answer"
+    assert by_id["n-ctx-over"]["budget"] == {
+        "rule": "n_ctx",
+        "fallback": True,
+        "predicted_ms": None,
+    }
+    assert assistant.GEN_TOKENS > 0
+
+
+def test_speed_vectors_reproduce():
+    assert len(DATA["speed"]) >= 20
+    for vector in DATA["speed"]:
+        got = assistant.update_speed(speed_of(vector["speed"]), vector["timings"])
+        assert speed_of(vector["expected"]) == got, vector["id"]
+
+
+@pytest.mark.parametrize("rate", [float("nan"), float("inf"), -float("inf")])
+def test_non_finite_rates_are_ignored(rate):
+    # Not expressible in JSON vectors; the TS tests repeat this.
+    speed = assistant.Speed(28.0, 10.4)
+    timings = {
+        "prompt_n": 200,
+        "prompt_per_second": rate,
+        "predicted_n": 20,
+        "predicted_per_second": rate,
+    }
+    assert assistant.update_speed(speed, timings) == speed
 
 
 def test_query_and_answer_prompts_start_with_their_own_prefixes():
