@@ -19,6 +19,54 @@ Template:
 
 ---
 
+## 2026-11-06: snapshot export, its loader, and the case-part budget measurement (seed dry run)
+
+- **Date:** 2026-11-06 (about 17:55–18:20 +08:00)
+- **What changed:**
+  - **`f1e7cbd` (`chore:`):** `data/local/` is gitignored. Before this, the user's first snapshot there was untracked but not ignored.
+  - **`5b574b4` (`feat:`):** `src/archways_assistant/snapshot.py`, `load_snapshot(path)`, maps a snapshot to the seed's row shape. It does no network or database access.
+    - The file must be UTF-8 without a BOM and one JSON array.
+    - Each element has exactly `id`, `title`, `body`, `office`, `priority`, `year_level`, `published_at`. The types are strict, the timestamp is naive (`YYYY-MM-DDTHH:MM:SS`), ids are unique, and duplicate keys are rejected.
+    - The error names two export mistakes: a non-UTF-8 encoding, and COPY's text format.
+    - Errors name the index, id and key, never announcement text.
+    - `tests/test_snapshot.py` has 32 tests on a tiny fake snapshot.
+  - **`7fca7d2` (`feat:`):**
+    - `scripts/snapshot_export.psql`: one `\copy` line. The person with database access runs it; this repo never connects.
+    - `scripts/measure_snapshot_budget.py`: the measurement (evidence, not pytest). It writes ids and numbers to `runs/`.
+- **Spring facts used** (read-only, `C:\UST-Archways-Organization\archways-backend` at `b1b6396`, 2026-11-03; the path was a placeholder in the request, so I chose the newest of three local copies):
+  - **Tables:** `announcement` (`announcement_id`, `title`, `body` TEXT, `office_id`, `academic_year_id`, `status`, `priority` STANDARD/URGENT, `published_at` TIMESTAMP, `year_level`, `is_archived`), `office.office_name`, `academic_year.status` (UPCOMING/ACTIVE/PREVIOUS/ARCHIVED), and `announcement_target_role` with the `Student` role.
+  - **Mobile visibility** (`AnnouncementRepository.MOBILE_VISIBLE`): not archived, status PUBLISHED **or FOR_DELETION**, year ACTIVE or PREVIOUS, targeted at the role, and `year_level` null or the student's.
+  - **The export differs on purpose:**
+    - only PUBLISHED (CLAUDE.md)
+    - plus `published_at` ≤ now in Manila, as asked
+    - years ACTIVE or PREVIOUS, which is stricter than "not archived": UPCOMING is also hidden from students
+  - Bodies are rich text sanitized to an HTML allowlist (`HtmlSanitizer`). The contract's excerpt is the body cut to 500 characters, so tags would count toward the budget. The script reports how many bodies contain `<`.
+  - `published_at` is written with `LocalDateTime.now()` (the JVM zone, not `AppTime`). That the JVM runs in Asia/Manila is unverified.
+- **The user's first snapshot (18:02) is not usable.** It was not changed; it was inspected in memory, structure only.
+  - It is not UTF-8 (Windows-1252).
+  - It is not valid JSON: COPY's text format wrote json_agg's line breaks as a literal backslash-n and doubled backslashes.
+  - It is a whole-row dump: 50 rows of 22 columns, including user ids, office ids but no office names, and one row that isn't published.
+  - It needs a re-export with `scripts/snapshot_export.psql`.
+- **Dry run on seed rows** (the 21 seed rows visible at 2026-11-06 12:00, written in snapshot form to the scratchpad; Ollama 0.40.14, cold; question "What are the latest announcements?"):
+  - Check: system 197 + case part 154 = whole 351.
+  - **1 result, exact, every row:** min 138, median 158, max 203. 1 of 21 is over 200 (ann-004, the 824-character body).
+  - **c = 34** in all 8 sampled pairs. The estimate `sum(T1) − (k−1)·34` had **error 0** on 8 pairs and 8 triples.
+  - **At the median:** 1 result 158, 2 results 282, 3 results 406.
+  - **Combinations over 200:** 1-result 1/21; 2-result **210/210**; 3-result **1330/1330**.
+  - **So under the 200-token rule, every answer with 2 or more results goes to the no-model fallback**, even on short seed rows. The smallest 2-result case part sampled was 275.
+- **How it was verified:**
+  - `uv run pytest -q` → `1093 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `49 files already formatted`.
+  - `uv run python scripts/measure_snapshot_budget.py --snapshot <scratchpad>/seed_snapshot.json --pairs 8 --triples 8` → the numbers above (2 min 9 s).
+  - The `\copy` command was **not run** (no database access here); unverified until the user runs it.
+- **Commits:** `f1e7cbd`, `5b574b4`, `7fca7d2`, and this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The user re-exports with `scripts/snapshot_export.psql`, then runs `uv run python scripts/measure_snapshot_budget.py` (defaults: 50 pairs, 50 triples, about 8 minutes for 50 rows). The real numbers go in a new entry.
+  - Whether FOR_DELETION rows (visible in the app) should be searchable by the assistant. CLAUDE.md says PUBLISHED only.
+  - Whether Spring strips HTML before cutting the excerpt (the contract says only "truncated").
+  - The 2+-result finding means the 200 budget sends most multi-result questions to the fallback. Measurement only here; no prompt or contract change.
+
+---
+
 ## 2026-11-06: assistant-ts (on-device UAT flow), its Python reference and parity vectors
 
 - **Date:** 2026-11-06 (after the entry below; commits 16:51 +08:00, entry about 16:55)
