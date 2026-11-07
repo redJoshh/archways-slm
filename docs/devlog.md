@@ -19,6 +19,65 @@ Template:
 
 ---
 
+## 2026-11-07: and_v3 scored (replay and cold runs); it replaces and_v2
+
+- **Date:** 2026-11-07 (late evening, +08:00)
+- **Decision (user, 2026-11-07):**
+  - The flow labels are confirmed as proposed: q01 18, q02 57, q03 50, q04 39, q05 28+8, q06 44+21+29, q07 7 (9 two-part, not counted), q08 56, q09 53, q10 trap.
+  - Run the replay, then the cold runs, and apply "nothing gets worse" mechanically.
+- **1. Retrieval replay** (saved and_v2 queries, no model calls; one-off scratch script, not committed):
+  - Probe definitions: a hit means all `source_ids` were retrieved (for none, nothing retrieved). Traps are the `expects_not_found` cases, counted separately. Out-of-scope cases are not scored.
+  - and_v2 reproduced every saved result in all four runs.
+
+  | | qwen3:0.6b e2e | qwen3:0.6b Taglish | gemma3:1b e2e | gemma3:1b Taglish |
+  |---|---|---|---|---|
+  | Answerable hit, and_v2 → and_v3 | 22/24 → 22/24 | 5/6 → 5/6 | 23/24 → 23/24 | 5/6 → 5/6 |
+  | Traps clean | 8/10 → 8/10 | 2/3 → 2/3 | 10/10 → 10/10 | 2/3 → 2/3 |
+  | Results changed | none | none | none | none |
+
+  - **Flow questions** (the snapshot, the bundle's instant, the queries qwen3:0.6b wrote cold):
+    - Questions hit: 8/10 → **9/10**.
+    - Labelled rows: 9/12 → **11/12**.
+    - q06 retrieves `44, 21, 29, 24` instead of `44`. Id 24 is an unlabelled row with "uniform" as a whole word; it is not counted either way.
+    - q01 is still a miss: the query `office` gives 59, 58, 57, 56, 54, not 18.
+    - q07's two-part id 9 is still not found, and not counted.
+    - The q10 trap is clean under both.
+- **2. Cold runs** (probe defaults: answer v1, query v1, `num_gpu` 0, `keep_alive` 0, `num_ctx` 4096; Ollama 0.40.15, commit `23d9af2` clean). Both matchers were run now, because the saved and_v2 runs were on Ollama 0.40.13. Files are `runs/{e2e34,taglish10}_{qwen3_0_6b,gemma3_1b}_cold_{and_v2,and_v3}_ollama0_40_15.txt`.
+
+  | and_v2 → and_v3 | qwen3:0.6b e2e | qwen3:0.6b Taglish | gemma3:1b e2e | gemma3:1b Taglish |
+  |---|---|---|---|---|
+  | Failed after guards | 6 → 6 | 3 → 3 | 5 → 5 | 3 → 3 |
+  | Unsafe before / after | 0/0 → 0/0 | 0/0 → 0/0 | 3/1 → 3/1 | 2/2 → 2/2 |
+  | Unhelpful before / after | 6/6 → 6/6 | 3/3 → 3/3 | 2/4 → 2/4 | 2/2 → 2/2 |
+  | Retrieval hit | 30/34 → 30/34 | 7/9 → 7/9 | 33/34 → 33/34 | 7/9 → 7/9 |
+
+  - The and_v2 and and_v3 runs are **identical line for line**: every query, result, reply and score (timings removed).
+  - **Against the saved 0.40.13 and_v2 runs:**
+    - Identical for qwen3:0.6b (e2e, Taglish) and for gemma3:1b Taglish.
+    - gemma3:1b e2e has 3 reply texts that differ (e2e-004, e2e-025, e2e-026), with the same scores. That is an Ollama-version effect, not the matcher.
+  - **Flow questions, cold answer calls** (qwen3:0.6b, answer v1; path from `assistant.flow()` with `case_tokens` 0, so the budget never decides; one-off scratch script):
+    - and_v2: 5 `answer`, 4 `answer_not_found`, 1 `not_found`.
+    - and_v3: **6 `answer`**, 3 `answer_not_found`, 1 `not_found`. q06 now answers (prompt 803, 46 generated tokens) instead of the not-found sentence.
+    - Unchanged: q05, q07, q09 `answer_not_found`; q10 `not_found`.
+    - Not scored: there is no scorer for the user's expected answers. q01's answer is built on rows that are not its label. q04 generated 59 tokens, over `GEN_TOKENS` (51).
+- **3. Rule, applied mechanically:** nothing got worse on failures, unsafe, unhelpful, retrieval hits or traps, for either model, on e2e or Taglish, or on flow retrieval. **`and_v3` replaces `and_v2`.**
+- **What changed:**
+  - **`b4584dd` (`feat:`):**
+    - `DEFAULT_MATCHER = "and_v3"`.
+    - The probe accepts and documents `and_v3`. Answer v2 is allowed with it, since results are newest first.
+    - `export_flow_test.py` uses `and_v3`. The default-matcher tests are updated.
+  - **`768cacd` (`docs:`):**
+    - `docs/how-it-works.md` gets "Search contract version 3". Spring implements v3 directly, with the same synonym file, the rule, `~* '\m…\M'` and the v3 vectors. The v2 section is marked superseded, not deleted, and the folder map gets a v3 vector row.
+    - ADR 0004's UAT matcher line is marked amended.
+  - **Test app data:** `local-data/flow_test.json` (gitignored) re-exported under `and_v3`, Ollama 0.40.15, commit `768cacd`. Every query is the same as before; only q06's results changed. The test app needs no code change, only a Metro reload.
+- **How it was verified:** `uv run pytest -q` → `1162 passed, 2 skipped`; `uv run ruff check .` → `All checks passed!`.
+- **Commits:** `b4584dd`, `768cacd`, this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - A phone rerun of the flow test with the new flow and the and_v3 data.
+  - q01 (query `office`) and q07 (two-part) are query-side misses, not matcher misses.
+
+---
+
 ## 2026-11-07: and_v3 (whole-word plural alternative): rule, vectors and matcher, before any run
 
 - **Date:** 2026-11-07 (late evening, +08:00)
