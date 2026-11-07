@@ -19,6 +19,64 @@ Template:
 
 ---
 
+## 2026-11-07: and_v3 (whole-word plural alternative): rule, vectors and matcher, before any run
+
+- **Date:** 2026-11-07 (late evening, +08:00)
+- **Decisions (user, 2026-11-07; plan approved with one change):**
+  - **The plural alternative matches only as a WHOLE WORD.** The original word and the synonyms keep and_v2's substring matching.
+  - **The flow-test questions are now a labelled dev set, not held-out.** They are `data/local/flow_test_questions.json`, gitignored because the expected answers name real announcements. They may be used for comparisons like e2e and Taglish, and are never copied into prompts or training data.
+  - **q07 is a two-part question.** Id 9 (the weather suspension) is not reachable from a single "remote work" query, so that miss is not counted against the matcher.
+  - Flow labels are to be proposed, then confirmed by the user **before** the replay.
+- **What changed:**
+  - **`930af0f` (`docs:`), committed before the code and before any run:**
+    - The rule, in the `fakebackend` docstring:
+      - **Eligible:** a query word (lowercased, whitespace-split, after stopwords) of 5+ code points that ends in "s" but not "ss", "us" or "is".
+      - **Alternative:** the word minus the "s". It is added only if it starts and ends with a word character (`_`, Unicode L*, Nd); this matches Postgres `\m…\M`.
+      - **Matching:** the alternative matches as a whole word; the word and its synonyms match as substrings.
+      - **Spring:** `title ~* ? OR body ~* ?` with `'\m' + stem + '\M'`, ASCII punctuation backslash-escaped. Postgres word characters follow its locale, so non-ASCII letters and digits are a documented gap, untested.
+    - `tests/vectors/search_vectors_and_v3.json`: the and_v2 rows plus p-01 to p-09, and 14 vectors with ids and patterns, written by hand. They include:
+      - "forms" not matching "information", "uniform", "platform", "form_id" or "form2"
+      - "uniforms" matching "uniform"
+      - "exams" not matching "example"
+      - the ss/us/is exclusions, 4 characters, exactly 5, "staff's", synonym plus plural, and "x-rays" escaping
+  - **`50b6a6d` (`feat:`):** `and_v3` in `fakebackend` (`plural_alternative()`, `whole_word_in()`, `word_regex()`, `plural_groups()`).
+    - It passes the hand-written vectors unchanged, and every and_v2 vector without an eligible word gives the same ids.
+    - Not the default.
+- **Proposed flow labels** (expected rows found by each answer's own text in the snapshot, not by a matcher; waiting for the user's confirmation):
+
+  | Question | Proposed label | How it was found |
+  |---|---|---|
+  | q01 | 18 | the Annual University Outing suspension: the only row with "outing" and "suspen", and the only row with "May 14, 2027" (48 mentions "outing" without the suspension) |
+  | q02 | 57 | the only row with "Lumina in Aeternum" and the only one with "415th" |
+  | q03 | 50 | the only row with "water", "interruption" and "Main Building" (it also has "5:00 PM") |
+  | q04 | 39 | the only row with "1.750" and the only one with "Dean's List" |
+  | q05 | 28 and 8 | the only two titles with "Paskuhan 2026" |
+  | q06 | 44, 21 and 29 | the three titles in the expected answer, one row each |
+  | q07 | 7 (counted); 9 (two-part, not counted) | the two titles in the expected answer |
+  | q08 | 56 | the only row with "Verde UST" and the only one with "styrofoam" |
+  | q09 | 53 | the only row with "October 25" (it also has "permission") |
+  | q10 | none (trap) | no row has "halloween" or "costume" |
+
+- **How it was verified:**
+  - `uv run pytest -q` → `1162 passed, 2 skipped` (the skips are the two and_v2 vectors whose queries have eligible words); `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `53 files already formatted`.
+  - Mutation checks on `and_v3`, each reverted, all caught (failures in `tests/test_fakebackend.py`):
+
+    | Change | Failed |
+    |---|---|
+    | Substring instead of whole word | 2 |
+    | No us/is exclusion | 2 |
+    | 4+ characters | 1 |
+    | No boundary after | 4 |
+    | `_` not a word character | 2 |
+
+- **Commits:** `930af0f`, `50b6a6d`, this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The user confirms the flow labels.
+  - Then the retrieval replay (saved and_v2 queries of both models, e2e, Taglish, and the 10 flow questions on the snapshot), then the cold runs.
+  - The rule: and_v3 replaces and_v2 only if nothing gets worse. If adopted, Spring implements contract v3 directly.
+
+---
+
 ## 2026-11-07: results list on every path with results, short replies add up for the speed
 
 - **Date:** 2026-11-07 (evening, +08:00)
