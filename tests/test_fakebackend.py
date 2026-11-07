@@ -15,10 +15,14 @@ from archways_assistant.fakebackend import (
     SYNONYMS,
     InvalidArguments,
     ilike_pattern,
+    plural_alternative,
+    plural_groups,
     prefix_stems,
     query_words,
     search_announcements,
     synonym_groups,
+    whole_word_in,
+    word_regex,
 )
 from archways_assistant.tooldef import SCHEMA_PATH
 
@@ -271,3 +275,75 @@ def test_and_v2_matches_and_v1_without_mapped_words(vector):
         return
     got = run_and_v2(vector["arguments"], rows=VECTORS["rows"])
     assert [r["id"] for r in got] == vector["expected_ids"]
+
+
+# and_v3 matcher (tests/vectors/search_vectors_and_v3.json, written by hand
+# before the code).
+
+VECTORS_AND_V3 = json.loads(
+    (ROOT / "tests" / "vectors" / "search_vectors_and_v3.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+def run_and_v3(arguments, rows=None):
+    return search_announcements(
+        VECTORS_AND_V3["rows"] if rows is None else rows,
+        arguments,
+        datetime.fromisoformat(VECTORS_AND_V3["now"]),
+        CONTRACT,
+        matcher="and_v3",
+    )
+
+
+@pytest.mark.parametrize("vector", VECTORS_AND_V3["vectors"], ids=lambda v: v["name"])
+def test_search_vector_and_v3(vector):
+    assert [r["id"] for r in run_and_v3(vector["arguments"])] == vector["expected_ids"]
+    groups = plural_groups(vector["arguments"]["query"])
+    assert [
+        {
+            "ilike": [ilike_pattern(alt) for alt in subs],
+            "word_regex": [word_regex(stem) for stem in stems],
+        }
+        for subs, stems in groups
+    ] == vector["expected_patterns"]
+
+
+def test_and_v3_vectors_share_the_and_v2_rows_and_stopwords():
+    assert VECTORS_AND_V3["matcher"] == "and_v3"
+    assert VECTORS_AND_V3["synonyms_file"] == VECTORS_AND_V2["synonyms_file"]
+    assert VECTORS_AND_V3["stopwords"] == VECTORS_AND_V2["stopwords"]
+    assert (
+        VECTORS_AND_V3["rows"][: len(VECTORS_AND_V2["rows"])] == VECTORS_AND_V2["rows"]
+    )
+
+
+@pytest.mark.parametrize("vector", VECTORS_AND_V2["vectors"], ids=lambda v: v["name"])
+def test_and_v3_matches_and_v2_without_eligible_words(vector):
+    words = [group[0] for group in synonym_groups(vector["arguments"]["query"])]
+    if any(plural_alternative(word) for word in words):
+        pytest.skip("has a word with a plural alternative")
+    got = run_and_v3(vector["arguments"], rows=VECTORS_AND_V2["rows"])
+    assert [r["id"] for r in got] == vector["expected_ids"]
+
+
+def test_and_v3_required_cases():
+    """The user's required cases (2026-11-07), on their own."""
+    for text in ("information", "uniform", "platform", "form_id", "form2", "forms"):
+        assert not whole_word_in("form", text), text
+    for text in ("form", "drop form.", "(form)", "form-based", "a form, b"):
+        assert whole_word_in("form", text), text
+    assert whole_word_in("uniform", "wear the uniform")
+    assert not whole_word_in("exam", "an example")
+    assert whole_word_in("exam", "the exam starts")
+
+
+def test_and_v3_word_characters_are_unicode_letters_digits_and_underscore():
+    # A documented gap: Postgres decides by its locale; untested there.
+    assert not whole_word_in("form", "formñ")
+    assert not whole_word_in("form", "form٣")  # Arabic-Indic digit 3 (Nd)
+    assert whole_word_in("form", "form²")  # superscript two is No, not Nd
+    assert plural_alternative("x-rays") == "x-ray"
+    assert plural_alternative("(forms") is None
+    assert plural_alternative("staff's") is None

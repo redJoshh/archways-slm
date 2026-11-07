@@ -75,6 +75,8 @@ I/O and no clock; `now` is always passed in.
 import json
 import math
 import re
+import string
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -137,7 +139,7 @@ SYNONYMS_PATH = (
 _SYNONYM_MAP = json.loads(SYNONYMS_PATH.read_text(encoding="utf-8"))
 SYNONYMS: dict[str, list[str]] = _SYNONYM_MAP["synonyms"]
 AND_V2_STOPWORDS = STOPWORDS | frozenset(_SYNONYM_MAP["extra_stopwords"])
-MATCHERS = ("and_v1", "prefix_v2", "and_v2")
+MATCHERS = ("and_v1", "prefix_v2", "and_v2", "and_v3")
 # and_v2 replaced and_v1 on 2026-10-31 (devlog); and_v1 stays for comparisons.
 DEFAULT_MATCHER = "and_v2"
 # prefix_v2: words this long or longer are cut to their first STEM_CHARS.
@@ -158,6 +160,49 @@ def ilike_pattern(word: str) -> str:
 
 def query_words(query: str) -> list[str]:
     return [word for word in query.lower().split() if word not in STOPWORDS]
+
+
+def is_word_char(ch: str) -> bool:
+    """and_v3 word character: "_", a Unicode letter (L*) or a decimal digit (Nd)."""
+    category = unicodedata.category(ch)
+    return ch == "_" or category.startswith("L") or category == "Nd"
+
+
+def plural_alternative(word: str) -> str | None:
+    """and_v3: the word without its trailing "s" if eligible, else None."""
+    if len(word) < 5 or not word.endswith("s") or word.endswith(("ss", "us", "is")):
+        return None
+    stem = word[:-1]
+    if not (is_word_char(stem[0]) and is_word_char(stem[-1])):
+        return None
+    return stem
+
+
+def whole_word_in(stem: str, text: str) -> bool:
+    """Whether stem occurs in text with no word character just before or after."""
+    start = text.find(stem)
+    while start != -1:
+        end = start + len(stem)
+        before = start == 0 or not is_word_char(text[start - 1])
+        after = end == len(text) or not is_word_char(text[end])
+        if before and after:
+            return True
+        start = text.find(stem, start + 1)
+    return False
+
+
+def word_regex(stem: str) -> str:
+    """The Postgres ARE Spring binds for ~* (and_v3 plural alternative)."""
+    escaped = "".join("\\" + ch if ch in string.punctuation else ch for ch in stem)
+    return r"\m" + escaped + r"\M"
+
+
+def plural_groups(query: str) -> list[tuple[list[str], list[str]]]:
+    """and_v3 groups: (word and its synonyms, [plural alternative] or [])."""
+    return [
+        (group, [] if (stem := plural_alternative(group[0])) is None else [stem])
+        for group in synonym_groups(query)
+    ]
 
 
 def synonym_groups(query: str) -> list[list[str]]:
@@ -243,6 +288,8 @@ def search_announcements(
         words = query_words(arguments["query"])
     elif matcher == "and_v2":
         words = synonym_groups(arguments["query"])
+    elif matcher == "and_v3":
+        words = plural_groups(arguments["query"])
     else:
         words = prefix_stems(arguments["query"])
     if not words:
@@ -261,6 +308,14 @@ def search_announcements(
             title, body = row["title"].lower(), row["body"].lower()
             if all(
                 any(alt in title or alt in body for alt in group) for group in words
+            ):
+                matches.append((0, row))
+        elif matcher == "and_v3":
+            title, body = row["title"].lower(), row["body"].lower()
+            if all(
+                any(alt in title or alt in body for alt in subs)
+                or any(whole_word_in(s, title) or whole_word_in(s, body) for s in stems)
+                for subs, stems in words
             ):
                 matches.append((0, row))
         else:
