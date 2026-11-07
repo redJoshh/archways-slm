@@ -153,6 +153,36 @@ Dev-set effect, from the qwen3:0.6b v1 `and_v1` baseline: 4 of 20 answer calls h
   - The prediction error on other phones.
 - **Amended 2026-11-07:** "until an answer call reports timings" under "Speed unknown" now means until answer calls have reported at least 10 generated tokens in total. See "Results list and short replies" below.
 
+#### Each call kind predicted from its own speed (user decision, 2026-11-07)
+
+- **Where it came from: a test run.** In the Redmi 10C flow test of 2026-11-07, with Prime pressed:
+  - Answer priming measured 27.1 prompt tokens/s. Query priming measured 23.8 prompt tokens/s and 14.2 generated tokens/s (the measuring call).
+  - `speedFromPriming()` folded the reports in order, so the last call (query) set the prompt rate used to predict **answer** calls.
+  - q03 (203 tokens, 2 980 ms elapsed), q07 (200, 2 675) and q09 (199, 3 141) were predicted at 15.6, 15.2 and 15.6 s and fell back.
+- **The change:**
+  - The answer call is predicted with the answer call's own prompt rate: answer priming, then answer calls.
+  - The query call's speed is kept separately (query priming, then query calls). The budget never reads it, because the query call is already measured by the time the budget is decided.
+  - The generation rate comes from answer priming if that call measured one, otherwise from the measuring query priming call; then answer calls update it.
+  - **`GEN_TOKENS` stays 51 (p90). The 15 s bar, the formula and every constant are unchanged.**
+- **Replay with the answer prompt rate (27.1) and the generation rate 14.2:**
+
+  | Question | Case tokens | Elapsed | Old prediction (23.8) | New prediction | New path |
+  |---|---|---|---|---|---|
+  | q03 | 203 | 2 980 ms | 15 601 ms | 14 562 ms | answer |
+  | q07 | 200 | 2 675 ms | 15 170 ms | 14 147 ms | answer |
+  | q09 | 199 | 3 141 ms | 15 594 ms | 14 576 ms | answer |
+  | q02 | 254 | 2 667 ms | 17 431 ms | 16 131 ms | budget fallback |
+
+- **Why it is principled, not tuned:**
+  - The prediction is for the answer call, so it should use a rate measured on the answer call. Before, it used whichever priming call happened to run last.
+  - The change moves no threshold and fits no constant to the run. It only stops one call's measurement from standing in for another's.
+  - It would have been the right rule before the run. The run is what showed the old fold mixed the two.
+  - **Honesty note:** written after seeing the run, which turns these three fallbacks into answers. Gate 1 is unchanged and still FAIL (e2e-009).
+- **Caveats:**
+  - The generation rate usually still comes from the **query** priming call, the only measuring call. Answer replies generated at 10.4–12.8 tokens/s on the Redmi, against 14.2 here, so the generation part of the prediction may be optimistic until answer calls update it. A reply of 51 tokens at 12.7 instead of 14.2 adds about 0.4 s.
+  - **Open:** making answer priming the measuring call instead.
+  - If the first priming call after model load is slow (about 9 tokens/s on 2026-10-31), the answer prompt rate is now pessimistic until answer calls update it. That falls back more, never less.
+
 #### Results list and short replies (user decision, 2026-11-07)
 
 - **Evidence: the Redmi 10C flow test of 2026-11-07** (devlog). The real assistant-ts and guard-ts ran on the phone's Hermes, with the parity vectors passing, on 10 test questions against the real snapshot.

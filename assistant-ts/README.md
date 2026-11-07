@@ -18,7 +18,7 @@ question -> query call -> search (Spring) -> budget check -> answer call -> guar
 
 ```ts
 import {
-  askAssistant, makeComplete, primeSessions, speedFromPriming, speedState,
+  askAssistant, makeComplete, primeSessions, querySpeedState, speedsFromPriming, speedState,
 } from "./assistant-ts/src/index.ts";
 
 const settings = {
@@ -46,7 +46,9 @@ const llama = {
 
 // On app start, and when the app returns to the foreground on a new Manila day:
 const reports = await primeSessions(llama, settings, Date.now());   // about 30 s on the Redmi 10C
-const speed = speedState(speedFromPriming(reports));   // in memory only; null if nothing was primed
+const speeds = speedsFromPriming(reports);             // { answer, query }; both null if nothing was primed
+const speed = speedState(speeds.answer);                // in memory only; the budget reads this one
+const querySpeed = querySpeedState(speeds.query);       // query calls only; the budget never reads it
 
 const result = await askAssistant(question, {
   nowMs: Date.now,
@@ -54,6 +56,7 @@ const result = await askAssistant(question, {
   search: (args) => api.post("/…/search_announcements", args).then((r) => r.data),  // Spring; path TBD
   countTokens: llama.countTokens,
   speed,
+  querySpeed,
   log: (entry) => uatLog.append(entry),   // REQUIRED for UAT, see "The UAT log"
 });
 show(result.text);   // only result.text, never log the question or any text
@@ -100,7 +103,13 @@ predicted = elapsed (query call, search, counting; measured)
 
 - **`GEN_TOKENS` = 51:** the nearest-rank p90 of answer-reply tokens. It comes from 29 dev answer calls with the UAT prompts on Ollama (min 10, median 26, max 53; `scripts/measure_reply_tokens.py`). The phone replies were 37 and 41 tokens. A reply over 51 tokens overruns the prediction by about (extra tokens ÷ 10) s on the Redmi.
 - **Speed:**
-  - **From priming:** `primeSessions()` runs its last priming call with `MEASURE_TOKENS` (16) generated tokens, `ignore_eos` and no stop strings. `speedFromPriming()` folds the reports in order, so the last call's rates win.
+  - **From priming:** `primeSessions()` runs its last priming call with `MEASURE_TOKENS` (16) generated tokens, `ignore_eos` and no stop strings.
+  - **Each call kind has its own speed** (`speedsFromPriming()`, 2026-11-07):
+    - The **answer** speed, which the budget uses, takes its prompt rate only from answer priming and then answer calls.
+    - Its generation rate comes from answer priming if that call measured one; otherwise from the measuring query priming call.
+    - The **query** speed takes query priming, then query calls (`querySpeedState`). The budget never reads it.
+    - Why: on the Redmi (2026-11-07), answer priming measured 27.1 prompt tokens/s and query priming 23.8. The old fold let the last call (query) set the answer rate, and three questions fell back that are predicted under 15 s with the answer rate.
+    - `speedFromPriming()` still returns the answer speed.
   - **From answer calls:** each answer call's llama.rn timings update the speed (`speedState().update`, which runs `updateAnswerSpeed()`). Query calls never do, because their short replies generate faster (14.6 against 10.4 tokens/s on the Redmi).
   - **Short answer replies add up:** a reply of fewer than 10 generated tokens (the not-found sentence is 8) adds its `predicted_n` and `predicted_ms` to a running total. At 10 tokens the total becomes the generation rate (total tokens × 1000 ÷ total ms, if accepted) and resets. A reply whose own rate is accepted sets the rate and resets the total. Priming never adds to it. On the Redmi (2026-11-07), the three 8-token not-found replies generated at 12.7–12.8 tokens/s, in line with longer answers (10.4–12.8).
   - **Accepted rates:** a finite number in 1–1000 tokens/s, from at least 100 prompt or 10 generated tokens.
@@ -214,7 +223,7 @@ uv run python scripts/export_assistant_vectors.py   # after a reference change; 
   - Completion: a raw `prompt`; `temperature: 0`, `stop: ["<|im_end|>", "<|im_start|>"]`.
     - The Gate 1 app set only `temperature: 0`. Adding `top_k: 1`, `top_p: 1` and `seed: 42` (as in the evaluation) is a proposal; whether it changes phone replies is unverified.
   - No JSON grammar in UAT: none was used on the phone, and Ollama gave the same e2e-009 query reply with or without the schema.
-- **Priming:** on first use each Manila day, with a progress message (about 30 s, apart from model load: 1.0–2.5 s measured). Keep `speedState(speedFromPriming(reports))` in memory and pass it to every `askAssistant()`.
+- **Priming:** on first use each Manila day, with a progress message (about 30 s, apart from model load: 1.0–2.5 s measured). Keep `speedState(speedsFromPriming(reports).answer)` and `querySpeedState(speedsFromPriming(reports).query)` in memory and pass both to every `askAssistant()`.
 - **Timeouts:** don't add an app timeout under 15 s around `askAssistant()`. The budget already decides when to skip the model.
 - **The UAT log:** keep every `deps.log` entry (above).
 - **One context, kept loaded.** With `use_mmap`, the app survived being swapped out and still answered (Gate 1, development build).
