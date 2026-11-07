@@ -63,17 +63,18 @@ show(result.text);   // only result.text, never log the question or any text
 
 | `path` | When | Text shown |
 |---|---|---|
-| `answer` | The guard passed the reply | The reply (ASCII whitespace trimmed) |
-| `guard_fired` | The guard rejected the reply | The guard's fallback (titles and posted dates) |
-| `budget_fallback` | Over budget (below): **no answer call** | `fallback(results)` |
-| `answer_error` | Token counting, the answer call or the guard threw | `fallback(results)` |
+| `answer` | The guard passed the reply | The reply (ASCII whitespace trimmed), a blank line, then the results list |
+| `answer_not_found` | The reply is exactly `NOT_FOUND_MESSAGE` (after the ASCII trim) although results exist | The results list |
+| `guard_fired` | The guard rejected the reply | The results list |
+| `budget_fallback` | Over budget (below): **no answer call** | The results list |
+| `answer_error` | Token counting, the answer call or the guard threw | The results list |
 | `not_found` | Valid search, no results: no answer call | `NOT_FOUND_MESSAGE` |
 | `query_invalid` | The query reply isn't valid search arguments | `LAST_RESORT_MESSAGE` |
 | `query_error` | The query call threw | `LAST_RESORT_MESSAGE` |
 | `search_error` | The search threw, or broke the result contract | `LAST_RESORT_MESSAGE` |
 | `question_invalid` | Empty, whitespace-only, over 500 code points, or lone surrogates | `LAST_RESORT_MESSAGE` |
 
-If `fallback()` itself fails, the text is `LAST_RESORT_MESSAGE`. Put the timeout in `complete`/`search` (reject on timeout); the flow falls back as above.
+**The results list** (`resultsList()`): `These announcements may help:`, then one line per result with its title and posted date (guard-ts `fallback()`'s lines). Every path with results ends with it (ADR 0004, UAT configuration, 2026-11-07): on the Redmi on 2026-11-07, all 3 answers were the not-found sentence although a result was retrieved. The model's text is shown only on the `answer` path, above the list. If the list can't be built, the text is `LAST_RESORT_MESSAGE`. Put the timeout in `complete`/`search` (reject on timeout); the flow falls back as above.
 
 **Decision to confirm:** an invalid query reply shows `LAST_RESORT_MESSAGE`, not the not-found message. The probe scores it as not found, but "not found" would be untrue when the model failed. qwen3:0.6b had 0/34 invalid on dev.
 
@@ -100,9 +101,10 @@ predicted = elapsed (query call, search, counting; measured)
 - **`GEN_TOKENS` = 51:** the nearest-rank p90 of answer-reply tokens. It comes from 29 dev answer calls with the UAT prompts on Ollama (min 10, median 26, max 53; `scripts/measure_reply_tokens.py`). The phone replies were 37 and 41 tokens. A reply over 51 tokens overruns the prediction by about (extra tokens ÷ 10) s on the Redmi.
 - **Speed:**
   - **From priming:** `primeSessions()` runs its last priming call with `MEASURE_TOKENS` (16) generated tokens, `ignore_eos` and no stop strings. `speedFromPriming()` folds the reports in order, so the last call's rates win.
-  - **From answer calls:** each answer call's llama.rn timings update the speed. Query calls never do, because their short replies generate faster (14.6 against 10.4 tokens/s on the Redmi).
+  - **From answer calls:** each answer call's llama.rn timings update the speed (`speedState().update`, which runs `updateAnswerSpeed()`). Query calls never do, because their short replies generate faster (14.6 against 10.4 tokens/s on the Redmi).
+  - **Short answer replies add up:** a reply of fewer than 10 generated tokens (the not-found sentence is 8) adds its `predicted_n` and `predicted_ms` to a running total. At 10 tokens the total becomes the generation rate (total tokens × 1000 ÷ total ms, if accepted) and resets. A reply whose own rate is accepted sets the rate and resets the total. Priming never adds to it. On the Redmi (2026-11-07), the three 8-token not-found replies generated at 12.7–12.8 tokens/s, in line with longer answers (10.4–12.8).
   - **Accepted rates:** a finite number in 1–1000 tokens/s, from at least 100 prompt or 10 generated tokens.
-- **Speed unknown:** the speed is never saved. After an app restart with existing session files, nothing is primed, so the 200-token rule applies until the first answer call reports timings. The same happens if llama.rn reports no timings.
+- **Speed unknown:** the speed is never saved. After an app restart with existing session files, nothing is primed, so the 200-token rule applies until answer calls have reported at least 10 generated tokens in total. The same happens if llama.rn reports no timings.
 - **Replay of the 2026-10-31 Redmi runs** (28 and 10.4 tokens/s): e2e-009 is predicted at 21.7 s (measured 20.2 s) and falls back; e2e-004 is predicted at 13.9 s (measured 11.9 s) and answers.
 
 ### The UAT log (the app must keep it)

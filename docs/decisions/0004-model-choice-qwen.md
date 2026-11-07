@@ -151,6 +151,27 @@ Dev-set effect, from the qwen3:0.6b v1 `and_v1` baseline: 4 of 20 answer calls h
   - The first priming call after model load measured about 9 prompt tokens/s against about 28 for the second (2026-10-31). The likely cause is the model being read in after load; this is not confirmed. The rule takes the last priming call's rate, so the slow first call does not set the speed when both run.
   - `ignore_eos` for the measuring priming call has not been tried on the phone.
   - The prediction error on other phones.
+- **Amended 2026-11-07:** "until an answer call reports timings" under "Speed unknown" now means until answer calls have reported at least 10 generated tokens in total. See "Results list and short replies" below.
+
+#### Results list and short replies (user decision, 2026-11-07)
+
+- **Evidence: the Redmi 10C flow test of 2026-11-07** (devlog). The real assistant-ts and guard-ts ran on the phone's Hermes, with the parity vectors passing, on 10 test questions against the real snapshot.
+  - All 3 answer calls replied with the not-found sentence although a result was retrieved (q06, q07, q09).
+  - On Ollama, cold, with the same results, the same sentence came back 3 of 3.
+  - In each case the needed fact was inside the excerpt the model saw, with no HTML tags or entities left. So the untuned model misses facts that are present.
+- **Results list on every path with results:**
+  - The text ends with `These announcements may help:` and one line per result (title and posted date).
+  - On the `answer` path, the guarded reply goes above the list.
+  - On `guard_fired`, `budget_fallback` and `answer_error`, the list is the whole text. This replaces the old `I found these announcements:` fallback text.
+  - The guard and its fallback function are unchanged.
+- **New path `answer_not_found`:** the reply is exactly the not-found sentence after the ASCII trim, although results exist. The list is shown instead of "not found".
+  - An exact match, because the prompt asks for only that sentence and all 6 observed replies (3 on the phone, 3 on Ollama) were exact.
+  - `not_found` (no results) is unchanged.
+- **Short answer replies add up for the speed:**
+  - A generated rate needs at least 10 tokens. The 8-token not-found sentence never qualified, and the tokens rule sent most other questions to the fallback before any answer call, so the speed could stay unknown until the next priming.
+  - Now answer replies under 10 tokens add their tokens and ms to a running total, and at 10 tokens the total becomes the rate. Answer calls only; priming is unchanged.
+  - The phone's 8-token replies generated at 12.7–12.8 tokens/s, in line with longer answers (10.4–12.8).
+- **Gate 1 is unchanged.** These are UAT product settings: the list is built from data, not by the model. Dev eval scoring still scores the model's reply.
 
 ## Caveats
 
