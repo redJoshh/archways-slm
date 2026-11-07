@@ -12,7 +12,15 @@ export type {
   StepInput,
   Trace,
 } from "./flow.ts";
-export { decideBudget, predictMs, speedKnown, speedState, updateAnswerSpeed, updateSpeed } from "./budget.ts";
+export {
+  decideBudget,
+  predictMs,
+  querySpeedState,
+  speedKnown,
+  speedState,
+  updateAnswerSpeed,
+  updateSpeed,
+} from "./budget.ts";
 export type { Budget, BudgetRule, KnownSpeed, Pending, Speed, SpeedState } from "./budget.ts";
 export { checkArguments, checkQuestion, checkResults, parseQueryReply } from "./contract.ts";
 export type { SearchArguments } from "./contract.ts";
@@ -36,6 +44,7 @@ export {
   sessionFile,
   sessionPrefix,
   speedFromPriming,
+  speedsFromPriming,
 } from "./session.ts";
 export type { Kind, LlamaAdapter, PrimeReport, SessionSettings } from "./session.ts";
 export {

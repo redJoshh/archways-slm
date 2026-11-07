@@ -12,6 +12,7 @@ import {
   sessionFile,
   sessionPrefix,
   speedFromPriming,
+  speedsFromPriming,
   type LlamaAdapter,
   type SessionSettings,
 } from "../src/session.ts";
@@ -111,15 +112,19 @@ test("primeSessions saves both prefixes once, with their own token counts", asyn
   assert.equal((await primeSessions(llama, SETTINGS, SATURDAY_MIDNIGHT)).length, 2);
 });
 
-test("speedFromPriming takes the last priming call's rates", async () => {
+test("priming: the answer prompt rate comes only from answer priming", async () => {
   const llama = fakeLlama();
   const reports = await primeSessions(llama, SETTINGS, FRIDAY);
-  // The fake reports 9 prompt tokens/s for the first call (like the Redmi's
-  // first call after load) and 28 for the measuring one.
-  assert.deepEqual(speedFromPriming(reports), { promptTps: 28, genTps: 10.4 });
+  // The fake reports 9 prompt tokens/s for the first call (answer, like the
+  // Redmi's first call after load on 2026-10-31) and 28 for the measuring
+  // query call. The answer prompt rate is the answer call's own (9); the
+  // generation rate comes from the measuring call.
+  assert.deepEqual(speedFromPriming(reports), { promptTps: 9, genTps: 10.4 });
+  assert.deepEqual(speedsFromPriming(reports).query, { promptTps: 28, genTps: 10.4 });
   // Files already there (an app restart): nothing primed, speed unknown.
   const again = await primeSessions(llama, SETTINGS, FRIDAY);
   assert.equal(speedFromPriming(again), null);
+  assert.deepEqual(speedsFromPriming(again), { answer: null, query: null });
 });
 
 test("when only one kind needs priming, that call measures", async () => {

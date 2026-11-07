@@ -389,6 +389,37 @@ def update_speed(speed: Speed | None, timings) -> Speed:
     return Speed(prompt, gen)
 
 
+def speeds_from_priming(reports) -> tuple[Speed | None, Speed | None]:
+    """(answer speed, query speed) from priming reports, in priming order.
+
+    reports: (kind, timings) pairs, kind "answer" or "query". Each call kind
+    is predicted from its own measurements (ADR 0004, 2026-11-07):
+    - The answer speed folds the answer priming reports only (update_speed,
+      so the last accepted rate wins). Query priming never sets its prompt
+      rate. If answer priming measured no generation rate (it generates one
+      token unless it was the measuring call), the query speed's generation
+      rate is used: the one MEASURE_TOKENS call is the only generation
+      measurement priming makes. Answer calls update the answer speed later.
+    - The query speed folds the query priming reports only. The budget never
+      reads it (the query call is measured, not predicted).
+    The answer speed is None if no report at all was given; the query speed
+    is None if no query report was given.
+    """
+    answer = None
+    query = None
+    for kind, timings in reports:
+        if kind == "answer":
+            answer = update_speed(answer, timings)
+        else:
+            query = update_speed(query, timings)
+    if not reports:
+        return None, None
+    answer = answer or Speed()
+    if answer.gen_tps is None and query is not None and query.gen_tps is not None:
+        answer = Speed(answer.prompt_tps, query.gen_tps)
+    return answer, query
+
+
 @dataclass(frozen=True)
 class Pending:
     """Generated tokens and ms of short answer replies, not yet a rate."""

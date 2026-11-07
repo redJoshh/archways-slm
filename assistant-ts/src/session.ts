@@ -30,7 +30,9 @@
  * This module never imports llama.rn: the app passes an adapter.
  */
 
-import { updateSpeed, type Speed } from "./budget.ts";
+import { speedsFromPriming, type Speed } from "./budget.ts";
+
+export { speedsFromPriming };
 import { ANSWER_PROMPT_SHA256, QUERY_PROMPT_SHA256 } from "./generated.ts";
 import type { Completion, ModelCall } from "./flow.ts";
 import { answerSystem, casePart, querySystem, systemTurn, todayText } from "./render.ts";
@@ -148,17 +150,9 @@ export async function primeSessions(
   return reports;
 }
 
-/**
- * The speed measured by priming, for budget.ts speedState(). null if
- * nothing was primed (files already existed, e.g. after an app restart):
- * the speed is never saved, so it stays unknown, and the 200-token rule
- * applies, until the first answer call reports timings.
- */
+/** The answer speed from priming, for budget.ts speedState(). */
 export function speedFromPriming(reports: PrimeReport[]): Speed | null {
-  if (reports.length === 0) return null;
-  let speed: Speed | null = null;
-  for (const report of reports) speed = updateSpeed(speed, report.timings);
-  return speed;
+  return speedsFromPriming(reports).answer;
 }
 
 /**

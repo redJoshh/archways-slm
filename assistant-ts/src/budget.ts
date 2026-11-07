@@ -173,6 +173,52 @@ export interface SpeedState {
   pending: () => Pending;
 }
 
+/**
+ * The answer and query speeds measured by priming (a port of
+ * speeds_from_priming()). Each call kind is predicted from its own
+ * measurements (ADR 0004, 2026-11-07):
+ * - answer: folds the answer priming reports only, so query priming never
+ *   sets the answer prompt rate. If answer priming measured no generation
+ *   rate, the query speed's is used (the one MEASURE_TOKENS call).
+ * - query: folds the query priming reports only. The budget never reads it.
+ * Both null if nothing was primed (files already existed, e.g. after an app
+ * restart): the speed is never saved, so the 200-token rule applies until
+ * answer calls report timings. query is null if no query report was given.
+ * Pure (session.ts re-exports it), so the Hermes CLI vectors can run it.
+ */
+export function speedsFromPriming(
+  reports: { kind: string; timings?: unknown }[],
+): { answer: Speed | null; query: Speed | null } {
+  let answer: Speed | null = null;
+  let query: Speed | null = null;
+  for (const report of reports) {
+    if (report.kind === "answer") answer = updateSpeed(answer, report.timings);
+    else query = updateSpeed(query, report.timings);
+  }
+  if (reports.length === 0) return { answer: null, query: null };
+  let answerOut: Speed = answer || { promptTps: null, genTps: null };
+  if (answerOut.genTps === null && query !== null && query.genTps !== null) {
+    answerOut = { promptTps: answerOut.promptTps, genTps: query.genTps };
+  }
+  return { answer: answerOut, query: query };
+}
+
+/**
+ * The query call's speed, in memory only: query priming, then query calls
+ * (updateSpeed, no running total). The budget never reads it; it is kept so
+ * that query measurements never reach the answer prediction.
+ */
+export function querySpeedState(initial?: Speed | null): SpeedState {
+  let current: Speed | null = initial || null;
+  return {
+    get: () => current,
+    update: (timings: unknown) => {
+      current = updateSpeed(current, timings);
+    },
+    pending: () => ({ n: 0, ms: 0 }),
+  };
+}
+
 export function speedState(initial?: Speed | null): SpeedState {
   let current: Speed | null = initial || null;
   let pending: Pending = { n: 0, ms: 0 };

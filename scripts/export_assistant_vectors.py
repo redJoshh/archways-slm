@@ -32,6 +32,7 @@ from archways_assistant.assistant import (
     Pending,
     Speed,
     flow,
+    speeds_from_priming,
     update_answer_speed,
     update_speed,
 )
@@ -455,6 +456,20 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
             Speed(1000.0, 1000.0),
         ),
     ]
+    # The Redmi flow test of 2026-11-07, replayed with the answer speed from
+    # speeds_from_priming(): answer priming 27.1 prompt tokens/s, the
+    # measuring query priming 14.2 generated tokens/s. (case tokens and
+    # elapsed ms as measured on the phone; results and replies are stand-ins.)
+    redmi_answer = Speed(27.1, 14.2)
+    for id_, tokens, elapsed in (
+        ("redmi-replay-q03", 203, 2980),
+        ("redmi-replay-q07", 200, 2675),
+        ("redmi-replay-q09", 199, 3141),
+        ("redmi-replay-q02", 254, 2667),
+    ):
+        timed.append(
+            (id_, q009, query_009, e2e_009, tokens, reply_009, elapsed, redmi_answer)
+        )
     scripts = [(*script, 0, None) for script in scripts] + timed
 
     def encode(value):
@@ -557,6 +572,60 @@ def speed_vectors() -> list[dict]:
         }
         for id_, previous, timings in cases
     ]
+
+
+def priming_vectors() -> list[dict]:
+    """speeds_from_priming(): (id, reports as (kind, timings), in order)."""
+
+    def report(kind, prompt_n, prompt_tps, predicted_n, gen_tps):
+        return {
+            "kind": kind,
+            "timings": {
+                "prompt_n": prompt_n,
+                "prompt_per_second": prompt_tps,
+                "predicted_n": predicted_n,
+                "predicted_per_second": gen_tps,
+            },
+        }
+
+    # Redmi 2026-11-07: answer priming 27.1 tokens/s (1 generated token),
+    # then query priming 23.8 tokens/s, measuring 16 tokens at 14.2.
+    answer = report("answer", 197, 27.1, 1, 30.0)
+    query = report("query", 213, 23.8, 16, 14.2)
+    cases = [
+        ("redmi-2026-11-07", [answer, query]),
+        ("nothing-primed", []),
+        ("only-answer-primed-measures", [report("answer", 197, 27.1, 16, 11.0)]),
+        ("only-query-primed", [query]),
+        ("query-first-then-answer", [query, answer]),
+        ("answer-prompt-below-min", [report("answer", 99, 27.1, 1, 30.0), query]),
+        (
+            "no-timings",
+            [{"kind": "answer", "timings": None}, {"kind": "query", "timings": None}],
+        ),
+        (
+            "not-an-object",
+            [{"kind": "answer", "timings": [1]}, {"kind": "query", "timings": "x"}],
+        ),
+        # Generation from answer priming is used too if it was measured.
+        ("both-measure", [report("answer", 197, 27.1, 16, 11.0), query]),
+    ]
+    out = []
+    for id_, reports in cases:
+        answer_speed, query_speed = speeds_from_priming(
+            [(r["kind"], r["timings"]) for r in reports]
+        )
+        out.append(
+            {
+                "id": id_,
+                "reports": reports,
+                "expected": {
+                    "answer": speed_json(answer_speed),
+                    "query": speed_json(query_speed),
+                },
+            }
+        )
+    return out
 
 
 def answer_timings(predicted_n, predicted_ms, **extra) -> dict:
@@ -693,6 +762,7 @@ def build() -> str:
         "flow": flow_vectors(rows),
         "speed": speed_vectors(),
         "answer_speed": answer_speed_vectors(),
+        "priming": priming_vectors(),
     }
     return json.dumps(data, ensure_ascii=True, indent=1) + "\n"
 

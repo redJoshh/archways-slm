@@ -259,6 +259,12 @@ export interface AssistantDeps {
    * answer call's timings update it. Omitted: unknown, the 200-token rule.
    */
   speed?: SpeedState;
+  /**
+   * The query call's speed (budget.ts querySpeedState, seeded from
+   * speedsFromPriming().query). Each query call's timings update it. The
+   * budget never reads it. Omitted: not tracked.
+   */
+  querySpeed?: SpeedState;
   /** Called once per question with the UAT log entry. Errors are ignored. */
   log?: (entry: QuestionLog) => void;
 }
@@ -292,6 +298,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
           // Only answer calls update the speed: query replies are short and
           // generate faster (14.6 against 10.4 tokens/s on the Redmi 10C).
           if (step.kind === "answer" && deps.speed) deps.speed.update(completion.timings);
+          if (step.kind === "query" && deps.querySpeed) deps.querySpeed.update(completion.timings);
         } else if (step.kind === "search") value = await deps.search(step.arguments);
         else {
           value = await deps.countTokens(step.casePart);

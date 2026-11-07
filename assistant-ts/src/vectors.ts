@@ -4,7 +4,7 @@
  */
 
 import { checkResults, parseQueryReply } from "./contract.ts";
-import { updateAnswerSpeed, updateSpeed, type Pending, type Speed } from "./budget.ts";
+import { speedsFromPriming, updateAnswerSpeed, updateSpeed, type Pending, type Speed } from "./budget.ts";
 import { startQuestion, type Step, type StepInput } from "./flow.ts";
 import { answerSystem, answerUserMessage, casePart, querySystem, systemTurn, todayText } from "./render.ts";
 
@@ -59,6 +59,11 @@ export interface VectorFile {
     expected: FlowExpected;
   }[];
   speed: { id: string; speed: SpeedJson | null; timings: unknown; expected: SpeedJson }[];
+  priming: {
+    id: string;
+    reports: { kind: "answer" | "query"; timings: unknown }[];
+    expected: { answer: SpeedJson | null; query: SpeedJson | null };
+  }[];
   answer_speed: {
     id: string;
     speed: SpeedJson | null;
@@ -166,6 +171,12 @@ export function runVectors(file: VectorFile, maxFailures = 20): VectorReport {
   for (const v of file.speed) {
     const got = updateSpeed(toSpeed(v.speed), v.timings);
     record("speed " + v.id, got.promptTps === v.expected.prompt_tps && got.genTps === v.expected.gen_tps);
+  }
+  for (const v of file.priming) {
+    const got = speedsFromPriming(v.reports);
+    const sameSpeed = (s: Speed | null, e: SpeedJson | null) =>
+      s === null || e === null ? s === e : s.promptTps === e.prompt_tps && s.genTps === e.gen_tps;
+    record("priming " + v.id, sameSpeed(got.answer, v.expected.answer) && sameSpeed(got.query, v.expected.query));
   }
   for (const v of file.answer_speed) {
     let speed: Speed | null = toSpeed(v.speed);

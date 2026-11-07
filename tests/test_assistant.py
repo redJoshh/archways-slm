@@ -373,3 +373,34 @@ def test_query_and_answer_prompts_start_with_their_own_prefixes():
         prefix = assistant.system_turn(system)
         assert prefix == f"<|im_start|>system\n\n{system}<|im_end|>\n"
         assert "Today is Friday, 2026-11-06 (Asia/Manila)." in prefix
+
+
+def test_priming_vectors_reproduce():
+    assert len(DATA["priming"]) >= 9
+    for vector in DATA["priming"]:
+        reports = [(r["kind"], r["timings"]) for r in vector["reports"]]
+        answer, query = assistant.speeds_from_priming(reports)
+        assert answer == speed_of(vector["expected"]["answer"]), vector["id"]
+        assert query == speed_of(vector["expected"]["query"]), vector["id"]
+
+
+def test_query_priming_never_sets_the_answer_prompt_rate():
+    """Redmi 2026-11-07: answer priming 27.1/s, query priming 23.8/s."""
+    by_id = {vector["id"]: vector["expected"] for vector in DATA["priming"]}
+    assert by_id["redmi-2026-11-07"]["answer"] == {"prompt_tps": 27.1, "gen_tps": 14.2}
+    assert by_id["only-query-primed"]["answer"]["prompt_tps"] is None
+    # An answer-measured generation rate wins over the query's.
+    assert by_id["both-measure"]["answer"]["gen_tps"] == 11.0
+
+
+def test_redmi_replay_with_the_answer_prompt_rate():
+    """The 2026-11-07 Redmi run: three fallbacks become answers; q02 stays."""
+    by_id = {vector["id"]: vector["expected"] for vector in DATA["flow"]}
+    for id_ in ("redmi-replay-q03", "redmi-replay-q07", "redmi-replay-q09"):
+        assert by_id[id_]["path"] == "answer", id_
+        assert by_id[id_]["budget"]["predicted_ms"] < assistant.BAR_MS, id_
+    assert by_id["redmi-replay-q02"]["path"] == "budget_fallback"
+    # With the query priming's prompt rate (the old fold), all four fell back.
+    old = assistant.Speed(23.8, 14.2)
+    for tokens, elapsed in ((203, 2980), (200, 2675), (199, 3141), (254, 2667)):
+        assert assistant.predict_ms(tokens, elapsed, old) > assistant.BAR_MS
