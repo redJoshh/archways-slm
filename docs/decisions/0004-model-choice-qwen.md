@@ -120,7 +120,7 @@ UAT is in the week after this record; fine-tuning continues after UAT. UAT ships
 
 - **untuned qwen3:0.6b**, on-device
 - answer prompt v1 (`prompts/e2e_answer_v1.txt`) and query prompt v1 (`prompts/e2e_query_v1.txt`)
-- the `and_v2` matcher (search contract v2) in Spring. **Amended 2026-11-07: `and_v3` (search contract v3, and_v2 plus a whole-word plural alternative).** It was adopted under the "nothing gets worse" rule: identical on the dev sets (replay and cold runs, both models), and 8/10 → 9/10 on the labelled flow-test questions. Spring implements v3 directly (`docs/how-it-works.md`).
+- the `and_v2` matcher (search contract v2) in Spring. **Amended 2026-11-07: `and_v3` (search contract v3, and_v2 plus a whole-word plural alternative).** It was adopted under the "nothing gets worse" rule: identical on the dev sets (replay and cold runs, both models), and 8/10 → 9/10 on the labelled flow-test questions. Spring implements v3 directly (`docs/how-it-works.md`). **Amended again 2026-11-07 by [ADR 0006](0006-on-device-search-over-the-feed.md) (accepted): and_v3 runs on the phone in assistant-ts, over the student's feed; Spring needs no search change.**
 - session-file caches, one per system turn ([0005](0005-gate-1-cold-definition.md))
 - the guard (guard-ts) on the device
 - the budget fallback: if the answer prompt's case part is over 200 Qwen tokens, the no-model fallback is shown instead of calling the model. **Amended later the same day; see "Adaptive time budget" below.**

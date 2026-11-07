@@ -1,9 +1,9 @@
 # 0006: The assistant searches on the phone, over the student's feed
 
-- **Status:** PROPOSED (decisions by the user, 2026-11-07; written for acceptance)
+- **Status:** ACCEPTED (by the user as team lead, 2026-11-07)
 - **Date:** 2026-11-07
 - **Supersedes:** the Spring parts of the search contract: the "Search contract version 2" and "version 3" requirements on Spring in [`docs/how-it-works.md`](../how-it-works.md), and [0004](0004-model-choice-qwen.md)'s UAT line that Spring runs the matcher. The tool arguments, the result shape and the matcher rules stay. They now run in assistant-ts.
-- **When accepted:** update `docs/how-it-works.md` ("Search contract version 3") and ADR 0004's UAT matcher line. and_v3 then runs on the phone in assistant-ts, and Spring needs no search change.
+- **Done on acceptance (2026-11-07):** `docs/how-it-works.md` ("Search contract version 3") and ADR 0004's UAT matcher line now say that and_v3 runs on the phone in assistant-ts and Spring needs no search change.
 
 ## Context
 
@@ -63,6 +63,7 @@ A new search endpoint would have to repeat every visibility rule of the feed, pe
 - **Spring needs no search change.** The v2/v3 search vectors become assistant-ts parity vectors (Python reference against TS, on Node and Hermes).
 - **`CLAUDE.md` has a rule this ADR changes:** "Only PUBLISHED, non-archived announcements may reach the model. Filter with an allowlist in the Spring query, never in the prompt." Under this ADR, the allowlist is the feed's own visibility filter, and `FOR_DELETION` posts can reach the model. **The user should update that rule** (it is the user's file).
 - **Time:**
+  - **The server clock is Manila only in the Docker image.** `publishedAt` is written with `LocalDateTime.now()` in the JVM's default zone, and the API then labels it `+08:00`. Under Docker (`TZ=Asia/Manila`, `-Duser.timezone=Asia/Manila`) that is right. A local run on a machine whose zone is not Manila would store that machine's local time, and every posted date and the days window would shift by the zone difference.
   - The adapter trusts the API's offset.
   - This is correct only if the server's JVM ran on Manila time when `publishedAt` was written. Docker guarantees it; a local run outside Docker on a non-Manila clock does not. The time-zone check is still open.
 - **Cost and freshness:**
@@ -70,8 +71,14 @@ A new search endpoint would have to repeat every visibility rule of the feed, pe
   - The rebuild and edit-detection rules are in the plan.
 - **Privacy:** announcement text stays on the phone, in memory, and is cleared on sign-out. Nothing is written to disk.
 
+## Blocking risk
+
+- **The team mobile app's Expo / React Native versions against llama.rn 0.13.0-rc.8.**
+  - `archways-mobile` `package.json` (read on 2026-11-07) lists `expo ^44.0.6` and `react-native ^0.72.17`. The Gate 1 test app, where llama.rn 0.13.0-rc.8 runs, is on Expo 57 and React Native 0.86.
+  - Until the versions are confirmed compatible (or the mobile app is upgraded), the assistant cannot ship in the team app. The user is verifying the exact versions.
+
 ## Unverified
 
 - The exact JSON text of `publishedAt` from a live server (the Jackson defaults are assumed).
 - Whether body edits can happen in place on a live row. Approved edits create a new row and archive the parent (`AnnouncementService`), so a changed id set catches those.
-- llama.rn 0.13.0-rc.8 on the mobile app's stack. `archways-mobile` `package.json` lists `expo ^44.0.6` and `react-native ^0.72.17`; the Gate 1 test app runs Expo 57 and React Native 0.86.
+- llama.rn 0.13.0-rc.8 on the mobile app's stack (the blocking risk above).

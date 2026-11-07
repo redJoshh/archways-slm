@@ -106,7 +106,7 @@ An array of announcements, newest first, at most 10 items. That 10 must match `a
 
 ### Search contract version 3 (matching, 2026-11-07)
 
-The search contract is now **version 3**. It replaces version 2, which Spring had not implemented, so **Spring implements v3 directly**. Arguments, results, visibility, plain-text excerpts and the other v2 additions above are unchanged. Only the matching changes: **and_v3** = and_v2 plus a whole-word plural alternative.
+The search contract is now **version 3**. It replaces version 2. **Since [ADR 0006](decisions/0006-on-device-search-over-the-feed.md) (accepted 2026-11-07), and_v3 runs on the phone in assistant-ts, over the student's own feed; Spring needs no search change.** The Spring wording below is kept for the record and is superseded. Arguments, results, visibility, plain-text excerpts and the other v2 additions above are unchanged. Only the matching changes: **and_v3** = and_v2 plus a whole-word plural alternative.
 
 - **The rule** (the reference is `fakebackend.py`; fixed before any run):
   - A query word is eligible for the plural alternative if, after lowercasing, the whitespace split and the stopwords, it:
