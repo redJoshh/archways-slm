@@ -18,7 +18,7 @@ function item(id: number, title: string, body = "<p>Body " + id + "</p>", publis
   return { id: id, title: title, body: body, publishedAt: publishedAt };
 }
 
-function fakeApi(items: Item[], options: { failPage?: number; status?: number; gone?: number[] } = {}) {
+function fakeApi(items: Item[], options: { failPage?: number; failDetail?: number; status?: number; gone?: number[] } = {}) {
   const requests: string[] = [];
   let active = 0;
   let maxActive = 0;
@@ -43,6 +43,7 @@ function fakeApi(items: Item[], options: { failPage?: number; status?: number; g
     if (detail) {
       const id = Number(detail[1]);
       const found = items.find((i) => i.id === id);
+      if (options.failDetail === id) throw new HttpError(options.status || 500);
       if (!found || (options.gone || []).indexOf(id) !== -1) throw new HttpError(404);
       return {
         id: found.id, title: found.title, body: found.body, priority: "NORMAL", officeName: "Office",
@@ -134,6 +135,12 @@ test("a 401 rejects and leaves the previous index as it was", async () => {
   now += 11 * 60000;
   await assert.rejects(index.ensure(), (error: unknown) => error instanceof HttpError && error.status === 401);
   assert.equal(index.size(), 3);
+});
+
+test("a 401 on a detail rejects too (only 404 details are skipped)", async () => {
+  const index = createFeedIndex(fakeApi(many(5), { failDetail: 3, status: 401 }).fetchJson, { clockMs: () => NOW });
+  await assert.rejects(index.ensure(), (error: unknown) => error instanceof HttpError && error.status === 401);
+  assert.equal(index.size(), 0);
 });
 
 test("clear() empties the index and discards a build still running", async () => {
