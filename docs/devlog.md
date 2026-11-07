@@ -19,6 +19,67 @@ Template:
 
 ---
 
+## 2026-11-07: results list on every path with results, short replies add up for the speed
+
+- **Date:** 2026-11-07 (evening, +08:00)
+- **Decisions (user, 2026-11-07; both plans approved as recommended):**
+  - **Speed:** a running total of short answer-call samples (answer calls only).
+    - Phone data for the three not-found calls: q06 8 tokens at 12.8 tokens/s, q07 8 at 12.7, q09 8 at 12.7. This is in line with longer answers (10.4–12.8).
+  - **Results list:**
+    - `These announcements may help:` on every path with results, including the budget and guard fallbacks.
+    - Exact match (after the ASCII trim) on the not-found sentence; new path `answer_not_found`.
+    - Recorded in ADR 0004, "Results list and short replies".
+- **What changed:**
+  - **`2f4211f` (`feat:`):**
+    - **Speed:**
+      - `assistant.py` gets `Pending`, `is_short_sample()` and `update_answer_speed()`.
+      - `budget.ts` gets `updateAnswerSpeed()`; `speedState().update` uses it and adds `pending()`.
+      - A reply of 1–9 generated tokens (integral) in finite, positive ms adds to the total. At 10 tokens the total becomes the rate (if accepted) and resets.
+      - A reply whose own rate is accepted resets the total. `update_speed()` (priming) is unchanged.
+    - **Flow:**
+      - `results_list()` / `resultsList()`: `RESULTS_HEADER` plus `fallback()`'s lines.
+      - `answer` = guarded reply + blank line + list. `answer_not_found`, `guard_fired`, `budget_fallback` and `answer_error` = the list.
+      - `RESULTS_HEADER` and `ANSWER_LIST_SEPARATOR` are exported to `generated.ts`.
+      - The guard, `fallback()` and the guard vectors are unchanged.
+    - **Vectors:**
+      - 7 new flow vectors (not-found sentence exact / trimmed / lowercase / plus text / NBSP / timed).
+      - A new `answer_speed` section of 22 sequences, including the Redmi case: three 8-token replies make the speed known after the second, at 16 000 / 1255 tokens/s.
+      - New Python and TS tests.
+  - **`0aaeafb` (`test:`):** a 10-token reply at a rejected rate never joins the total. It was added after a mutation check survived (below).
+  - **`23f58f0` (`docs:`):** the assistant-ts README (path table, results list, short replies) and ADR 0004's new subsection. The "Speed unknown" bullet is marked as amended, not deleted.
+  - **Test app `2f4d757`** (not pushed):
+    - Re-vendored from `23f58f0` with `git show`, so the copies are the committed bytes.
+    - `answer_not_found` counts as fallback on the screen.
+    - The speed and the short-reply total are logged after each question.
+    - Typecheck clean; the Android bundle builds. Metro reload only.
+- **How it was verified:**
+  - `uv run pytest -q` → `1135 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `53 files already formatted`.
+  - `export_assistant_ts.py --check` and `export_assistant_vectors.py --check` → up to date.
+  - assistant-ts `npm test` → `tests 233, pass 233`. `npm run test:hermes` → `216/216 passed`, `askAssistant answer: answer (as expected)`. guard-ts `npm test` → `pass 461`.
+  - Mutation checks on the TS port, each reverted (node test failures / Hermes failure lines):
+
+    | Change | Caught |
+    |---|---|
+    | Short sample `<` → `<=` | 1 / 1 (after `0aaeafb`; 0 / 0 before) |
+    | A long sample keeps the total | 1 / 2 |
+    | `speedState` without the total | 1 / 0 |
+    | The pooled rate not range-checked | 1 / 2 |
+    | `ms > 0` → `ms >= 0` | 1 / 1 |
+    | Exact match → contains | 5 / 2 |
+    | No not-found check | 8 / 3 |
+    | Answer without the list | 26 / 12 |
+    | Guard fired shows the guard's text | 7 / 3 |
+    | The old header | 58 / 20 |
+
+- **and_v3 (plural rule):** plan only, in the chat, waiting for approval. The rule is as the user wrote it; nothing was scored.
+  - **Affected words**, from a word-level check of the saved and_v2 queries (qwen3:0.6b and gemma3:1b, e2e and Taglish) and the 10 flow-test queries. This counts single-word row matches only, no AND across words, so it is not a replay.
+  - 18 words qualify: changes, christmas, databases, drafts, examinations, exams, finals, forms, hours, intramurals, plastics, prelims, robotics, rules, souls, subjects, tryouts, uniforms.
+  - "mass" (4 letters) and qwen3's truncated "sinusus" (ends in "us") do not qualify.
+- **Commits:** `2f4211f`, `0aaeafb`, `23f58f0`, this `docs:` commit. Test app `2f4d757`. Not pushed.
+- **Open questions / next:** approval of the and_v3 plan; a phone rerun of the flow test with the new flow.
+
+---
+
 ## 2026-11-07: Redmi run of the flow test, and the three not-found answers diagnosed
 
 - **Date:** 2026-11-07 (evening, +08:00)
