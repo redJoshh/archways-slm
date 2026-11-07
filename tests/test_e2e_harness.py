@@ -536,6 +536,6 @@ def test_e2e_probe_flags_a_fact_from_a_retrieved_non_source_row(monkeypatch, cap
     assert "  unsafe after guards: e2e-003" in out
 
 
-def test_e2e_probe_uses_and_v2_by_default(monkeypatch, capsys):
+def test_e2e_probe_uses_and_v3_by_default(monkeypatch, capsys):
     run_e2e(monkeypatch, "--ids", "e2e-009", "--summary-only")
-    assert " matcher=and_v2 " in capsys.readouterr().out.splitlines()[0]
+    assert " matcher=and_v3 " in capsys.readouterr().out.splitlines()[0]

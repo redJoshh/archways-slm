@@ -189,9 +189,10 @@ def test_and_v1_matches_enrolment_only_as_written():
     assert [r["id"] for r in search(arguments, rows=VECTORS_V2["rows"])] == ["v-12"]
 
 
-def test_default_matcher_is_and_v2():
-    # and_v2 replaced and_v1 on 2026-10-31 under the user's rule (devlog).
-    assert DEFAULT_MATCHER == "and_v2"
+def test_default_matcher_is_and_v3():
+    # and_v2 replaced and_v1 on 2026-10-31, and and_v3 replaced and_v2 on
+    # 2026-11-07, each under the user's "nothing gets worse" rule (devlog).
+    assert DEFAULT_MATCHER == "and_v3"
     results = search_announcements(
         VECTORS_AND_V2["rows"],
         {"query": "tuition payment"},

@@ -11,7 +11,8 @@ gitignored JSON list of {id, category, question, expected}):
    arguments schema as format (what the probes ran) is recorded too, only
    to show whether the two differ.
 2. parse_query_reply() (the phone's parser) on the no-format reply, then
-   fakebackend.search_announcements(..., matcher and_v2) on the snapshot at
+   fakebackend.search_announcements(..., matcher and_v3, the default since
+   2026-11-07) on the snapshot at
    the same instant. An invalid reply gets results null (the phone never
    searches then).
 
@@ -46,7 +47,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SNAPSHOT = ROOT / "data" / "local" / "announcements_snapshot.json"
 DEFAULT_QUESTIONS = ROOT / "data" / "local" / "flow_test_questions.json"
 QUERY_N_PREDICT = 64  # assistant-ts N_PREDICT.query
-MATCHER = "and_v2"
+MATCHER = "and_v3"
 OPTIONS = {
     **SAMPLING_OPTIONS,
     "num_ctx": NUM_CTX,

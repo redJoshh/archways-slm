@@ -3,7 +3,7 @@
 Usage: uv run python scripts/probe_end_to_end.py [--model qwen3:1.7b]
     [--cases evals/e2e_cases.jsonl] [--ids e2e-001,e2e-002] [--repeat 5]
     [--summary-only]
-    [--num-gpu 0] [--keep-alive 0] [--matcher and_v1|prefix_v2|and_v2]
+    [--num-gpu 0] [--keep-alive 0] [--matcher and_v1|prefix_v2|and_v2|and_v3]
     [--answer-prompt v1|v2|v3] [--query-prompt v1|v2|v3]
 
 For each case:
@@ -12,7 +12,7 @@ For each case:
    prompts/e2e_query_v1.txt (--query-prompt v2: e2e_query_v2.txt). Every
    case searches.
 2. Search. fakebackend runs it over data/seed/announcements.json at the
-   case's fixed now, with --matcher (default and_v2). Arguments the contract rejects count as no results,
+   case's fixed now, with --matcher (default and_v3). Arguments the contract rejects count as no results,
    as Spring rejects them.
 3. Answer call. With no results the reply is the fixed not-found message
    and the model is not called. Otherwise the answer prompt gets the
@@ -20,7 +20,7 @@ For each case:
    --answer-prompt v1 (the default) that is prompts/e2e_answer_v1.txt and
    the results as JSON; with v2 it is prompts/e2e_answer_v2.txt and the
    compact format of compact_announcements_message(). v2 tells the model
-   the list is newest first, so it runs only with --matcher and_v1 or and_v2, whose
+   the list is newest first, so it runs only with --matcher and_v1, and_v2 or and_v3, whose
    order is newest first. v3 is v1 with today's date moved from the
    system turn to the start of the user message (prompt_pair()), so the
    system turn is the same every day; --query-prompt v2 does the same to
@@ -314,9 +314,13 @@ def main() -> None:
     )
     args = parser.parse_args()
     show = (lambda *_, **__: None) if args.summary_only else print
-    if args.answer_prompt == "v2" and args.matcher not in ("and_v1", "and_v2"):
+    if args.answer_prompt == "v2" and args.matcher not in (
+        "and_v1",
+        "and_v2",
+        "and_v3",
+    ):
         sys.exit(
-            "--answer-prompt v2 needs --matcher and_v1 or and_v2 (results newest first)"
+            "--answer-prompt v2 needs --matcher and_v1, and_v2 or and_v3 (newest first)"
         )
     answer_prompt, answer_message, answer_date_in_user = ANSWER_VERSIONS[
         args.answer_prompt

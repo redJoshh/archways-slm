@@ -58,7 +58,7 @@ Rules, in order:
      start some word of the title or body. A stem that starts a title word
      scores 2, otherwise one that starts a body word scores 1.
    No query words left means no results.
-4. Highest score first (and_v1 and and_v2 score every match 0), then newest
+4. Highest score first (and_v1, and_v2 and and_v3 score every match 0), then newest
    published_at, then id ascending; then limit.
 5. Each row is returned in the contract's announcement shape: published_at
    gets STORED_ZONE and becomes posted_at, and the body is cut to
@@ -140,8 +140,9 @@ _SYNONYM_MAP = json.loads(SYNONYMS_PATH.read_text(encoding="utf-8"))
 SYNONYMS: dict[str, list[str]] = _SYNONYM_MAP["synonyms"]
 AND_V2_STOPWORDS = STOPWORDS | frozenset(_SYNONYM_MAP["extra_stopwords"])
 MATCHERS = ("and_v1", "prefix_v2", "and_v2", "and_v3")
-# and_v2 replaced and_v1 on 2026-10-31 (devlog); and_v1 stays for comparisons.
-DEFAULT_MATCHER = "and_v2"
+# and_v2 replaced and_v1 on 2026-10-31, and and_v3 replaced and_v2 on
+# 2026-11-07 (devlog); the older matchers stay for comparisons.
+DEFAULT_MATCHER = "and_v3"
 # prefix_v2: words this long or longer are cut to their first STEM_CHARS.
 STEM_MIN_CHARS = 5
 STEM_CHARS = 4

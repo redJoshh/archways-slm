@@ -4,7 +4,8 @@ Evidence, not pytest. Sets GEN_TOKENS for the adaptive time budget
 (assistant.py): the nearest-rank 90th percentile of eval_count over every
 answer call of the e2e and Taglish dev cases.
 
-UAT configuration: query v1, answer v1, and_v2 (fakebackend's default),
+UAT configuration: query v1, answer v1, fakebackend's default matcher (and_v2
+when GEN_TOKENS was measured on 2026-11-06; and_v3 since 2026-11-07),
 qwen3:0.6b. Each call is a raw /api/generate of render_qwen3(), cold
 (keep_alive 0), with the probe's sampling options, as in
 check_render_qwen3.py (which showed raw = /api/chat for every call). The query
