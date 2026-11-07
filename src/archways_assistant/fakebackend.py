@@ -27,6 +27,29 @@ Rules, in order:
      afterwards: a change is a new map file and a new matcher. Spring must
      load the same file and pass tests/vectors/search_vectors_and_v2.json.
      Untested on real announcements: "due" also matches "due to".
+   - and_v3 (search contract v3; rule fixed 2026-11-07 before any run):
+     and_v2 plus a plural alternative. Same stopwords, same synonym file;
+     the word and its synonyms keep and_v2's plain substring matching.
+     A query word (lowercased, whitespace-split, after stopwords) is
+     eligible if it has 5 or more characters (code points), ends in "s",
+     and does not end in "ss", "us" or "is". Its plural alternative is the
+     word without that trailing "s", and it is added only if it starts and
+     ends with a word character. The alternative matches only as a WHOLE
+     WORD: an occurrence in the lowercased title or body with no word
+     character immediately before it or after it. A word character is "_",
+     a Unicode letter (category L*) or a decimal digit (category Nd). The
+     group matches if the word or a synonym is a substring, or the
+     alternative occurs as a whole word (OR within the group); AND across
+     groups as before. Spring: (title ILIKE ? OR body ILIKE ? ... OR
+     title ~* ? OR body ~* ?) with the pattern '\\m' + stem + '\\M', every
+     ASCII punctuation character of the stem escaped with a backslash
+     (word_regex()); it must pass tests/vectors/search_vectors_and_v3.json.
+     Postgres decides word characters by its locale (alnum or "_"); for
+     non-ASCII letters and digits that may differ from the rule here
+     (documented gap, untested). Examples: "forms" adds "form", which
+     matches "drop form." but not "information", "uniform", "platform" or
+     "form_id"; "uniforms" adds "uniform"; "exams" adds "exam", which does
+     not match "example".
    - prefix_v2: query, title and body are lowercased and split into words
      (runs of letters and digits; anything else separates words), and
      STOPWORDS are dropped from the query. Each query word of 5 or more

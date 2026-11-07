@@ -1,0 +1,623 @@
+{
+ "$comment": "Search vectors for the and_v3 matcher (fakebackend.search_announcements with matcher='and_v3'): and_v2 plus a whole-word plural alternative (rule in the fakebackend docstring, fixed 2026-11-07 before any run). Rows are the and_v2 vector rows plus p-01 to p-09. Expected ids and patterns were written by hand before the code. expected_patterns: one object per remaining query word: ilike, the word then its synonyms as ILIKE patterns (escape char \\), exactly as and_v2; word_regex, the plural alternative as a Postgres ARE for ~* ('\\m' + stem with ASCII punctuation backslash-escaped + '\\M'), or empty if the word is not eligible. Every and_v2 vector whose query has no eligible word behaves as in and_v2.",
+ "matcher": "and_v3",
+ "synonyms_file": "contracts/search_synonyms_v1.json",
+ "now": "2026-11-02T10:00:00+08:00",
+ "stopwords": [
+  "a",
+  "about",
+  "an",
+  "and",
+  "ang",
+  "announcement",
+  "announcements",
+  "ano",
+  "any",
+  "are",
+  "at",
+  "ba",
+  "for",
+  "from",
+  "how",
+  "in",
+  "is",
+  "kailan",
+  "kapag",
+  "mga",
+  "ng",
+  "of",
+  "on",
+  "or",
+  "po",
+  "sa",
+  "the",
+  "there",
+  "to",
+  "what",
+  "when",
+  "where",
+  "which",
+  "who",
+  "with",
+  "yung"
+ ],
+ "rows": [
+  {
+   "id": "v-01",
+   "title": "Library Hours Extended",
+   "body": "The library will stay open until 9 PM.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "v-02",
+   "title": "Enrollment Reminder",
+   "body": "Enrollment closes Friday. Visit the registrar.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-30T08:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "v-03",
+   "title": "Registrar Advisory",
+   "body": "Document requests resume Monday.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-30T08:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "v-04",
+   "title": "Bookstore Sale",
+   "body": "Get 50% off selected items.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-28T10:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "v-05",
+   "title": "Parking Update",
+   "body": "Use the off_peak lane after 6 PM.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-27T10:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "v-06",
+   "title": "Path Notice",
+   "body": "Forms are stored under C:\\shared\\forms.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-26T10:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "v-07",
+   "title": "Library Draft Notice",
+   "body": "A library notice that is still a draft.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-31T09:00:00",
+   "status": "DRAFT",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "v-08",
+   "title": "Library Archive Notice",
+   "body": "An archived library notice.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-31T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": true,
+   "scheduled": false
+  },
+  {
+   "id": "v-09",
+   "title": "Library Future Notice",
+   "body": "A library notice scheduled for later.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-05T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": true
+  },
+  {
+   "id": "v-10",
+   "title": "Library Old Notice",
+   "body": "Posted exactly seven days before now.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-26T10:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "v-11",
+   "title": "Library Older Notice",
+   "body": "Posted one second before the seven-day window.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-26T09:59:59",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "s-01",
+   "title": "Tuition Reminder",
+   "body": "The second installment is due on Friday.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "s-02",
+   "title": "Peer Tutor Sign-ups",
+   "body": "Students may sign up at the office.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "s-03",
+   "title": "Class Suspension",
+   "body": "Classes are suspended during a typhoon.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "s-04",
+   "title": "Second Term Enrollment",
+   "body": "Enrollment for the second term opens Monday.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-31T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "s-05",
+   "title": "Physical Examination",
+   "body": "The annual examination is at the clinic.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "s-06",
+   "title": "Payment Center Hours",
+   "body": "The payment center opens at 8.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-10-31T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-01",
+   "title": "Information Desk",
+   "body": "Visit the information desk for help.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-02",
+   "title": "School Uniform Policy",
+   "body": "Wear the prescribed uniform on campus.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-03",
+   "title": "Online Platform Update",
+   "body": "The platform will be down on Sunday.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-04",
+   "title": "Drop Form Deadline",
+   "body": "Submit the drop form by Friday.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-05",
+   "title": "Example Schedule",
+   "body": "An example of the new schedule is posted.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-06",
+   "title": "Midterm Exam Schedule",
+   "body": "The exam starts at 8 AM.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-07",
+   "title": "Dress Code Rule",
+   "body": "The rule applies to all students.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-08",
+   "title": "Leave Request",
+   "body": "Fill out the leave form.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  },
+  {
+   "id": "p-09",
+   "title": "API Note",
+   "body": "Use the field form_id or form2 in the request.",
+   "office": "Test Office",
+   "priority": "NORMAL",
+   "year_level": null,
+   "published_at": "2026-11-01T09:00:00",
+   "status": "PUBLISHED",
+   "is_archived": false,
+   "scheduled": false
+  }
+ ],
+ "vectors": [
+  {
+   "name": "forms: whole-word form matches; information, uniform, platform, form_id, form2 do not",
+   "arguments": {
+    "query": "forms"
+   },
+   "expected_ids": [
+    "p-04",
+    "p-08",
+    "v-06"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%forms%"
+     ],
+     "word_regex": [
+      "\\mform\\M"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "uniforms matches uniform",
+   "arguments": {
+    "query": "uniforms"
+   },
+   "expected_ids": [
+    "p-02"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%uniforms%"
+     ],
+     "word_regex": [
+      "\\muniform\\M"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "case-insensitive: UNIFORMS",
+   "arguments": {
+    "query": "UNIFORMS"
+   },
+   "expected_ids": [
+    "p-02"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%uniforms%"
+     ],
+     "word_regex": [
+      "\\muniform\\M"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "exams matches exam, not example",
+   "arguments": {
+    "query": "exams"
+   },
+   "expected_ids": [
+    "p-06"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%exams%"
+     ],
+     "word_regex": [
+      "\\mexam\\M"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "drop forms: AND across groups",
+   "arguments": {
+    "query": "drop forms"
+   },
+   "expected_ids": [
+    "p-04"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%drop%"
+     ],
+     "word_regex": []
+    },
+    {
+     "ilike": [
+      "%forms%"
+     ],
+     "word_regex": [
+      "\\mform\\M"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "exactly 5 characters: rules adds rule",
+   "arguments": {
+    "query": "rules"
+   },
+   "expected_ids": [
+    "p-07"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%rules%"
+     ],
+     "word_regex": [
+      "\\mrule\\M"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "classes adds classe, which never matches class; the substring still matches",
+   "arguments": {
+    "query": "classes"
+   },
+   "expected_ids": [
+    "s-03"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%classes%"
+     ],
+     "word_regex": [
+      "\\mclasse\\M"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ends in ss: class is not eligible",
+   "arguments": {
+    "query": "class"
+   },
+   "expected_ids": [
+    "s-03"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%class%"
+     ],
+     "word_regex": []
+    }
+   ]
+  },
+  {
+   "name": "ends in us: campus is not eligible",
+   "arguments": {
+    "query": "campus"
+   },
+   "expected_ids": [
+    "p-02"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%campus%"
+     ],
+     "word_regex": []
+    }
+   ]
+  },
+  {
+   "name": "ends in is: basis is not eligible",
+   "arguments": {
+    "query": "basis"
+   },
+   "expected_ids": [],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%basis%"
+     ],
+     "word_regex": []
+    }
+   ]
+  },
+  {
+   "name": "4 characters: fees is not eligible",
+   "arguments": {
+    "query": "fees"
+   },
+   "expected_ids": [],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%fees%"
+     ],
+     "word_regex": []
+    }
+   ]
+  },
+  {
+   "name": "alternative ending in a non-word character is not added: staff's",
+   "arguments": {
+    "query": "staff's"
+   },
+   "expected_ids": [],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%staff's%"
+     ],
+     "word_regex": []
+    }
+   ]
+  },
+  {
+   "name": "synonym and plural alternative together",
+   "arguments": {
+    "query": "physical examinations"
+   },
+   "expected_ids": [
+    "s-05"
+   ],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%physical%"
+     ],
+     "word_regex": []
+    },
+    {
+     "ilike": [
+      "%examinations%",
+      "%examination%"
+     ],
+     "word_regex": [
+      "\\mexamination\\M"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "punctuation inside the alternative is escaped: x-rays",
+   "arguments": {
+    "query": "x-rays"
+   },
+   "expected_ids": [],
+   "expected_patterns": [
+    {
+     "ilike": [
+      "%x-rays%"
+     ],
+     "word_regex": [
+      "\\mx\\-ray\\M"
+     ]
+    }
+   ]
+  }
+ ]
+}
