@@ -294,24 +294,25 @@ test("the answer path shows the guarded reply above the results list", async () 
   assert.ok(result.text.startsWith((vector.answer_reply as string) + "\n\nThese announcements may help:\n- "));
 });
 
-test("query-call timings update only the query speed, never the answer speed", async () => {
+test("each call kind updates only its own speed", async () => {
   const vector = file.flow.find((v) => v.id === "time-fast-e2e-009")!;
   const speed = speedState({ promptTps: 60, genTps: 20 });
   const querySpeed = querySpeedState({ promptTps: 23.8, genTps: 14.2 });
   const queryTimings = { prompt_n: 300, prompt_per_second: 25, predicted_n: 15, predicted_per_second: 15 };
+  const answerTimings = { prompt_n: 394, prompt_per_second: 30, predicted_n: 39, predicted_per_second: 11 };
   await askAssistant(vector.question, {
     nowMs: () => vector.now_ms,
     complete: (call) =>
       Promise.resolve(
         call.kind === "query"
           ? { text: vector.query_reply as string, timings: queryTimings }
-          : { text: vector.answer_reply as string },
+          : { text: vector.answer_reply as string, timings: answerTimings },
       ),
     search: () => Promise.resolve(vector.search_reply),
     countTokens: () => Promise.resolve(vector.case_tokens as number),
     speed: speed,
     querySpeed: querySpeed,
   });
-  assert.deepEqual(speed.get(), { promptTps: 60, genTps: 20 });
+  assert.deepEqual(speed.get(), { promptTps: 30, genTps: 11 });
   assert.deepEqual(querySpeed.get(), { promptTps: 25, genTps: 15 });
 });
