@@ -19,7 +19,12 @@
  * used only if it is a finite number in RATE_MIN..RATE_MAX tokens/s and came
  * from at least PROMPT_N_MIN prompt / PREDICTED_N_MIN generated tokens.
  * Speed is never saved: after an app restart with existing session files it
- * is unknown until the first answer call reports timings.
+ * is unknown until answer calls report enough generated tokens.
+ *
+ * Answer calls go through updateAnswerSpeed() (speedState().update): a reply
+ * shorter than PREDICTED_N_MIN tokens (the 8-token not-found sentence) adds
+ * its predicted_n and predicted_ms to a running total; at PREDICTED_N_MIN
+ * tokens the total becomes the generation rate. Priming never adds to it.
  */
 
 import {
@@ -107,18 +112,77 @@ export function decideBudget(caseTokens: number, elapsedMs: number, speed: Speed
   return { rule: "time", fallback: predicted > BAR_MS, predictedMs: predicted };
 }
 
-/** The speed the app holds between questions, in memory only. */
+/** Generated tokens and ms of short answer replies, not yet a rate. */
+export interface Pending {
+  n: number;
+  ms: number;
+}
+
+function isIntegralNumber(value: unknown): value is number {
+  return typeof value === "number" && isFinite(value) && Math.floor(value) === value;
+}
+
+/** 1 to PREDICTED_N_MIN - 1 tokens (integral), in finite, positive ms. */
+function isShortSample(count: unknown, ms: unknown): count is number {
+  return (
+    isIntegralNumber(count) &&
+    count >= 1 &&
+    count < PREDICTED_N_MIN &&
+    typeof ms === "number" &&
+    isFinite(ms) &&
+    ms > 0
+  );
+}
+
+/**
+ * updateSpeed() for an answer call, adding up short replies (a port of
+ * update_answer_speed()). Answer calls only, never priming or query calls.
+ */
+export function updateAnswerSpeed(
+  speed: Speed | null | undefined,
+  pending: Pending,
+  timings: unknown,
+): { speed: Speed; pending: Pending } {
+  const updated = updateSpeed(speed, timings);
+  if (typeof timings !== "object" || timings === null || Array.isArray(timings)) {
+    return { speed: updated, pending: pending };
+  }
+  const count = field(timings, "predicted_n");
+  if (acceptRate(field(timings, "predicted_per_second"), count, PREDICTED_N_MIN)) {
+    return { speed: updated, pending: { n: 0, ms: 0 } };
+  }
+  const ms = field(timings, "predicted_ms");
+  if (!isShortSample(count, ms)) return { speed: updated, pending: pending };
+  const total: Pending = { n: pending.n + count, ms: pending.ms + (ms as number) };
+  if (total.n < PREDICTED_N_MIN) return { speed: updated, pending: total };
+  const rate = (total.n * 1000) / total.ms;
+  const speedOut = acceptRate(rate, total.n, PREDICTED_N_MIN)
+    ? { promptTps: updated.promptTps, genTps: rate }
+    : updated;
+  return { speed: speedOut, pending: { n: 0, ms: 0 } };
+}
+
+/**
+ * The speed the app holds between questions, in memory only. update() is
+ * for answer-call timings: it keeps the running total of short replies.
+ */
 export interface SpeedState {
   get: () => Speed | null;
   update: (timings: unknown) => void;
+  /** The running total of short answer replies (for logs and tests). */
+  pending: () => Pending;
 }
 
 export function speedState(initial?: Speed | null): SpeedState {
   let current: Speed | null = initial || null;
+  let pending: Pending = { n: 0, ms: 0 };
   return {
     get: () => current,
     update: (timings: unknown) => {
-      current = updateSpeed(current, timings);
+      const next = updateAnswerSpeed(current, pending, timings);
+      current = next.speed;
+      pending = next.pending;
     },
+    pending: () => ({ n: pending.n, ms: pending.ms }),
   };
 }

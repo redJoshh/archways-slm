@@ -63,6 +63,8 @@ def render() -> str:
         ("NOT_FOUND_MESSAGE", NOT_FOUND_MESSAGE),
         ("LAST_RESORT_MESSAGE", LAST_RESORT_MESSAGE),
         ("FALLBACK_HEADER", FALLBACK_HEADER),
+        ("RESULTS_HEADER", assistant.RESULTS_HEADER),
+        ("ANSWER_LIST_SEPARATOR", assistant.ANSWER_LIST_SEPARATOR),
         ("BUDGET_CASE_TOKENS", assistant.BUDGET_CASE_TOKENS),
         ("QUESTION_MAX_CHARS", assistant.QUESTION_MAX_CHARS),
         ("BAR_MS", assistant.BAR_MS),

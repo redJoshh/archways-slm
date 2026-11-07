@@ -209,9 +209,62 @@ def test_flow_shows_model_text_only_on_the_answer_path():
         reply = vector["answer_reply"]
         if isinstance(reply, str) and reply.strip(assistant.ASCII_WHITESPACE):
             if expected["path"] == "answer":
-                assert expected["text"] == reply.strip(assistant.ASCII_WHITESPACE)
+                assert expected["text"].startswith(
+                    reply.strip(assistant.ASCII_WHITESPACE)
+                    + assistant.ANSWER_LIST_SEPARATOR
+                    + assistant.RESULTS_HEADER
+                    + "\n- "
+                ), vector["id"]
             else:
                 assert reply.strip() not in expected["text"], vector["id"]
+
+
+def test_every_path_with_results_ends_with_the_results_list():
+    """ADR 0004 UAT configuration (2026-11-07)."""
+    seen = set()
+    for vector in DATA["flow"]:
+        expected = vector["expected"]
+        if not expected["result_count"]:
+            assert assistant.RESULTS_HEADER not in expected["text"], vector["id"]
+            continue
+        listed = assistant.results_list(vector["search_reply"])
+        assert expected["text"].endswith(listed), vector["id"]
+        assert listed.count("\n- ") == expected["result_count"], vector["id"]
+        if expected["path"] != "answer":
+            assert expected["text"] == listed, vector["id"]
+        seen.add(expected["path"])
+    assert seen == {
+        "answer",
+        "answer_not_found",
+        "guard_fired",
+        "budget_fallback",
+        "answer_error",
+    }
+
+
+def test_answer_not_found_needs_the_exact_sentence():
+    by_id = {vector["id"]: vector["expected"] for vector in DATA["flow"]}
+    for id_ in (
+        "answer-not-found-sentence",
+        "answer-not-found-trimmed",
+        "time-answer-not-found",
+    ):
+        assert by_id[id_]["path"] == "answer_not_found", id_
+        assert assistant.NOT_FOUND_MESSAGE not in by_id[id_]["text"], id_
+    for id_ in (
+        "answer-not-found-lowercase",
+        "answer-not-found-plus-text",
+        "answer-not-found-nbsp",
+    ):
+        assert by_id[id_]["path"] == "answer", id_
+    # No results: the not-found message, no list, no answer call.
+    assert by_id["not-found"]["text"] == assistant.NOT_FOUND_MESSAGE
+
+
+def test_results_list_rejects_a_changed_fallback_header(monkeypatch):
+    monkeypatch.setattr(assistant, "fallback", lambda results: "Other:\n- x")
+    with pytest.raises(ValueError):
+        assistant.results_list([])
 
 
 def speed_of(value) -> assistant.Speed | None:
@@ -260,6 +313,43 @@ def test_speed_vectors_reproduce():
     for vector in DATA["speed"]:
         got = assistant.update_speed(speed_of(vector["speed"]), vector["timings"])
         assert speed_of(vector["expected"]) == got, vector["id"]
+
+
+def pending_of(value) -> assistant.Pending:
+    return assistant.Pending(value["n"], value["ms"])
+
+
+def test_answer_speed_vectors_reproduce():
+    assert len(DATA["answer_speed"]) >= 20
+    for vector in DATA["answer_speed"]:
+        speed, pending = speed_of(vector["speed"]), pending_of(vector["pending"])
+        assert len(vector["steps"]) == len(vector["expected"])
+        for timings, expected in zip(vector["steps"], vector["expected"], strict=True):
+            speed, pending = assistant.update_answer_speed(speed, pending, timings)
+            assert speed == speed_of(expected["speed"]), vector["id"]
+            assert pending == pending_of(expected["pending"]), vector["id"]
+
+
+def test_redmi_not_found_replies_make_the_speed_known():
+    """Redmi 2026-11-07: three 8-token not-found replies, no priming."""
+    by_id = {vector["id"]: vector for vector in DATA["answer_speed"]}
+    steps = by_id["redmi-not-found-x3"]["expected"]
+    assert steps[0]["speed"]["gen_tps"] is None
+    assert 12.7 < steps[1]["speed"]["gen_tps"] < 12.8
+    assert steps[1]["pending"] == {"n": 0, "ms": 0.0}
+    # update_speed() alone (priming) never adds short replies up.
+    short = by_id["redmi-not-found-x3"]["steps"][0]
+    assert assistant.update_speed(None, short).gen_tps is None
+
+
+@pytest.mark.parametrize("ms", [float("nan"), float("inf"), -float("inf")])
+def test_non_finite_predicted_ms_is_ignored(ms):
+    timings = {"predicted_n": 8, "predicted_ms": ms, "predicted_per_second": 12.8}
+    pending = assistant.Pending(8, 600.0)
+    assert assistant.update_answer_speed(None, pending, timings) == (
+        assistant.Speed(),
+        pending,
+    )
 
 
 @pytest.mark.parametrize("rate", [float("nan"), float("inf"), -float("inf")])

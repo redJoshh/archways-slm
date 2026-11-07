@@ -18,15 +18,27 @@
  * - no results                                           -> NOT_FOUND_MESSAGE
  * - over budget (budget.ts: predicted time over 15 s, or over 200 tokens
  *   while this phone's speed is unknown, or over the n_ctx limit)
- *                                                        -> fallback(results)
- * - token count, answer call or guard failed             -> fallback(results)
- * - guard fired                                          -> the guard's text
- * fallback() failing gives LAST_RESORT_MESSAGE.
+ *                                                        -> resultsList(results)
+ * - token count, answer call or guard failed             -> resultsList(results)
+ * - guard fired                                          -> resultsList(results)
+ * - the reply is exactly NOT_FOUND_MESSAGE (after the ASCII trim), although
+ *   results exist ("answer_not_found")                   -> resultsList(results)
+ * - the guard passed the reply ("answer")
+ *              -> reply + ANSWER_LIST_SEPARATOR + resultsList(results)
+ * resultsList() is RESULTS_HEADER and fallback()'s lines (titles and posted
+ * dates): every path with results ends with it (ADR 0004, UAT configuration,
+ * 2026-11-07). If it can't be built, the text is LAST_RESORT_MESSAGE.
  */
 
 import { fallback, guard } from "../../guard-ts/src/guard.ts";
 import { decideBudget, type Budget, type Speed, type SpeedState } from "./budget.ts";
-import { LAST_RESORT_MESSAGE, NOT_FOUND_MESSAGE } from "./generated.ts";
+import {
+  ANSWER_LIST_SEPARATOR,
+  FALLBACK_HEADER,
+  LAST_RESORT_MESSAGE,
+  NOT_FOUND_MESSAGE,
+  RESULTS_HEADER,
+} from "./generated.ts";
 import {
   checkQuestion,
   checkResults,
@@ -45,6 +57,7 @@ import { trimAscii } from "./text.ts";
 
 export type Path =
   | "answer"
+  | "answer_not_found"
   | "guard_fired"
   | "budget_fallback"
   | "answer_error"
@@ -92,12 +105,24 @@ export type Step =
   | { kind: "answer"; call: ModelCall; next: (input: StepInput) => Step }
   | { kind: "done"; outcome: Outcome; trace: Trace };
 
-function safeFallback(results: Announcement[]): string {
+/** RESULTS_HEADER, then fallback()'s lines (a port of results_list()). */
+export function resultsList(results: Announcement[]): string {
+  const text = fallback(results);
+  if (text.indexOf(FALLBACK_HEADER + "\n") !== 0) throw new Error("fallback() changed its header line");
+  return RESULTS_HEADER + text.slice(FALLBACK_HEADER.length);
+}
+
+function safeResultsList(results: Announcement[]): string | null {
   try {
-    return fallback(results);
+    return resultsList(results);
   } catch (error) {
-    return LAST_RESORT_MESSAGE;
+    return null;
   }
+}
+
+function listOrLastResort(results: Announcement[]): string {
+  const listed = safeResultsList(results);
+  return listed === null ? LAST_RESORT_MESSAGE : listed;
 }
 
 function isCount(value: unknown): value is number {
@@ -132,22 +157,31 @@ export function startQuestion(question: string, nowMs: number, speed?: Speed | n
 
   const afterAnswer = (results: Announcement[]) => (input: StepInput): Step => {
     if (!input.ok || typeof input.value !== "string") {
-      return done("answer_error", safeFallback(results));
+      return done("answer_error", listOrLastResort(results));
     }
     const reply = trimAscii(input.value);
+    // The not-found sentence although results exist: show the list instead.
+    if (reply === NOT_FOUND_MESSAGE) return done("answer_not_found", listOrLastResort(results));
+    let guarded: { fired: boolean; text: string; codes: string[] };
     try {
-      const guarded = guard(reply, results, question, []);
-      return done(guarded.fired ? "guard_fired" : "answer", guarded.text, guarded.codes.slice());
+      guarded = guard(reply, results, question, []);
     } catch (error) {
       // Defense in depth: never show an unguarded reply.
-      return done("answer_error", safeFallback(results));
+      return done("answer_error", listOrLastResort(results));
     }
+    const listed = safeResultsList(results);
+    if (guarded.fired) {
+      return done("guard_fired", listed === null ? LAST_RESORT_MESSAGE : listed, guarded.codes.slice());
+    }
+    // Unreachable for contract-checked results; never show the reply without its list.
+    if (listed === null) return done("answer_error", LAST_RESORT_MESSAGE);
+    return done("answer", guarded.text + ANSWER_LIST_SEPARATOR + listed, guarded.codes.slice());
   };
 
   const afterCount = (results: Announcement[], call: ModelCall) => (input: StepInput, elapsedMs: number): Step => {
-    if (!input.ok || !isCount(input.value)) return done("answer_error", safeFallback(results));
+    if (!input.ok || !isCount(input.value)) return done("answer_error", listOrLastResort(results));
     budget = decideBudget(input.value, elapsedMs, speed);
-    if (budget.fallback) return done("budget_fallback", safeFallback(results));
+    if (budget.fallback) return done("budget_fallback", listOrLastResort(results));
     return { kind: "answer", call: call, next: afterAnswer(results) };
   };
 

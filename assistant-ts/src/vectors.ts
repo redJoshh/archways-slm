@@ -4,7 +4,7 @@
  */
 
 import { checkResults, parseQueryReply } from "./contract.ts";
-import { updateSpeed, type Speed } from "./budget.ts";
+import { updateAnswerSpeed, updateSpeed, type Pending, type Speed } from "./budget.ts";
 import { startQuestion, type Step, type StepInput } from "./flow.ts";
 import { answerSystem, answerUserMessage, casePart, querySystem, systemTurn, todayText } from "./render.ts";
 
@@ -59,6 +59,13 @@ export interface VectorFile {
     expected: FlowExpected;
   }[];
   speed: { id: string; speed: SpeedJson | null; timings: unknown; expected: SpeedJson }[];
+  answer_speed: {
+    id: string;
+    speed: SpeedJson | null;
+    pending: Pending;
+    steps: unknown[];
+    expected: { speed: SpeedJson; pending: Pending }[];
+  }[];
 }
 
 export interface VectorReport {
@@ -159,6 +166,23 @@ export function runVectors(file: VectorFile, maxFailures = 20): VectorReport {
   for (const v of file.speed) {
     const got = updateSpeed(toSpeed(v.speed), v.timings);
     record("speed " + v.id, got.promptTps === v.expected.prompt_tps && got.genTps === v.expected.gen_tps);
+  }
+  for (const v of file.answer_speed) {
+    let speed: Speed | null = toSpeed(v.speed);
+    let pending: Pending = v.pending;
+    let ok = v.steps.length === v.expected.length;
+    for (let i = 0; ok && i < v.steps.length; i++) {
+      const next = updateAnswerSpeed(speed, pending, v.steps[i]);
+      speed = next.speed;
+      pending = next.pending;
+      const e = v.expected[i];
+      ok =
+        speed.promptTps === e.speed.prompt_tps &&
+        speed.genTps === e.speed.gen_tps &&
+        pending.n === e.pending.n &&
+        pending.ms === e.pending.ms;
+    }
+    record("answer_speed " + v.id, ok);
   }
   return { total: total, passed: total - failed, failed: failed, failures: failures };
 }

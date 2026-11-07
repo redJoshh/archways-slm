@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { checkResults, parseQueryReply } from "../src/contract.ts";
-import { speedState, updateSpeed } from "../src/budget.ts";
+import { speedState, updateAnswerSpeed, updateSpeed } from "../src/budget.ts";
 import { askAssistant, startQuestion, type QuestionLog, type Step, type StepInput } from "../src/flow.ts";
 import { answerSystem, answerUserMessage, casePart, querySystem, systemTurn, todayText } from "../src/render.ts";
 import { runVectors, type VectorFile } from "../src/vectors.ts";
@@ -238,4 +238,58 @@ test("the driver never rejects, even if a dependency throws synchronously", asyn
     countTokens: () => Promise.resolve(0),
   });
   assert.equal(result.path, "query_error");
+});
+
+test("Redmi 2026-11-07: short not-found replies add up until the speed is known", async () => {
+  const vector = file.flow.find((v) => v.id === "answer-not-found-sentence")!;
+  const speed = speedState(null);
+  const paths: string[] = [];
+  for (const ms of [625, 630, 630]) {
+    const timings = { prompt_n: 177, prompt_per_second: 25, predicted_n: 8, predicted_ms: ms, predicted_per_second: 8000 / ms };
+    const result = await askAssistant(vector.question, {
+      nowMs: () => vector.now_ms,
+      complete: (call) =>
+        Promise.resolve(
+          call.kind === "query"
+            ? { text: vector.query_reply as string, timings: { predicted_n: 9, predicted_ms: 1, predicted_per_second: 9000 } }
+            : { text: vector.answer_reply as string, timings: timings },
+        ),
+      search: () => Promise.resolve(vector.search_reply),
+      countTokens: () => Promise.resolve(vector.case_tokens as number),
+      speed: speed,
+    });
+    paths.push(result.path);
+    if (paths.length === 1) {
+      // Query-call timings never add to the total.
+      assert.deepEqual(speed.pending(), { n: 8, ms: 625 });
+      assert.equal(speed.get()!.genTps, null);
+    }
+  }
+  assert.deepEqual(paths, ["answer_not_found", "answer_not_found", "answer_not_found"]);
+  assert.equal(speed.get()!.genTps, 16000 / 1255);
+  assert.deepEqual(speed.pending(), { n: 8, ms: 630 });
+});
+
+test("non-finite predicted_ms is ignored (not expressible in the JSON vectors)", () => {
+  const pending = { n: 8, ms: 600 };
+  for (const ms of [NaN, Infinity, -Infinity]) {
+    const timings = { predicted_n: 8, predicted_ms: ms, predicted_per_second: 12.8 };
+    assert.deepEqual(updateAnswerSpeed(null, pending, timings), {
+      speed: { promptTps: null, genTps: null },
+      pending: pending,
+    });
+  }
+});
+
+test("the answer path shows the guarded reply above the results list", async () => {
+  const vector = file.flow.find((v) => v.id === "answer")!;
+  const result = await askAssistant(vector.question, {
+    nowMs: () => vector.now_ms,
+    complete: (call) =>
+      Promise.resolve({ text: (call.kind === "query" ? vector.query_reply : vector.answer_reply) as string }),
+    search: () => Promise.resolve(vector.search_reply),
+    countTokens: () => Promise.resolve(vector.case_tokens as number),
+  });
+  assert.equal(result.path, "answer");
+  assert.ok(result.text.startsWith((vector.answer_reply as string) + "\n\nThese announcements may help:\n- "));
 });

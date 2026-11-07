@@ -11,6 +11,9 @@ The vectors define what assistant-ts must do, case by case:
 - query: query replies and whether they are valid search arguments
 - results: search replies and whether they meet the result contract
 - flow: whole questions with every step scripted, and the outcome
+- speed: update_speed() (priming and answer calls)
+- answer_speed: update_answer_speed() over a sequence of answer calls,
+  with the running total of short replies
 
 Expected values come from the Python reference only. --check exits 1 if the
 committed file differs. Deterministic: no clock, no network, no model.
@@ -24,7 +27,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from archways_assistant import assistant
-from archways_assistant.assistant import ERROR, Speed, flow, update_speed
+from archways_assistant.assistant import (
+    ERROR,
+    Pending,
+    Speed,
+    flow,
+    update_answer_speed,
+    update_speed,
+)
 from archways_assistant.fakebackend import is_visible, to_announcement
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -282,6 +292,7 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
     query_009 = '{"query": "student portal", "days": 30}'
     query_004 = '{"query": "curriculum advising session", "days": 30}'
     bad_row = [{**by_id["ann-005"], "posted_at": "yesterday"}]
+    not_found = assistant.NOT_FOUND_MESSAGE
     scripts = [
         ("answer", q004, query_004, e2e_004, 177, reply_004),
         ("answer-trimmed", q004, query_004, e2e_004, 177, "\n  " + reply_004 + " \t"),
@@ -299,6 +310,42 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
         ("budget-e2e-009", q009, query_009, e2e_009, 394, reply_009),
         ("guard-fired-invented", q009, query_009, e2e_009, 150, invented),
         ("guard-fired-non-ascii-digit", q004, query_004, e2e_004, 177, "Room \u0661."),
+        # The not-found sentence although results exist (Redmi 2026-11-07):
+        # the list only. Exact match after the ASCII trim.
+        ("answer-not-found-sentence", q004, query_004, e2e_004, 177, not_found),
+        (
+            "answer-not-found-trimmed",
+            q009,
+            query_009,
+            e2e_009,
+            150,
+            "\n " + not_found + " \t",
+        ),
+        # Not exact: these are ordinary replies, guarded, then the list.
+        (
+            "answer-not-found-lowercase",
+            q004,
+            query_004,
+            e2e_004,
+            177,
+            not_found.lower(),
+        ),
+        (
+            "answer-not-found-plus-text",
+            q004,
+            query_004,
+            e2e_004,
+            177,
+            not_found + " Please check with your college.",
+        ),
+        (
+            "answer-not-found-nbsp",
+            q004,
+            query_004,
+            e2e_004,
+            177,
+            not_found + "\u00a0",
+        ),
         ("not-found", q004, '{"query": "swimming pool"}', [], None, None),
         ("query-invalid-prose", q004, "Sure! Searching now.", None, None, None),
         ("query-invalid-fence", q004, '```json\n{"query": "x"}\n```', None, None, None),
@@ -355,6 +402,16 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
         ),
         ("time-error", q009, query_009, e2e_009, 394, ERROR, 2200, fast),
         ("time-guard-fired", q009, query_009, e2e_009, 394, invented, 2200, fast),
+        (
+            "time-answer-not-found",
+            q009,
+            query_009,
+            e2e_009,
+            394,
+            assistant.NOT_FOUND_MESSAGE,
+            2200,
+            fast,
+        ),
         # Only one rate known: the tokens rule decides.
         (
             "tokens-partial-speed",
@@ -502,6 +559,111 @@ def speed_vectors() -> list[dict]:
     ]
 
 
+def answer_timings(predicted_n, predicted_ms, **extra) -> dict:
+    """An answer call's timings (prompt rate accepted: 177 tokens)."""
+    timings = {
+        "prompt_n": 177,
+        "prompt_per_second": 25.0,
+        "predicted_n": predicted_n,
+        "predicted_ms": predicted_ms,
+        "predicted_per_second": (
+            predicted_n * 1000 / predicted_ms
+            if isinstance(predicted_n, int | float)
+            and not isinstance(predicted_n, bool)
+            and isinstance(predicted_ms, int | float)
+            and not isinstance(predicted_ms, bool)
+            and predicted_ms > 0
+            else 12.8
+        ),
+    }
+    return {**timings, **extra}
+
+
+def answer_speed_vectors() -> list[dict]:
+    """update_answer_speed(): (id, start speed, start pending, timings list).
+
+    The Redmi 2026-11-07 flow test: three not-found replies of 8 tokens at
+    12.8, 12.7 and 12.7 tokens/s (625, 630 and 630 ms here).
+    """
+    redmi = Speed(28.0, 10.4)
+    short = answer_timings(8, 625.0)
+    cases = [
+        (
+            "redmi-not-found-x3",
+            None,
+            Pending(),
+            [short, answer_timings(8, 630.0), answer_timings(8, 630.0)],
+        ),
+        ("short-then-long", None, Pending(), [short, answer_timings(37, 3557.7)]),
+        ("long-resets-pending", redmi, Pending(8, 600.0), [answer_timings(37, 3557.7)]),
+        (
+            "exactly-ten",
+            None,
+            Pending(),
+            [answer_timings(4, 300.0), answer_timings(6, 500.0)],
+        ),
+        ("nine-is-pending", None, Pending(), [answer_timings(9, 700.0)]),
+        ("count-integral-float", None, Pending(), [answer_timings(8.0, 625.0), short]),
+        ("count-fraction", None, Pending(), [answer_timings(8.5, 625.0)]),
+        ("count-zero", None, Pending(), [answer_timings(0, 625.0)]),
+        ("count-bool", None, Pending(), [answer_timings(True, 625.0)]),
+        ("count-string", None, Pending(), [answer_timings("8", 625.0)]),
+        ("ms-missing", None, Pending(), [{**short, "predicted_ms": None}]),
+        (
+            "ms-absent",
+            None,
+            Pending(),
+            [{k: v for k, v in short.items() if k != "predicted_ms"}],
+        ),
+        ("ms-zero", None, Pending(), [answer_timings(8, 0)]),
+        ("ms-negative", None, Pending(), [answer_timings(8, -5.0)]),
+        ("ms-string", None, Pending(), [answer_timings(8, "625")]),
+        ("ms-bool", None, Pending(), [answer_timings(8, True)]),
+        # The pooled rate is checked like any rate: 10 tokens in 5 ms is
+        # 2000 tokens/s, over RATE_MAX, so it is dropped and pending resets.
+        ("pooled-rate-above-max", None, Pending(5, 2.5), [answer_timings(5, 2.5)]),
+        (
+            "pooled-rate-below-min",
+            None,
+            Pending(5, 6000.0),
+            [answer_timings(5, 5000.0)],
+        ),
+        # A long reply whose rate is rejected leaves pending as it is.
+        (
+            "long-rejected-keeps-pending",
+            redmi,
+            Pending(8, 600.0),
+            [answer_timings(20, 1000.0, predicted_per_second=1000.5)],
+        ),
+        ("not-an-object", redmi, Pending(8, 600.0), [[1, 2]]),
+        ("no-timings", redmi, Pending(8, 600.0), [None]),
+        ("known-speed-short-replies", redmi, Pending(), [short, short]),
+    ]
+    out = []
+    for id_, speed, pending, steps in cases:
+        expected = []
+        current, total = speed, pending
+        for timings in steps:
+            current, total = update_answer_speed(current, total, timings)
+            expected.append(
+                {"speed": speed_json(current), "pending": pending_json(total)}
+            )
+        out.append(
+            {
+                "id": id_,
+                "speed": speed_json(speed),
+                "pending": pending_json(pending),
+                "steps": steps,
+                "expected": expected,
+            }
+        )
+    return out
+
+
+def pending_json(pending: Pending) -> dict:
+    return {"n": pending.n, "ms": pending.ms}
+
+
 def build() -> str:
     rows = json.loads(SEED.read_text(encoding="utf-8"))
     for row in rows:
@@ -523,6 +685,7 @@ def build() -> str:
         "results": results_vectors(rows),
         "flow": flow_vectors(rows),
         "speed": speed_vectors(),
+        "answer_speed": answer_speed_vectors(),
     }
     return json.dumps(data, ensure_ascii=True, indent=1) + "\n"
 

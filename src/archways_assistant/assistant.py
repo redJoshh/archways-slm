@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from archways_assistant.e2escore import (
+    FALLBACK_HEADER,
     LAST_RESORT_MESSAGE,
     NOT_FOUND_MESSAGE,
     fallback,
@@ -82,6 +83,8 @@ CASE_TOKENS_CTX_MAX = N_CTX - ANSWER_N_PREDICT - SYSTEM_TOKENS_MAX
 RATE_MIN = 1
 RATE_MAX = 1000
 PROMPT_N_MIN = 100
+# Answer replies shorter than this add up (update_answer_speed()) until
+# their total reaches it.
 PREDICTED_N_MIN = 10
 # Questions longer than this (code points) are refused before any call, so
 # a pasted text can't overflow n_ctx 2048. Proposal, not measured.
@@ -100,11 +103,18 @@ ECMA_WHITESPACE = frozenset(
 )
 ASCII_WHITESPACE = " \t\n\r\f\v"
 
+# ADR 0004, UAT configuration (2026-11-07): every path with results ends
+# with the results list under this header; a guarded answer goes above it.
+RESULTS_HEADER = "These announcements may help:"
+# Between the guarded answer and the results list.
+ANSWER_LIST_SEPARATOR = "\n\n"
+
 PATHS = (
-    "answer",  # the model answered and the guard did not fire
-    "guard_fired",  # the guard replaced the reply
-    "budget_fallback",  # case part over budget: no answer call
-    "answer_error",  # counting, the answer call or the guard failed
+    "answer",  # the guard passed the reply: the reply, then the results list
+    "answer_not_found",  # the reply was the not-found sentence: the list only
+    "guard_fired",  # the guard rejected the reply: the list only
+    "budget_fallback",  # over budget, no answer call: the list only
+    "answer_error",  # counting, the answer call or the guard failed: the list
     "not_found",  # valid search, no results: no answer call
     "query_invalid",  # the query reply is not valid arguments
     "query_error",  # the query call failed
@@ -379,6 +389,57 @@ def update_speed(speed: Speed | None, timings) -> Speed:
     return Speed(prompt, gen)
 
 
+@dataclass(frozen=True)
+class Pending:
+    """Generated tokens and ms of short answer replies, not yet a rate."""
+
+    n: int = 0
+    ms: float = 0.0
+
+
+def is_short_sample(count, ms) -> bool:
+    """A reply too short to give a rate alone: 1 to PREDICTED_N_MIN - 1
+    tokens (an integral number), generated in a finite, positive number of ms."""
+    return (
+        is_integral(count)
+        and 1 <= count < PREDICTED_N_MIN
+        and is_number(ms)
+        and math.isfinite(ms)
+        and ms > 0
+    )
+
+
+def update_answer_speed(
+    speed: Speed | None, pending: Pending, timings
+) -> tuple[Speed, Pending]:
+    """update_speed() for an answer call, adding up short replies.
+
+    Answer calls only (never priming or query calls). A reply of fewer than
+    PREDICTED_N_MIN generated tokens (for example the 8-token not-found
+    sentence) adds its predicted_n and predicted_ms to pending. When pending
+    reaches PREDICTED_N_MIN tokens, the generation rate becomes
+    pending.n * 1000 / pending.ms (if that rate is accepted) and pending is
+    reset. A reply whose own rate is accepted sets the rate as before and
+    resets pending. Anything else leaves pending as it is.
+    """
+    updated = update_speed(speed, timings)
+    if not isinstance(timings, dict):
+        return updated, pending
+    count = timings.get("predicted_n")
+    if accept_rate(timings.get("predicted_per_second"), count, PREDICTED_N_MIN):
+        return updated, Pending()
+    ms = timings.get("predicted_ms")
+    if not is_short_sample(count, ms):
+        return updated, pending
+    total = Pending(pending.n + count, pending.ms + ms)
+    if total.n < PREDICTED_N_MIN:
+        return updated, total
+    rate = total.n * 1000 / total.ms
+    if accept_rate(rate, total.n, PREDICTED_N_MIN):
+        updated = Speed(updated.prompt_tps, rate)
+    return updated, Pending()
+
+
 def predict_ms(case_tokens: int, elapsed_ms: int, speed: Speed) -> float:
     """The whole question's predicted time if the answer call is made.
 
@@ -418,11 +479,26 @@ class Outcome:
 ERROR = object()  # a scripted step that throws
 
 
-def safe_fallback(results: list[dict]) -> str:
+def results_list(results: list[dict]) -> str:
+    """RESULTS_HEADER, then fallback()'s lines (titles and posted dates)."""
+    text = fallback(results)
+    if not text.startswith(FALLBACK_HEADER + "\n"):
+        raise ValueError("fallback() changed its header line")
+    return RESULTS_HEADER + text[len(FALLBACK_HEADER) :]
+
+
+def safe_results_list(results: list[dict]) -> str | None:
+    """results_list(), or None if it can't be built (an unreadable posted_at;
+    contract-checked results never have one)."""
     try:
-        return fallback(results)
+        return results_list(results)
     except ValueError:
-        return LAST_RESORT_MESSAGE
+        return None
+
+
+def list_or_last_resort(results: list[dict]) -> str:
+    listed = safe_results_list(results)
+    return LAST_RESORT_MESSAGE if listed is None else listed
 
 
 def flow(
@@ -492,23 +568,46 @@ def flow(
         case_part(answer_system, user),
     )
     if not is_count(case_tokens):
-        outcome = Outcome("answer_error", safe_fallback(results), result_count=count)
+        outcome = Outcome(
+            "answer_error", list_or_last_resort(results), result_count=count
+        )
         return outcome, calls, arguments
     budget = decide_budget(case_tokens, elapsed_ms, speed)
     if budget.fallback:
-        outcome = Outcome("budget_fallback", safe_fallback(results), (), budget, count)
+        outcome = Outcome(
+            "budget_fallback", list_or_last_resort(results), (), budget, count
+        )
         return outcome, calls, arguments
     if answer_reply is ERROR:
-        outcome = Outcome("answer_error", safe_fallback(results), (), budget, count)
+        outcome = Outcome(
+            "answer_error", list_or_last_resort(results), (), budget, count
+        )
         return outcome, calls, arguments
     reply = answer_reply.strip(ASCII_WHITESPACE)
+    # The not-found sentence although results exist: show the list instead.
+    if reply == NOT_FOUND_MESSAGE:
+        outcome = Outcome(
+            "answer_not_found", list_or_last_resort(results), (), budget, count
+        )
+        return outcome, calls, arguments
     try:
         guarded = guard(reply, results, question, [])
     # Defense in depth: results are contract-checked, so the guard should not
     # raise; if it does, never show the unguarded reply.
     except (ValueError, KeyError, TypeError):
-        outcome = Outcome("answer_error", safe_fallback(results), (), budget, count)
+        outcome = Outcome(
+            "answer_error", list_or_last_resort(results), (), budget, count
+        )
         return outcome, calls, arguments
-    path = "guard_fired" if guarded.fired else "answer"
-    outcome = Outcome(path, guarded.text, tuple(guarded.codes), budget, count)
+    listed = safe_results_list(results)
+    if guarded.fired:
+        text = LAST_RESORT_MESSAGE if listed is None else listed
+        outcome = Outcome("guard_fired", text, tuple(guarded.codes), budget, count)
+    elif listed is None:
+        # Unreachable for contract-checked results; never show the reply
+        # without its list.
+        outcome = Outcome("answer_error", LAST_RESORT_MESSAGE, (), budget, count)
+    else:
+        text = guarded.text + ANSWER_LIST_SEPARATOR + listed
+        outcome = Outcome("answer", text, tuple(guarded.codes), budget, count)
     return outcome, calls, arguments
