@@ -19,6 +19,38 @@ Template:
 
 ---
 
+## 2026-11-07: stress check on the longer snapshot, and the phone flow test of the real packages
+
+- **Date:** 2026-11-07 (about 15:40–16:10 +08:00)
+- **Stress check:** `scripts/measure_snapshot_budget.py --excerpt-chars 500,350,250` on the new snapshot (ids and numbers only; report `runs/snapshot_budget_20261107T155059.json`; Ollama 0.40.15, commit `5052ef7`).
+  - **The snapshot has 53 rows, not 54:** 4 new long rows (ids 56, 57, 58, 59) reached the export, not 5. Id 54 is also new but short. Why the fifth is missing is unverified (it may not be PUBLISHED or visible).
+  - **Longest plain-text body: 1649 characters (id 58)**; then 59: 1593, 57: 1567, 56: 1567, 39: 350. Median 268 (was 262).
+  - Check: system 197 + case part 232 = whole 429. c = 34 at every length; the estimate error was 0 on 50 pairs and 50 triples at each length.
+
+  | Excerpt | Bodies cut | 1 result: min / median / max | Over 200 tokens (1 / 2 / 3 results) | Over 15 s at Redmi rates (1 / 2 / 3) | Median estimate, tokens (1 / 2 / 3) | Predicted at Redmi, ms (1 / 2 / 3) |
+  |---|---|---|---|---|---|---|
+  | 500 | 4/53 | 161 / 177 / 240 | 6/53 (ids 59, 58, 57, 56, 39, 10), 1378/1378, 23426/23426 | 6/53 (the same ids), 1378/1378, 23426/23426 | 177 / 320 / 463 | 13 925 / 19 032 / 24 140 |
+  | 350 | 4/53 | 161 / 177 / 219 | 4/53 (ids 59, 57, 39, 10), 1378/1378, 23426/23426 | 2/53 (ids 39, 10), 1378/1378, 23426/23426 | 177 / 320 / 463 | 13 925 / 19 032 / 24 140 |
+  | 250 | 34/53 | 161 / 175 / 201 | 2/53 (ids 39, 10 at 201), 1378/1378, 23426/23426 | 0/53, 1378/1378, 23426/23426 | 175 / 316 / 457 | 13 854 / 18 890 / 23 925 |
+
+  - Single-result tokens of the long rows: at 500, 57: 240, 59: 232, 56: 229, 58: 212; at 350, 57: 202, 59: 201 (56 and 58 ≤ 200).
+  - Exact 2-result samples: 295–427 (500), 295–370 (350), 294–357 (250). Exact 3-result samples: 439–568, 439–535, 432–506.
+  - **What it shows:** at 500, every long row as a single result falls back on the Redmi; at 350 and 250 none of them does. Multi-result questions still all fall back at every length, as before.
+- **Phone flow test (test app `C:\throw-away-app\gate1-llm`, its commit `c1a77b5`, not pushed):**
+  - "Assistant flow test" screen (`FlowTest.tsx`, `Screens.tsx`; `App.tsx` unchanged). It uses copies of assistant-ts, guard-ts and both vector files vendored from `5052ef7` (`vendor/archways/VENDORED.md`). No vector holds snapshot text (checked: 0 snapshot titles in either file).
+  - Buttons: guard vectors, assistant vectors, pick/load model (threads 4, `use_mmap`, `n_ctx` 2048, CPU), Prime (`primeSessions` with the `ignore_eos` sample, then `speedFromPriming`), run test questions (`askAssistant`, fake search, UAT `QuestionLog` lines).
+  - **Only a Metro reload is needed:** no new native module (llama.rn and expo-document-picker were already in the build). `fileExists` is an in-memory set of files saved this run, so no file-system module.
+- **`3dce70a` (`feat:`): `scripts/export_flow_test.py`.** For each test question it runs the phone's query call on Ollama (cold, no format, `num_predict` 64), and and_v2 on the snapshot. It writes the results to the test app's gitignored `local-data/flow_test.json`. The questions are the user's, in `data/local/flow_test_questions.json` (gitignored, expected answers unchanged). They are not eval files and are in no prompt.
+  - Result ids per question (Ollama 0.40.15, commit `3dce70a`, two runs identical; all 10 replies valid and the same with and without the schema as format): q01 59, 58, 57, 56, 54 (query `office`); q02 57; q03 50; q04 39; q05 28, 8; q06 44; q07 7; q08 56; q09 53; q10 none.
+- **How it was verified:** `uv run pytest -q` → `1127 passed`; `uv run ruff check .` → `All checks passed!`; `uv run ruff format --check .` → `53 files already formatted`. Test app: `npx tsc --noEmit` → no errors; `npx expo export --platform android` → bundled (608 modules). `npx expo lint` was not run: the app has no ESLint config, and the first run would install one. Nothing has run on the phone yet.
+- **Commits:** `3dce70a`, and this `docs:` commit. Test app: `c1a77b5`.
+- **Open questions / next:**
+  - The phone run: vector counts on Hermes, the priming speed sample, predicted against actual time, and the phone's query against Ollama's.
+  - The missing fifth long announcement.
+  - The query prompt contains today's date. If the phone runs on a different Manila day than the export, its queries may differ; the screen notes this. Re-run the export on the test day.
+
+---
+
 ## 2026-11-06: adaptive time budget for UAT, and case parts at excerpt lengths 500/350/250
 
 - **Date:** 2026-11-06 (about 18:45–20:00 +08:00)
