@@ -19,6 +19,49 @@ Template:
 
 ---
 
+## 2026-11-07: Redmi run of the flow test, and the three not-found answers diagnosed
+
+- **Date:** 2026-11-07 (evening, +08:00)
+- **Redmi 10C run (user, 2026-11-07; dev build of test app `c1a77b5`, 10 questions, real snapshot):**
+  - **Parity verified on the phone:** guard vectors 453/453 and assistant vectors 188/188 pass on Hermes 250829098.0.17.
+  - **Paths:** 3 `answer` (q06, q07, q09), 6 `budget_fallback` (q01, q02, q03, q04, q05, q08), 1 `not_found` (q10).
+  - **All 3 answers were the not-found sentence**, although each question had a retrieved result.
+  - **Queries:** q09's phone query was `drop forms`, against Ollama's `dropping forms`. The fake search returned Ollama's results (id 53) anyway.
+  - **Rule:** `tokens` on all 10, because Prime was not pressed.
+  - **Memory:** PSS 980,909 kB, RSS 1,040,424 kB, swap 224 kB.
+  - **First-call penalty:**
+    - q01's query call took 10.4 s, against about 2.5–3.4 s for later ones.
+    - q06's answer call took 13.8 s for 179 tokens, against 7.7–7.8 s for about 200 tokens later.
+    - q06's whole question took 16.2 s.
+- **Diagnosis of the three not-found answers on the laptop:**
+  - The setup:
+    - The answer call is answer v1, built with the Python reference.
+    - It uses the same results as the phone (from `local-data/flow_test.json`) and the date 2026-11-07.
+    - It ran cold on Ollama 0.40.15 (`keep_alive` 0, CPU, `num_predict` 200).
+  - The script is a one-off in the session scratchpad and is not committed. It prints ids, numbers and yes/no only.
+
+  | Question | Results | Not-found sentence reproduced | Prompt / generated tokens | Needed fact in the excerpt the model saw | Excerpt length | HTML tags / entities (raw body; excerpt) |
+  |---|---|---|---|---|---|---|
+  | q06 | 44 | yes (exact reply) | 376 / 10 | yes: "uniform" at character 179 (not in the title) | 270 (whole body, no cut) | 0 / 0; 0 / 0 |
+  | q07 | 7 | yes (exact reply) | 397 / 10 | yes: "strike" (title and character 44), "remote" (title and 155), "suspen" (261) | 292 (whole body) | 0 / 0; 0 / 0 |
+  | q09 | 53 | yes (exact reply) | 396 / 10 | yes: "october 25" at character 87 | 259 (whole body) | 0 / 0; 0 / 0 |
+
+  - **What it shows:** the needed fact was in the excerpt the model saw, with no HTML leftovers, entities or non-ASCII characters. So this is the model's own failure, not a data or excerpt problem.
+    - It reproduces cold on Ollama, so it is not a phone or llama.rn effect.
+    - The snapshot's only bodies with character references are ids 18 and 14, neither of them involved.
+  - **Retrieval, a separate finding:**
+    - The user's expected answers name 3 announcements for q06 (ids 44, 21, 29) and 2 for q07 (ids 7, 9). Search returned only 44 and 7.
+    - Ids 21 and 29 contain "uniform" but were not matched by the query `uniforms`.
+    - Id 9 is the weather suspension, which `remote work` cannot match.
+- **Proposed, not yet approved (plans in the chat):**
+  - The speed-update fix: pool short answer-call samples.
+  - The UAT change: always show the results list when there are results.
+- **How it was verified:** the phone numbers are as the user reported them. The laptop rows come from the scratch script's output above.
+- **Commits:** this `docs:` commit.
+- **Open questions / next:** the two plans. The speed rates of the 3 not-found answer calls on the phone (generation tokens/s) were not reported; they would show whether short replies generate at the answer-call rate.
+
+---
+
 ## 2026-11-07: correction to the stress-check entry
 
 - **Date:** 2026-11-07 (16:15 +08:00)
