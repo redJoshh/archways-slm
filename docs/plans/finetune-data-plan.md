@@ -63,6 +63,12 @@ Also unverified: whether an answer-only LoRA changes the query call's outputs. T
 
 Note (2026-11-06): for qwen3:0.6b, ADR 0004 names the query call's retrieval misses as the main quality risk (under `and_v2`: e2e-003, 014, 021, 023). Decision A is unchanged. Option C is the one to revisit if those misses remain on real announcements.
 
+**Recorded 2026-11-07 (user): the query call should be trained too.**
+- Evidence: the labelled flow-test questions on the real snapshot (devlog 2026-11-07). Under `and_v3`, two misses come from the model's queries, not the matcher:
+  - q01: the query `office` never reaches row 18.
+  - q07: `remote work` cannot reach the weather suspension, id 9 (a two-part question).
+- Decision 1 should move from A toward C (or a separate query-call LoRA). How to split the data and score the query call separately is open for the user's review.
+
 ## Decision 2: training announcements
 
 - **A NEW synthetic corpus,** fully separate from `data/seed/announcements.json`. Generated files go in `data/generated/`, which is gitignored.
