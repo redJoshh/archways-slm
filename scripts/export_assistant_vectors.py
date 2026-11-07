@@ -635,6 +635,13 @@ def answer_speed_vectors() -> list[dict]:
             Pending(8, 600.0),
             [answer_timings(20, 1000.0, predicted_per_second=1000.5)],
         ),
+        # 10 tokens at a rejected rate is not a short reply either.
+        (
+            "ten-rejected-is-not-short",
+            None,
+            Pending(3, 300.0),
+            [answer_timings(10, 0.5, predicted_per_second=20000.0)],
+        ),
         ("not-an-object", redmi, Pending(8, 600.0), [[1, 2]]),
         ("no-timings", redmi, Pending(8, 600.0), [None]),
         ("known-speed-short-replies", redmi, Pending(), [short, short]),
