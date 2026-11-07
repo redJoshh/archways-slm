@@ -19,6 +19,58 @@ Template:
 
 ---
 
+## 2026-11-07: per-kind speeds; ADR 0006 accepted; the feed index, and_v3 port and Live screen built
+
+- **Date:** 2026-11-07 (night, +08:00)
+- **Decisions (user, 2026-11-07):**
+  - Predict the answer call with the answer call's own prompt speed. `GEN_TOKENS` stays 51.
+  - The feed-index plan is approved, with N = 10 min and the 60-min full rebuild.
+  - **ADR 0006 is ACCEPTED** (team lead).
+  - The mobile app's Expo/RN versions against llama.rn are a blocking risk.
+- **Speed fix:**
+  - **Commits:**
+    - `2d7cff7`: `speeds_from_priming()` / `speedsFromPriming()`, `querySpeedState`, `deps.querySpeed`.
+    - `b33cba2`: a stronger test.
+    - `1a4f063`: ADR 0004 "Each call kind predicted from its own speed" and the README.
+  - **Replay** (answer 27.1, generation 14.2):
+
+    | Question | Old prediction | New prediction | New path |
+    |---|---|---|---|
+    | q03 | 15 601 ms | 14 562 ms | answer |
+    | q07 | 15 170 ms | 14 147 ms | answer |
+    | q09 | 15 594 ms | 14 576 ms | answer |
+    | q02 | 17 431 ms | 16 131 ms | still falls back |
+
+  - **Caveat:** the generation rate usually still comes from the query priming call (14.2, against 10.4–12.8 for phone answers).
+  - **Mistake, recovered:** a mutation helper restored files with `git checkout` while `budget.ts` and `flow.ts` held uncommitted work, and wiped it. The changes were re-applied before the commit, and the helper now backs up and restores files instead.
+- **ADR 0006 accepted (`9eb5cee`):**
+  - `how-it-works.md` v3 and ADR 0004's matcher line now say that and_v3 runs on the phone and Spring needs no search change.
+  - ADR 0006 records that the server clock is Manila only in the Docker image (a local run elsewhere shifts posted dates), and the blocking risk.
+  - **The new `CLAUDE.md` wording is proposed in the chat; `CLAUDE.md` is unchanged.**
+- **Built:**
+  - `c5eb4f3`: `feedindex.py`, the reference.
+  - `0aaaefe`: `export_search_ts.py` → `searchData.ts`, including `WORD_RANGES` from `unicodedata`, because the Hermes 0.12 CLI has no `\p{…}` escapes.
+  - `export_feed_vectors.py` → `feed_vectors.json`.
+  - `ea55ed1`: `plaintext.ts`, `search.ts`, `feed.ts`, `feedVectors.ts`. The Hermes bundle now fails on a top-level name clash; it found `SPACE_SET` in two files.
+  - `5c56f26`: stronger vectors.
+  - `852d8f8`: `feedIndex.ts`.
+  - `d20e720`: a test.
+  - `5400b7d`: the README (feed search and mobile wiring).
+  - **Test app `c11cda0`:**
+    - The Live screen (dev-login with a `test.*` email, token in memory only, index, live flow, 401 → log in again).
+    - A shared model in `phoneModel.ts`; the flow test gains "Run feed vectors".
+    - Vendored from `d20e720`.
+- **How it was verified:**
+  - `uv run pytest -q` → `1174 passed, 2 skipped`; ruff clean; all generators `--check` up to date.
+  - assistant-ts `npm test` → 252 pass. Hermes CLI → assistant 230/230, feed 188/188. guard-ts → 461 pass.
+  - Test app: `tsc --noEmit` clean; the Android bundle builds (618 modules).
+  - Mutation checks, all caught after the fixes: 5 speed, 16 search/plain-text/feed, 10 index. Survivors fixed by `b33cba2`, `5c56f26` and `d20e720`.
+- **Not verified:**
+  - Anything on the phone, or against a live Spring server: the exact `publishedAt` string (the Live screen logs it), the fetch and index times, and cleartext HTTP in the dev build.
+- **Commits:** as listed, plus this `docs:` commit. Not pushed.
+
+---
+
 ## 2026-11-07: ADR 0006 proposed (on-phone search over the feed); plan for the index, port and live mode
 
 - **Date:** 2026-11-07 (night, +08:00)
