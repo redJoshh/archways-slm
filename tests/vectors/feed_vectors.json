@@ -1,0 +1,1767 @@
+{
+ "format": "archways feed search vectors v1",
+ "generator": "scripts/export_feed_vectors.py",
+ "matcher": "and_v3",
+ "plain_text": [
+  {
+   "body": "Plain text stays.",
+   "expected": "Plain text stays."
+  },
+  {
+   "body": "<p>One</p><p>Two</p>",
+   "expected": "One Two"
+  },
+  {
+   "body": "Line<br>break<br/>and<br />more",
+   "expected": "Line break and more"
+  },
+  {
+   "body": "<ul><li>a</li><li>b</li></ul>",
+   "expected": "a b"
+  },
+  {
+   "body": "<div style=\"text-align: center\">Centred</div>",
+   "expected": "Centred"
+  },
+  {
+   "body": "un<b>der</b>l<i>in</i>e<u>d</u> <s>x</s><strike>y</strike>",
+   "expected": "underlined xy"
+  },
+  {
+   "body": "<STRONG>Bold</STRONG><EM>it</EM>",
+   "expected": "Boldit"
+  },
+  {
+   "body": "Go <a href=\"https://x.example\" rel=\"noopener noreferrer\">here</a>.",
+   "expected": "Go here."
+  },
+  {
+   "body": "<blockquote>Q</blockquote>A",
+   "expected": "Q A"
+  },
+  {
+   "body": "Before<!-- note -->after",
+   "expected": "Before after"
+  },
+  {
+   "body": "Unknown<span>tag</span>s",
+   "expected": "Unknown tag s"
+  },
+  {
+   "body": "&lt;b&gt;not bold&lt;/b&gt;",
+   "expected": "<b>not bold</b>"
+  },
+  {
+   "body": "a &amp; b",
+   "expected": "a & b"
+  },
+  {
+   "body": "x&nbsp;&nbsp;y",
+   "expected": "x y"
+  },
+  {
+   "body": "&#65;&#x42;&#X43;",
+   "expected": "ABC"
+  },
+  {
+   "body": "&#x1F600;",
+   "expected": "\ud83d\ude00"
+  },
+  {
+   "body": "&#0;|&#xD800;|&#x110000;",
+   "expected": "\ufffd|\ufffd|\ufffd"
+  },
+  {
+   "body": "&amp no semicolon",
+   "expected": "&amp no semicolon"
+  },
+  {
+   "body": "&bogus; stays",
+   "expected": "&bogus; stays"
+  },
+  {
+   "body": "AT&T",
+   "expected": "AT&T"
+  },
+  {
+   "body": "1 < 2 and 3 <= 4",
+   "expected": "1 < 2 and 3 <= 4"
+  },
+  {
+   "body": "<3 you",
+   "expected": "<3 you"
+  },
+  {
+   "body": "  a \t\n\r b\u00a0\u00a0c\f\u000b ",
+   "expected": "a b c"
+  },
+  {
+   "body": "<p> padded </p>",
+   "expected": "padded"
+  },
+  {
+   "body": "a\u2003b",
+   "expected": "a\u2003b"
+  },
+  {
+   "body": "",
+   "expected": ""
+  },
+  {
+   "body": "<p style=\"text-align: justify\">A <strong>bold</strong> start.</p><p>Next&nbsp;para.</p>",
+   "expected": "A bold start. Next para."
+  },
+  {
+   "body": "<h2>Heading</h2><ol><li>One</li><li>Two</li></ol>",
+   "expected": "Heading One Two"
+  },
+  {
+   "body": "Tab\tand<br>\nnew line",
+   "expected": "Tab and new line"
+  },
+  {
+   "body": "&#128512; &#x1f600; &#1114112; &#xffffffffff; &#99999999999999999999;",
+   "expected": "\ud83d\ude00 \ud83d\ude00 \ufffd \ufffd \ufffd"
+  },
+  {
+   "body": "&constructor; &toString; &__proto__; &hasOwnProperty;",
+   "expected": "&constructor; &toString; &__proto__; &hasOwnProperty;"
+  },
+  {
+   "body": "&NotEqualTilde; &ngE; &fjlig;",
+   "expected": "\u2242\u0338 \u2267\u0338 fj"
+  },
+  {
+   "body": "<p>Unclosed <b>bold",
+   "expected": "Unclosed bold"
+  },
+  {
+   "body": "a > b and <!DOCTYPE html> c",
+   "expected": "a > b and c"
+  },
+  {
+   "body": "<a href=\"x\">link</a><A HREF='y'>LINK</A>",
+   "expected": "linkLINK"
+  },
+  {
+   "body": "\u00a0\u00a0lead and trail\u00a0",
+   "expected": "lead and trail"
+  },
+  {
+   "body": "x<br/>\u2028y",
+   "expected": "x \u2028y"
+  }
+ ],
+ "cut": [
+  {
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "text": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+   "expected": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00"
+  },
+  {
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud83d\ude00b",
+   "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud83d\ude00"
+  },
+  {
+   "text": "",
+   "expected": ""
+  }
+ ],
+ "published_at": [
+  {
+   "text": "2026-11-07T15:33:53+08:00",
+   "expected": {
+    "manila": "2026-11-07T15:33:53+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "2026-11-07T15:33:53.987+08:00",
+   "expected": {
+    "manila": "2026-11-07T15:33:53+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "2026-11-07T15:33:53.000000001+08:00",
+   "expected": {
+    "manila": "2026-11-07T15:33:53+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "2026-11-07T07:33:53Z",
+   "expected": {
+    "manila": "2026-11-07T15:33:53+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "2026-11-07T15:33:53",
+   "expected": {
+    "manila": "2026-11-07T15:33:53+08:00",
+    "offset_added": true
+   }
+  },
+  {
+   "text": "2026-11-07T15:33:53-05:00",
+   "expected": {
+    "manila": "2026-11-08T04:33:53+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "2026-12-31T20:00:00-05:00",
+   "expected": {
+    "manila": "2027-01-01T09:00:00+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "2026-11-07T15:33+08:00",
+   "expected": null
+  },
+  {
+   "text": "2026-11-07 15:33:53+08:00",
+   "expected": null
+  },
+  {
+   "text": "2026-02-29T10:00:00+08:00",
+   "expected": null
+  },
+  {
+   "text": "2028-02-29T10:00:00+08:00",
+   "expected": {
+    "manila": "2028-02-29T10:00:00+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "2026-02-30T10:00:00+08:00",
+   "expected": null
+  },
+  {
+   "text": "2026-13-01T10:00:00+08:00",
+   "expected": null
+  },
+  {
+   "text": "2026-11-07T24:00:00+08:00",
+   "expected": null
+  },
+  {
+   "text": "2026-11-07T23:60:00+08:00",
+   "expected": null
+  },
+  {
+   "text": "2026-11-07T23:59:60+08:00",
+   "expected": null
+  },
+  {
+   "text": "2026-11-07T15:33:53+24:00",
+   "expected": null
+  },
+  {
+   "text": "2026-11-07T15:33:53+08:60",
+   "expected": null
+  },
+  {
+   "text": "2026-11-07T15:33:53+0800",
+   "expected": null
+  },
+  {
+   "text": "0999-12-31T20:00:00+08:00",
+   "expected": null
+  },
+  {
+   "text": "1000-01-01T07:00:00+00:00",
+   "expected": {
+    "manila": "1000-01-01T15:00:00+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "9999-12-31T23:59:59+08:00",
+   "expected": {
+    "manila": "9999-12-31T23:59:59+08:00",
+    "offset_added": false
+   }
+  },
+  {
+   "text": "9999-12-31T20:00:00-05:00",
+   "expected": null
+  },
+  {
+   "text": "",
+   "expected": null
+  },
+  {
+   "text": null,
+   "expected": null
+  },
+  {
+   "text": 20261107,
+   "expected": null
+  }
+ ],
+ "rows": [
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 7.0,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "7",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 7.5,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": null
+  },
+  {
+   "detail": {
+    "id": "7",
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": null
+  },
+  {
+   "detail": {
+    "id": true,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": null
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": null,
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": null
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": null,
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": null
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": null,
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": null,
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T07:33:53Z",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": true
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": null,
+    "version": 1,
+    "attachments": []
+   },
+   "expected": null
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "yesterday",
+    "version": 1,
+    "attachments": []
+   },
+   "expected": null
+  },
+  {
+   "detail": "not an object",
+   "expected": null
+  },
+  {
+   "detail": null,
+   "expected": null
+  }
+ ],
+ "search": {
+  "now": "2026-11-02T10:00:00+08:00",
+  "details": [
+   {
+    "id": 1,
+    "title": "Library Hours Extended",
+    "body": "The library will stay open until 9 PM.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 2,
+    "title": "Enrollment Reminder",
+    "body": "Enrollment closes Friday. Visit the registrar.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-30T08:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 3,
+    "title": "Registrar Advisory",
+    "body": "Document requests resume Monday.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-30T08:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 4,
+    "title": "Bookstore Sale",
+    "body": "Get 50% off selected items.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-28T10:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 5,
+    "title": "Parking Update",
+    "body": "Use the off_peak lane after 6 PM.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-27T10:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 6,
+    "title": "Path Notice",
+    "body": "Forms are stored under C:\\shared\\forms.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-26T10:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 9,
+    "title": "Library Future Notice",
+    "body": "A library notice scheduled for later.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-05T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 10,
+    "title": "Library Old Notice",
+    "body": "Posted exactly seven days before now.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-26T10:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 11,
+    "title": "Library Older Notice",
+    "body": "Posted one second before the seven-day window.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-26T09:59:59+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 101,
+    "title": "Tuition Reminder",
+    "body": "The second installment is due on Friday.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 102,
+    "title": "Peer Tutor Sign-ups",
+    "body": "Students may sign up at the office.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 103,
+    "title": "Class Suspension",
+    "body": "Classes are suspended during a typhoon.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 104,
+    "title": "Second Term Enrollment",
+    "body": "Enrollment for the second term opens Monday.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-31T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 105,
+    "title": "Physical Examination",
+    "body": "The annual examination is at the clinic.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 106,
+    "title": "Payment Center Hours",
+    "body": "The payment center opens at 8.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-10-31T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 201,
+    "title": "Information Desk",
+    "body": "Visit the information desk for help.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 202,
+    "title": "School Uniform Policy",
+    "body": "Wear the prescribed uniform on campus.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 203,
+    "title": "Online Platform Update",
+    "body": "The platform will be down on Sunday.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 204,
+    "title": "Drop Form Deadline",
+    "body": "Submit the drop form by Friday.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 205,
+    "title": "Example Schedule",
+    "body": "An example of the new schedule is posted.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 206,
+    "title": "Midterm Exam Schedule",
+    "body": "The exam starts at 8 AM.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 207,
+    "title": "Dress Code Rule",
+    "body": "The rule applies to all students.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 208,
+    "title": "Leave Request",
+    "body": "Fill out the leave form.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 209,
+    "title": "API Note",
+    "body": "Use the field form_id or form2 in the request.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-01T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 901,
+    "title": "Office Hours Update",
+    "body": "<p>The <b>registrar's office</b> opens at 8&nbsp;AM.</p>",
+    "priority": "NORMAL",
+    "officeName": "Office of the Registrar",
+    "publishedAt": "2026-11-01T08:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 902,
+    "title": "Foundation Anniversary Mass",
+    "body": "<p>Join the foundation anniversary Mass at the field.</p>",
+    "priority": "HIGH",
+    "officeName": "Campus Ministry",
+    "publishedAt": "2026-10-31T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 903,
+    "title": "Emergency Water Service Interruption",
+    "body": "<p>Emergency water service interruption in Building A until 3:00&nbsp;PM.</p>",
+    "priority": "HIGH",
+    "officeName": "Facilities",
+    "publishedAt": "2026-10-30T07:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 904,
+    "title": "General Weighted Average Reminder",
+    "body": "<p>The general weighted average is computed per term.</p>",
+    "priority": "NORMAL",
+    "officeName": "Registrar",
+    "publishedAt": "2026-10-29T10:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 905,
+    "title": "Paskuhan 2026 Schedule",
+    "body": "<ul><li>Paskuhan 2026</li><li>Gates open at 5 PM</li></ul>",
+    "priority": "NORMAL",
+    "officeName": "Student Affairs",
+    "publishedAt": "2026-10-28T10:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 906,
+    "title": "Remote Work Advisory",
+    "body": "<p>Employees shift to remote work on Friday.</p>",
+    "priority": "NORMAL",
+    "officeName": "Human Resources",
+    "publishedAt": "2026-10-27T10:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 907,
+    "title": "Single-Use Plastics Ban",
+    "body": "<p>Single-use plastics &amp; styrofoam are banned.</p>",
+    "priority": "HIGH",
+    "officeName": "Sustainability",
+    "publishedAt": "2026-10-26T12:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 908,
+    "title": "Dropping Period",
+    "body": "<p>Submit dropping forms at the dean's office.</p>",
+    "priority": "NORMAL",
+    "officeName": "Registrar",
+    "publishedAt": "2026-10-26T11:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 909,
+    "title": "Caf\u00e9 Reopening",
+    "body": "<p>The campus caf\u00e9 reopens on Monday.</p>",
+    "priority": "NORMAL",
+    "officeName": "Auxiliary Services",
+    "publishedAt": "2026-11-01T07:00:00Z",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 910,
+    "title": "Ni\u00f1o Festival",
+    "body": "<p>The Santo Ni\u00f1o procession starts at the plaza.</p>",
+    "priority": "NORMAL",
+    "officeName": "Campus Ministry",
+    "publishedAt": "2026-10-31T10:00:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 911,
+    "title": "Math Note",
+    "body": "<p>form\ud835\udc00 and form\u0663 only.</p>",
+    "priority": "NORMAL",
+    "officeName": "Mathematics",
+    "publishedAt": "2026-10-30T10:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 913,
+    "title": "Superscript Note",
+    "body": "<p>Use form\u00b2 here, not \ud835\udc00form.</p>",
+    "priority": "NORMAL",
+    "officeName": "Mathematics",
+    "publishedAt": "2026-10-30T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 912,
+    "title": "Late Item",
+    "body": "<p>Posted after now: forms.</p>",
+    "priority": "NORMAL",
+    "officeName": "Registrar",
+    "publishedAt": "2026-11-02T10:00:01+08:00",
+    "version": 1,
+    "attachments": []
+   }
+  ],
+  "cases": [
+   {
+    "name": "search_vectors: one word, default days 7: draft, archived and future rows excluded; v-10 is exactly on the window edge",
+    "arguments": {
+     "query": "library"
+    },
+    "ok": true,
+    "expected_ids": [
+     "1",
+     "10"
+    ]
+   },
+   {
+    "name": "search_vectors: days 30 brings in v-11",
+    "arguments": {
+     "query": "library",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "1",
+     "10",
+     "11"
+    ]
+   },
+   {
+    "name": "search_vectors: case-insensitive",
+    "arguments": {
+     "query": "LIBRARY"
+    },
+    "ok": true,
+    "expected_ids": [
+     "1",
+     "10"
+    ]
+   },
+   {
+    "name": "search_vectors: stopwords dropped",
+    "arguments": {
+     "query": "the library"
+    },
+    "ok": true,
+    "expected_ids": [
+     "1",
+     "10"
+    ]
+   },
+   {
+    "name": "search_vectors: only stopwords: no results",
+    "arguments": {
+     "query": "the of"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "search_vectors: AND across words; each word may match title or body",
+    "arguments": {
+     "query": "enrollment registrar"
+    },
+    "ok": true,
+    "expected_ids": [
+     "2"
+    ]
+   },
+   {
+    "name": "search_vectors: equal timestamps ordered by id",
+    "arguments": {
+     "query": "registrar"
+    },
+    "ok": true,
+    "expected_ids": [
+     "901",
+     "2",
+     "3"
+    ]
+   },
+   {
+    "name": "search_vectors: limit",
+    "arguments": {
+     "query": "library",
+     "days": 30,
+     "limit": 2
+    },
+    "ok": true,
+    "expected_ids": [
+     "1",
+     "10"
+    ]
+   },
+   {
+    "name": "search_vectors: percent is literal",
+    "arguments": {
+     "query": "%"
+    },
+    "ok": true,
+    "expected_ids": [
+     "4"
+    ]
+   },
+   {
+    "name": "search_vectors: percent inside a word",
+    "arguments": {
+     "query": "50%"
+    },
+    "ok": true,
+    "expected_ids": [
+     "4"
+    ]
+   },
+   {
+    "name": "search_vectors: underscore is literal",
+    "arguments": {
+     "query": "off_peak"
+    },
+    "ok": true,
+    "expected_ids": [
+     "5"
+    ]
+   },
+   {
+    "name": "search_vectors: lone underscore is literal",
+    "arguments": {
+     "query": "_"
+    },
+    "ok": true,
+    "expected_ids": [
+     "209",
+     "5"
+    ]
+   },
+   {
+    "name": "search_vectors: asterisk is literal and matches nothing",
+    "arguments": {
+     "query": "*"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "search_vectors: backslash is literal",
+    "arguments": {
+     "query": "c:\\shared"
+    },
+    "ok": true,
+    "expected_ids": [
+     "6"
+    ]
+   },
+   {
+    "name": "search_vectors: a word only in a draft row: no results",
+    "arguments": {
+     "query": "library draft"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "search_vectors: ties by id across the window",
+    "arguments": {
+     "query": "notice",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "10",
+     "6",
+     "11"
+    ]
+   },
+   {
+    "name": "search_vectors: empty query",
+    "arguments": {
+     "query": ""
+    },
+    "ok": false,
+    "expected_ids": null
+   },
+   {
+    "name": "search_vectors: whitespace-only query",
+    "arguments": {
+     "query": "   "
+    },
+    "ok": false,
+    "expected_ids": null
+   },
+   {
+    "name": "search_vectors: query over 200 characters",
+    "arguments": {
+     "query": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "ok": false,
+    "expected_ids": null
+   },
+   {
+    "name": "search_vectors: days above 30",
+    "arguments": {
+     "query": "library",
+     "days": 31
+    },
+    "ok": false,
+    "expected_ids": null
+   },
+   {
+    "name": "search_vectors: limit below 1",
+    "arguments": {
+     "query": "library",
+     "limit": 0
+    },
+    "ok": false,
+    "expected_ids": null
+   },
+   {
+    "name": "search_vectors: unknown argument",
+    "arguments": {
+     "query": "library",
+     "extra": 1
+    },
+    "ok": false,
+    "expected_ids": null
+   },
+   {
+    "name": "search_vectors: missing query",
+    "arguments": {
+     "days": 7
+    },
+    "ok": false,
+    "expected_ids": null
+   },
+   {
+    "name": "search_vectors_and_v2: synonym adds an alternative: payment also matches due",
+    "arguments": {
+     "query": "tuition payment"
+    },
+    "ok": true,
+    "expected_ids": [
+     "101"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: the word itself still matches; newest first",
+    "arguments": {
+     "query": "payment"
+    },
+    "ok": true,
+    "expected_ids": [
+     "101",
+     "106"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: keys are whole words: payments has no synonym",
+    "arguments": {
+     "query": "payments"
+    },
+    "ok": true,
+    "expected_ids": [
+     "106"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: phrase alternative: registration also matches sign up",
+    "arguments": {
+     "query": "peer registration"
+    },
+    "ok": true,
+    "expected_ids": [
+     "102"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: Filipino words map to English",
+    "arguments": {
+     "query": "klase bagyo"
+    },
+    "ok": true,
+    "expected_ids": [
+     "103"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: kapag is an and_v2 stopword",
+    "arguments": {
+     "query": "klase kapag bagyo"
+    },
+    "ok": true,
+    "expected_ids": [
+     "103"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: only kapag: no results",
+    "arguments": {
+     "query": "kapag"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "search_vectors_and_v2: may is not a stopword",
+    "arguments": {
+     "query": "klase may bagyo"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "search_vectors_and_v2: hyphenated key and spelling variant",
+    "arguments": {
+     "query": "second-term enrolment"
+    },
+    "ok": true,
+    "expected_ids": [
+     "104"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: spelling variant alone matches every enrollment row",
+    "arguments": {
+     "query": "enrolment"
+    },
+    "ok": true,
+    "expected_ids": [
+     "104",
+     "2"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: plural maps to singular",
+    "arguments": {
+     "query": "physical examinations"
+    },
+    "ok": true,
+    "expected_ids": [
+     "105"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v2: case-insensitive keys",
+    "arguments": {
+     "query": "Tuition PAYMENT"
+    },
+    "ok": true,
+    "expected_ids": [
+     "101"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: forms: whole-word form matches; information, uniform, platform, form_id, form2 do not",
+    "arguments": {
+     "query": "forms"
+    },
+    "ok": true,
+    "expected_ids": [
+     "204",
+     "208",
+     "913",
+     "908",
+     "6"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: uniforms matches uniform",
+    "arguments": {
+     "query": "uniforms"
+    },
+    "ok": true,
+    "expected_ids": [
+     "202"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: case-insensitive: UNIFORMS",
+    "arguments": {
+     "query": "UNIFORMS"
+    },
+    "ok": true,
+    "expected_ids": [
+     "202"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: exams matches exam, not example",
+    "arguments": {
+     "query": "exams"
+    },
+    "ok": true,
+    "expected_ids": [
+     "206"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: drop forms: AND across groups",
+    "arguments": {
+     "query": "drop forms"
+    },
+    "ok": true,
+    "expected_ids": [
+     "204",
+     "908"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: exactly 5 characters: rules adds rule",
+    "arguments": {
+     "query": "rules"
+    },
+    "ok": true,
+    "expected_ids": [
+     "207"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: classes adds classe, which never matches class; the substring still matches",
+    "arguments": {
+     "query": "classes"
+    },
+    "ok": true,
+    "expected_ids": [
+     "103"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: ends in ss: class is not eligible",
+    "arguments": {
+     "query": "class"
+    },
+    "ok": true,
+    "expected_ids": [
+     "103"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: ends in us: campus is not eligible",
+    "arguments": {
+     "query": "campus"
+    },
+    "ok": true,
+    "expected_ids": [
+     "909",
+     "202"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: ends in is: basis is not eligible",
+    "arguments": {
+     "query": "basis"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "search_vectors_and_v3: 4 characters: fees is not eligible",
+    "arguments": {
+     "query": "fees"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "search_vectors_and_v3: alternative ending in a non-word character is not added: staff's",
+    "arguments": {
+     "query": "staff's"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "search_vectors_and_v3: synonym and plural alternative together",
+    "arguments": {
+     "query": "physical examinations"
+    },
+    "ok": true,
+    "expected_ids": [
+     "105"
+    ]
+   },
+   {
+    "name": "search_vectors_and_v3: punctuation inside the alternative is escaped: x-rays",
+    "arguments": {
+     "query": "x-rays"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "flow: office",
+    "arguments": {
+     "query": "office",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "102",
+     "901",
+     "908"
+    ]
+   },
+   {
+    "name": "flow: foundation anniversary",
+    "arguments": {
+     "query": "foundation anniversary",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "902"
+    ]
+   },
+   {
+    "name": "flow: emergency water service interruption",
+    "arguments": {
+     "query": "emergency water service interruption",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "903"
+    ]
+   },
+   {
+    "name": "flow: general weight average",
+    "arguments": {
+     "query": "general weight average",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "904"
+    ]
+   },
+   {
+    "name": "flow: Paskuhan 2026",
+    "arguments": {
+     "query": "Paskuhan 2026",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "905"
+    ]
+   },
+   {
+    "name": "flow: uniforms",
+    "arguments": {
+     "query": "uniforms",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "202"
+    ]
+   },
+   {
+    "name": "flow: remote work",
+    "arguments": {
+     "query": "remote work",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "906"
+    ]
+   },
+   {
+    "name": "flow: single-use plastics",
+    "arguments": {
+     "query": "single-use plastics",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "907"
+    ]
+   },
+   {
+    "name": "flow: dropping forms",
+    "arguments": {
+     "query": "dropping forms",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "908"
+    ]
+   },
+   {
+    "name": "flow: halloween costume party",
+    "arguments": {
+     "query": "halloween costume party",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "flow: drop forms",
+    "arguments": {
+     "query": "drop forms",
+     "days": 30
+    },
+    "ok": true,
+    "expected_ids": [
+     "204",
+     "908"
+    ]
+   },
+   {
+    "name": "edge: 'drop\\xa0forms'",
+    "arguments": {
+     "query": "drop\u00a0forms"
+    },
+    "ok": true,
+    "expected_ids": [
+     "204",
+     "908"
+    ]
+   },
+   {
+    "name": "edge: 'drop\\u2003forms'",
+    "arguments": {
+     "query": "drop\u2003forms"
+    },
+    "ok": true,
+    "expected_ids": [
+     "204",
+     "908"
+    ]
+   },
+   {
+    "name": "edge: 'drop\\x85forms'",
+    "arguments": {
+     "query": "drop\u0085forms"
+    },
+    "ok": true,
+    "expected_ids": [
+     "204",
+     "908"
+    ]
+   },
+   {
+    "name": "edge: 'caf\u00e9s'",
+    "arguments": {
+     "query": "caf\u00e9s"
+    },
+    "ok": true,
+    "expected_ids": [
+     "909"
+    ]
+   },
+   {
+    "name": "edge: 'CAF\u00c9S'",
+    "arguments": {
+     "query": "CAF\u00c9S"
+    },
+    "ok": true,
+    "expected_ids": [
+     "909"
+    ]
+   },
+   {
+    "name": "edge: 'ni\u00f1os'",
+    "arguments": {
+     "query": "ni\u00f1os"
+    },
+    "ok": true,
+    "expected_ids": [
+     "910"
+    ]
+   },
+   {
+    "name": "edge: 'forms'",
+    "arguments": {
+     "query": "forms",
+     "days": 1
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "edge: 'forms'",
+    "arguments": {
+     "query": "forms",
+     "days": 30,
+     "limit": 2
+    },
+    "ok": true,
+    "expected_ids": [
+     "204",
+     "208"
+    ]
+   },
+   {
+    "name": "edge: 'the of'",
+    "arguments": {
+     "query": "the of"
+    },
+    "ok": true,
+    "expected_ids": []
+   },
+   {
+    "name": "edge: 'kapag forms'",
+    "arguments": {
+     "query": "kapag forms"
+    },
+    "ok": true,
+    "expected_ids": [
+     "204",
+     "208",
+     "913",
+     "908",
+     "6"
+    ]
+   }
+  ]
+ }
+}
