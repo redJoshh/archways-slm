@@ -33,6 +33,7 @@ from archways_assistant.excerpt import plain_text
 from archways_assistant.fakebackend import (
     EXCERPT_CHARS,
     InvalidArguments,
+    plural_alternative,
     to_announcement,
 )
 from archways_assistant.feedindex import feed_row, parse_published_at, search_feed
@@ -60,6 +61,36 @@ FLOW_QUERIES = [
     {"query": "halloween costume party", "days": 30},
     {"query": "drop forms", "days": 30},
 ]
+PLURAL_WORDS = [
+    "forms",
+    "uniforms",
+    "exams",
+    "rules",
+    "class",
+    "classes",
+    "campus",
+    "basis",
+    "thesis",
+    "fees",
+    "news",
+    "staff's",
+    "x-rays",
+    "(forms",
+    "forms)",
+    "cafés",
+    "niños",
+    "𝐀𝐀𝐀s",
+    "𝐀bcs",
+    "abc𝐀s",
+    "a٣bcs",
+    "12345s",
+    "_abcs",
+    "s",
+    "ss",
+    "sssss",
+    "éééés",
+    "abcd²s",
+]
 EDGE_QUERIES = [
     {"query": "drop forms"},
     {"query": "drop forms"},
@@ -71,6 +102,8 @@ EDGE_QUERIES = [
     {"query": "forms", "days": 30, "limit": 2},
     {"query": "the of"},
     {"query": "kapag forms"},
+    {"query": "campus"},
+    {"query": "thesis"},
 ]
 # Synthetic rows (invented text) for the flow queries and Unicode edges:
 # (id, title, body HTML, office, priority, publishedAt).
@@ -164,6 +197,25 @@ SYNTHETIC = [
         "Mathematics",
         "NORMAL",
         "2026-10-30T10:00:00+08:00",
+    ),
+    # Only occurrence preceded by U+1D400 (an astral letter): no match.
+    (
+        914,
+        "Astral Note",
+        "<p>Only \U0001d400form here.</p>",
+        "Mathematics",
+        "NORMAL",
+        "2026-10-30T08:00:00+08:00",
+    ),
+    # Whole-word "campu" and "thesi": they match only if "campus" or
+    # "thesis" were (wrongly) given a plural alternative.
+    (
+        915,
+        "Odd Words",
+        "<p>The campu and thesi rows exist only to test exclusions.</p>",
+        "Testing",
+        "NORMAL",
+        "2026-10-30T07:00:00+08:00",
     ),
     # Whole-word "form": followed by U+00B2 (category No, not a word char),
     # and preceded by U+1D400 (a letter), which blocks the second one.
@@ -261,6 +313,10 @@ PUBLISHED_AT_TEXTS = [
     None,
     20261107,
 ]
+
+
+def plural_vectors() -> list[dict]:
+    return [{"word": w, "expected": plural_alternative(w)} for w in PLURAL_WORDS]
 
 
 def published_at_vectors() -> list[dict]:
@@ -403,6 +459,7 @@ def build() -> str:
         "matcher": "and_v3",
         "plain_text": plain_vectors(),
         "cut": cut_vectors(),
+        "plural_alternative": plural_vectors(),
         "published_at": published_at_vectors(),
         "rows": row_vectors(),
         "search": search_vectors(),

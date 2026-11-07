@@ -178,6 +178,120 @@
    "expected": ""
   }
  ],
+ "plural_alternative": [
+  {
+   "word": "forms",
+   "expected": "form"
+  },
+  {
+   "word": "uniforms",
+   "expected": "uniform"
+  },
+  {
+   "word": "exams",
+   "expected": "exam"
+  },
+  {
+   "word": "rules",
+   "expected": "rule"
+  },
+  {
+   "word": "class",
+   "expected": null
+  },
+  {
+   "word": "classes",
+   "expected": "classe"
+  },
+  {
+   "word": "campus",
+   "expected": null
+  },
+  {
+   "word": "basis",
+   "expected": null
+  },
+  {
+   "word": "thesis",
+   "expected": null
+  },
+  {
+   "word": "fees",
+   "expected": null
+  },
+  {
+   "word": "news",
+   "expected": null
+  },
+  {
+   "word": "staff's",
+   "expected": null
+  },
+  {
+   "word": "x-rays",
+   "expected": "x-ray"
+  },
+  {
+   "word": "(forms",
+   "expected": null
+  },
+  {
+   "word": "forms)",
+   "expected": null
+  },
+  {
+   "word": "caf\u00e9s",
+   "expected": "caf\u00e9"
+  },
+  {
+   "word": "ni\u00f1os",
+   "expected": "ni\u00f1o"
+  },
+  {
+   "word": "\ud835\udc00\ud835\udc00\ud835\udc00s",
+   "expected": null
+  },
+  {
+   "word": "\ud835\udc00bcs",
+   "expected": null
+  },
+  {
+   "word": "abc\ud835\udc00s",
+   "expected": "abc\ud835\udc00"
+  },
+  {
+   "word": "a\u0663bcs",
+   "expected": "a\u0663bc"
+  },
+  {
+   "word": "12345s",
+   "expected": "12345"
+  },
+  {
+   "word": "_abcs",
+   "expected": "_abc"
+  },
+  {
+   "word": "s",
+   "expected": null
+  },
+  {
+   "word": "ss",
+   "expected": null
+  },
+  {
+   "word": "sssss",
+   "expected": null
+  },
+  {
+   "word": "\u00e9\u00e9\u00e9\u00e9s",
+   "expected": "\u00e9\u00e9\u00e9\u00e9"
+  },
+  {
+   "word": "abcd\u00b2s",
+   "expected": null
+  }
+ ],
  "published_at": [
   {
    "text": "2026-11-07T15:33:53+08:00",
@@ -1028,6 +1142,26 @@
     "attachments": []
    },
    {
+    "id": 914,
+    "title": "Astral Note",
+    "body": "<p>Only \ud835\udc00form here.</p>",
+    "priority": "NORMAL",
+    "officeName": "Mathematics",
+    "publishedAt": "2026-10-30T08:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 915,
+    "title": "Odd Words",
+    "body": "<p>The campu and thesi rows exist only to test exclusions.</p>",
+    "priority": "NORMAL",
+    "officeName": "Testing",
+    "publishedAt": "2026-10-30T07:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
     "id": 913,
     "title": "Superscript Note",
     "body": "<p>Use form\u00b2 here, not \ud835\udc00form.</p>",
@@ -1761,6 +1895,25 @@
      "908",
      "6"
     ]
+   },
+   {
+    "name": "edge: 'campus'",
+    "arguments": {
+     "query": "campus"
+    },
+    "ok": true,
+    "expected_ids": [
+     "909",
+     "202"
+    ]
+   },
+   {
+    "name": "edge: 'thesis'",
+    "arguments": {
+     "query": "thesis"
+    },
+    "ok": true,
+    "expected_ids": []
    }
   ]
  }

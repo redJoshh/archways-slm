@@ -5,7 +5,7 @@
 
 import { feedRow, parsePublishedAt } from "./feed.ts";
 import { cutCodePoints, plainText } from "./plaintext.ts";
-import { searchRows, type IndexRow } from "./search.ts";
+import { pluralAlternative, searchRows, type IndexRow } from "./search.ts";
 import { EXCERPT_CHARS } from "./searchData.ts";
 
 export interface FeedVectorFile {
@@ -13,6 +13,7 @@ export interface FeedVectorFile {
   matcher: string;
   plain_text: { body: string; expected: string }[];
   cut: { text: string; expected: string }[];
+  plural_alternative: { word: string; expected: string | null }[];
   published_at: { text: unknown; expected: { manila: string; offset_added: boolean } | null }[];
   rows: {
     detail: unknown;
@@ -57,6 +58,9 @@ export function runFeedVectors(file: FeedVectorFile, maxFailures = 20): FeedVect
 
   for (const v of file.plain_text) record("plain " + JSON.stringify(v.body).slice(0, 60), plainText(v.body) === v.expected);
   for (const v of file.cut) record("cut " + v.text.length, cutCodePoints(v.text, EXCERPT_CHARS) === v.expected);
+  for (const v of file.plural_alternative) {
+    record("plural " + JSON.stringify(v.word), pluralAlternative(v.word) === v.expected);
+  }
   for (const v of file.published_at) {
     const got = parsePublishedAt(v.text);
     const ok =
