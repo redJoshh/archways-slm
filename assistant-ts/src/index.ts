@@ -57,3 +57,11 @@ export {
   QUERY_PROMPT_SHA256,
   QUESTION_MAX_CHARS,
 } from "./generated.ts";
+// On-phone search over the student's feed (ADR 0006).
+export { createFeedIndex, HttpError, makeFeedSearch } from "./feedIndex.ts";
+export type { FeedIndex, FeedIndexOptions, FetchJson, IndexReport } from "./feedIndex.ts";
+export { feedRow, parsePublishedAt } from "./feed.ts";
+export type { PublishedAt } from "./feed.ts";
+export { cutCodePoints, plainText } from "./plaintext.ts";
+export { pluralAlternative, queryGroups, searchRows, wholeWordIn } from "./search.ts";
+export type { IndexRow } from "./search.ts";
