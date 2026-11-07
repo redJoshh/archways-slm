@@ -230,19 +230,34 @@ uv run python scripts/export_assistant_vectors.py   # after a reference change; 
 - **Licence:** ship the Apache License 2.0 text and notices for qwen3:0.6b.
 - **Logging:** paths and timings only, never questions or replies (no real user data in logs).
 
-## What Spring must do
+## Search over the student's feed (ADR 0006)
 
-- **Search contract v2:**
-  - `and_v2` matching with `contracts/search_synonyms_v1.json`
-  - pass `tests/vectors/search_vectors_and_v2.json`
-  - the same ILIKE escaping (`ilike_pattern()` in `fakebackend.py`)
-- **An allowlist in the query:** only PUBLISHED, non-archived, visible rows. Never filter in the prompt.
-- Apply the defaults (`days` 7, `limit` 5), and reject invalid arguments per the schema.
-- Return `$defs/result`:
-  - excerpt ≤ 500 characters
-  - `posted_at` in RFC 3339 with the `+08:00` offset
-  - newest first, at most `limit` rows
-- The endpoint path and its auth are not defined in this repo (unverified; team).
+Spring needs **no search change**: the assistant searches the student's own feed on the phone.
+
+- **`feedIndex.ts`, `createFeedIndex(fetchJson)`:**
+  - A full build reads every `GET /announcements?page=P&size=50` page, then every `GET /announcements/{id}`, 4 at a time. It never calls the read POST.
+  - `ensure()`: a full build if there is no index or it is 60 min old; a refresh after 10 min (pages only, then new or changed ids); otherwise nothing.
+  - A 404 detail is skipped. Any other error, a 401 included, rejects and keeps the previous index.
+  - `clear()` on sign-out and on a 401. The log reports numbers only.
+- **`feed.ts`, `feedRow()`:**
+  - The body becomes plain text (`plaintext.ts`, `excerpt.py`'s rule); the excerpt is its first 500 code points.
+  - `year_level` is always null.
+  - `posted_at` is `publishedAt` converted to `+08:00`. With no offset, `+08:00` is assumed and the row is flagged; this assumes the server clock is Manila time, which is true only in the Docker image.
+- **`search.ts`, `searchRows()`:** and_v3 (see `fakebackend.py`) over the plain text, with the days window on `publishedAt`, newest first, then id. Pinned is ignored.
+  - Word characters come from `WORD_RANGES`, generated from Python's `unicodedata`.
+  - Documented gap: `toLowerCase()` against Python's `str.lower()` for some non-ASCII text.
+- **`makeFeedSearch(index)`** is `AssistantDeps.search`.
+- **Parity:** `tests/vectors/feed_vectors.json` (`scripts/export_feed_vectors.py`) runs on Node and on the Hermes CLI. `searchData.ts` comes from `scripts/export_search_ts.py`; never edit it by hand.
+
+## Wiring into the team mobile app (to do in the team repo only after approval)
+
+- **Blocking first:** llama.rn 0.13.0-rc.8 against the app's `expo ^44.0.6` / `react-native ^0.72.17` (ADR 0006, "Blocking risk").
+- **Copy:** `assistant-ts/src/*.ts` and `guard-ts/src/*.ts`, in the same layout, with the source commit hash recorded (as the Gate 1 test app's `vendor/archways/VENDORED.md` does).
+- **One hook, `useAssistant()`:**
+  - A module-level `createFeedIndex(fetchJson)`, where `fetchJson = (path) => api.get(path).then((r) => r.data)` through the existing axios `api` client (its base URL already ends in `/api/v1`). Axios errors are rethrown as `HttpError(error.response?.status ?? 0)`.
+  - `index.ensure()` when the assistant screen opens.
+  - `ask(question)` calls `askAssistant` with `makeFeedSearch(index)`, `makeComplete(llama, settings)`, `speed` and `querySpeed` from `speedsFromPriming()`, and the UAT log.
+- **Sign-out:** in `src/features/auth/auth-context.tsx` `signOut()`, call the index's `clear()` next to `queryClient.clear()`. The 401 handler already calls `signOut()`.
 
 ## Unverified
 
