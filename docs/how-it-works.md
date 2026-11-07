@@ -31,6 +31,7 @@ The model never touches the database and never "knows" announcements from traini
 | `contracts/search_announcements.schema.json` | **The source of truth.** A JSON Schema describing the tool's arguments and its results. |
 | `contracts/search_synonyms_v1.json` | Frozen synonym map for search contract v2 (the and_v2 matcher). Spring loads the same file. |
 | `tests/vectors/search_vectors_and_v2.json` | Search vectors that Spring's and_v2 implementation must pass. |
+| `tests/vectors/search_vectors_and_v3.json` | Search vectors that Spring's and_v3 implementation must pass (search contract v3, the current one). |
 | `guard-ts/` | TypeScript port of the answer guard (`e2escore.guard()`), for the mobile app. Zero runtime dependencies; see its README. Any guard change updates both versions and the guard vectors. |
 | `tests/vectors/guard_vectors.json` | Guard parity vectors: unit cases, edge cases, phone replies and every saved run reply. Python (`tests/test_guard_vectors.py`) and guard-ts must both match them. Built by `scripts/export_guard_vectors.py` (`--refresh` after a guard change). |
 | `src/archways_assistant/tooldef.py` | Generator that turns the contract into the tool definition Ollama understands. |
@@ -83,7 +84,7 @@ An array of announcements, newest first, at most 10 items. That 10 must match `a
 
 ### Search contract version 2 (matching)
 
-The search contract is now **version 2** (2026-10-31). The arguments and results are the same as above. Only the matching changes: Spring must search with **and_v2**.
+**Superseded by version 3 below (2026-11-07); Spring never implemented v2.** The search contract was **version 2** from 2026-10-31. The arguments and results are the same as above. Only the matching changes: Spring must search with **and_v2**.
 
 - **and_v2:** the query is lowercased and split on whitespace, and the and_v1 stopwords plus the map's `extra_stopwords` ("kapag") are dropped. Each remaining word, with its synonyms from [`contracts/search_synonyms_v1.json`](../contracts/search_synonyms_v1.json), forms a group: `(title ILIKE '%alt%' OR body ILIKE '%alt%' …)` over the word and its synonyms, escaped as `ilike_pattern()` does (escape char `\`). Every group must match (AND across words). Visibility, the days window, newest-first order and limit are unchanged.
 - **The map file is frozen.** A hash test pins it. A change is a new file (`search_synonyms_v2.json`) and a new matcher, never an edit. Spring must load this same file, not a copy.
@@ -102,6 +103,31 @@ The search contract is now **version 2** (2026-10-31). The arguments and results
   - The reference is `src/archways_assistant/excerpt.py` (`plain_text()`), tested in `tests/test_excerpt.py`. Every seed body is already plain text under this rule, so `fakebackend` is unchanged. Whether Jsoup's `Element.text()` gives the same output is unverified; Spring should test against the cases in `tests/test_excerpt.py`.
   - Open: whether the and_v2 ILIKE should match the HTML column or the plain text. Over HTML, a query word like "strong" could match a tag.
 - **Time zone: unconfirmed.** `published_at` is written with the JVM's `LocalDateTime.now()`, and contract v1 attaches `+08:00`. The user is checking this with a test announcement.
+
+### Search contract version 3 (matching, 2026-11-07)
+
+The search contract is now **version 3**. It replaces version 2, which Spring had not implemented, so **Spring implements v3 directly**. Arguments, results, visibility, plain-text excerpts and the other v2 additions above are unchanged. Only the matching changes: **and_v3** = and_v2 plus a whole-word plural alternative.
+
+- **The rule** (the reference is `fakebackend.py`; fixed before any run):
+  - A query word is eligible for the plural alternative if, after lowercasing, the whitespace split and the stopwords, it:
+    - has 5 or more characters (code points)
+    - ends in `s`
+    - does not end in `ss`, `us` or `is`
+  - The alternative is the word without that `s`. It is added only if it starts and ends with a word character (`_`, a letter or a decimal digit).
+  - **The word and its synonyms match as substrings, exactly as in and_v2.** The alternative matches only as a **whole word**.
+- **In Spring:** each group becomes `(title ILIKE ? OR body ILIKE ? … OR title ~* ? OR body ~* ?)`.
+  - The `ILIKE` patterns are as in and_v2.
+  - The regex is `'\m' + stem + '\M'` with every ASCII punctuation character of the stem backslash-escaped (`word_regex()`). For example, "forms" adds `\mform\M` and "x-rays" adds `\mx\-ray\M`.
+- **Examples:**
+  - "forms" matches "drop form." but not "information", "uniform", "platform", "form_id" or "form2".
+  - "uniforms" matches "uniform".
+  - "exams" does not match "example".
+- **Vectors:** Spring must pass [`tests/vectors/search_vectors_and_v3.json`](../tests/vectors/search_vectors_and_v3.json) (14 vectors, written by hand before the code, with the expected `ILIKE` and regex patterns per word) as well as [`tests/vectors/search_vectors.json`](../tests/vectors/search_vectors.json). The synonym file is the same frozen `contracts/search_synonyms_v1.json`.
+- **No new schema file:** the `$id` stays `...:v1`. `DEFAULT_MATCHER = "and_v3"`.
+- **Known gap:** Postgres decides word characters by its locale (alphanumeric or `_`). For non-ASCII letters and digits that may differ from the reference; this is untested. The vectors are ASCII.
+- **Evidence (devlog 2026-11-07):**
+  - On the dev sets (both models, e2e and Taglish), the saved-query replay and the cold runs are identical to and_v2.
+  - On the 10 labelled flow-test questions over the real snapshot, retrieval goes from 8/10 to 9/10 questions. q06 now finds all three uniform announcements.
 
 ## 2. The generator (`src/archways_assistant/tooldef.py`)
 
