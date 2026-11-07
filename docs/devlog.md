@@ -19,6 +19,35 @@ Template:
 
 ---
 
+## 2026-11-07: ADR 0006 proposed (on-phone search over the feed); plan for the index, port and live mode
+
+- **Date:** 2026-11-07 (night, +08:00)
+- **Decisions (user, 2026-11-07), from read-only reports of the team repos:**
+  - The assistant searches on the phone over exactly the student's feed. No new endpoint; the search contract's matching becomes an assistant-ts matcher.
+  - `FOR_DELETION` posts are searchable, reversing 2026-11-06.
+  - `year_level` is null for feed items.
+  - The read POST is never called.
+  - The query call should be trained too.
+- **What changed:**
+  - **`3ab5d6f` (`docs:`):** ADR 0006, **PROPOSED**. Once it is accepted, `docs/how-it-works.md` ("Search contract version 3") and ADR 0004's UAT matcher line will say that and_v3 runs on the phone and Spring needs no search change. They are not changed yet.
+  - **`a08f1e1` (`docs:`):** the fine-tuning plan records that the query call should be trained too (flow q01 `office`, q07 `remote work`). Decision 1's option is left for the user's review.
+- **Read-only findings** (`C:\UST-Archways-Organization`: `archways-backend` `b1b6396`, `archways-mobile` `01f6ceb`; nothing changed there):
+  - **`publishedAt`:**
+    - `AnnouncementSummaryResponse` and `AnnouncementDetailResponse` declare it as `OffsetDateTime`.
+    - `AnnouncementFeedMapper.toOffset()` truncates the stored `LocalDateTime` to seconds and attaches `Asia/Manila`.
+    - There are no `spring.jackson.*` settings and no custom `ObjectMapper`, so the expected JSON is `2026-11-07T15:33:53+08:00`. Not yet checked against a live response.
+  - **The stored time** comes from `LocalDateTime.now()` (the JVM zone). The Dockerfile pins `TZ=Asia/Manila` and `-Duser.timezone=Asia/Manila`; a local run outside Docker does not.
+  - **Edits:** an approved edit is a new row, and the parent is archived (`AnnouncementService`, "NEW / EDITING approved"). So edits show up as a changed id set in the feed. In-place body edits on a live row were not found, but are not ruled out.
+  - **Mobile:**
+    - `FEED_PAGE_SIZE` is 20. `signOut()` clears the token and `queryClient.clear()`, and a 401 handler calls `signOut()`.
+    - `package.json` lists `expo ^44.0.6` and `react-native ^0.72.17`. llama.rn 0.13.0-rc.8 on that stack is unverified; the test app runs Expo 57 and RN 0.86.
+  - **`CLAUDE.md`'s rule** "Only PUBLISHED, non-archived … allowlist in the Spring query" conflicts with ADR 0006. It is the user's file to update.
+- **How it was verified:** docs only; nothing to run.
+- **Commits:** `3ab5d6f`, `a08f1e1`, this `docs:` commit. Not pushed.
+- **Open questions / next:** the plan for tasks 1–5 (index, matcher port, row mapping, live mode in the test app, mobile wiring) is in the chat, waiting for approval.
+
+---
+
 ## 2026-11-07: and_v3 scored (replay and cold runs); it replaces and_v2
 
 - **Date:** 2026-11-07 (late evening, +08:00)
