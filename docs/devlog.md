@@ -19,6 +19,15 @@ Template:
 
 ---
 
+## 2026-11-07: correction to the stress-check entry
+
+- **Date:** 2026-11-07 (16:15 +08:00)
+- **Correction:** the entry below says "Id 54 is also new but short." That is wrong. Comparing the single-result ids in `runs/snapshot_budget_20261106T184931.json` and `runs/snapshot_budget_20261107T155059.json`: added 56, 57, 58, 59; removed none. Id 54 was already in the 49-row snapshot.
+- **How it was verified:** the id comparison above (a one-off `uv run python -c`).
+- **Commits:** this `docs:` commit.
+
+---
+
 ## 2026-11-07: stress check on the longer snapshot, and the phone flow test of the real packages
 
 - **Date:** 2026-11-07 (about 15:40–16:10 +08:00)
