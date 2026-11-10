@@ -19,6 +19,63 @@ Template:
 
 ---
 
+## 2026-11-10: Nothing Phone 3a Pro flow run checked against the snapshot; plans for a gate, a UAT label and speed-chosen excerpts
+
+- **Date:** 2026-11-10 (13:30 +08:00)
+- **Phone run (user's log summary, dev build, Prime used):**
+  - Vectors: guard 453/453, assistant 230/230 on Hermes 250829098.0.17.
+  - Load 1,104 ms. Prime 3,692 ms (answer priming prompt 138.9/s; query priming prompt 144.6/s, generation 28.4/s). The time rule applied to every question.
+  - Paths: 7 `answer`, 2 `answer_not_found` (q05, q09), 1 `not_found` (q10).
+  - Whole questions 1.3–8.5 s, except q01 at 11.9 s (962 case tokens, predicted 10.4 s: the only under-prediction). The other predictions were within about 2 s.
+  - Memory: PSS 1,306,907 kB, RSS 1,412,140 kB, swap 47,107 kB.
+  - The query matched Ollama on 9/10 questions. q03 differed: "emergency water service" against Ollama's "...interruption".
+- **Checked against the local snapshot** (`data/local/`, not committed; ids, positions and yes/no only). Positions are code points in `excerpt.plain_text(body)`. The q01 results were reproduced with `search_announcements(..., matcher="and_v3")`, query `office`, `days` 7, `limit` 5:
+  1. **q01:** results are 59, 58, 57, 56, 54. **Only row 59 (position 1)** has the office the reply named. Row 18, the labelled row, has a different office and was not retrieved.
+     - **Recorded as a confidently wrong answer the guard can't catch.** The entity is wrong: an office copied from an unrelated top result. The date is allowed by the question-echo rule (`guard.ts` `supported()` accepts claims that appear in the question). The guard passed it, and the UAT build showed it as an answer.
+  2. **q03:** yes, "8:00 AM" is in row 50 (position 102 of 256). "5:00 PM" (the expected answer) is at position 113. Both fall inside the 500-character excerpt.
+  3. **q06:** "Type A" is in **row 21 only** (position 153 of 325, inside the excerpt). It is not in rows 44, 29 or 24.
+  4. **q07:** yes, both are in row 7: "September 14" at position 176 and "unclaimed materials" at 216 (case-insensitive), of 292. Both are inside the excerpt.
+  5. **q08:** row 56 (1,567 characters) has all five banned items **after character 500**: the first starts at 509 and the last at 580. The words introducing the ban start at 429. So the 500-character excerpt the model saw announces the ban but leaves out every item.
+- **Plans (PLAN ONLY, post-UAT; nothing built):**
+  - **(a) Answerability gate**, which skips the answer call when no result is about the question:
+    - **Rule (proposed):**
+      - Take the question's content words with the and_v3 tokenizer (`WORD_RANGES`, the same stopword handling), plus "anchors": numbers, dates and runs of capitalised words.
+      - For each result, compute coverage = the share of content words found in title + full plain text. The feed index has the full text, so the check isn't limited to the excerpt.
+      - The gate passes if some result has coverage ≥ θ, or contains every anchor.
+      - Otherwise there is a new path, `not_about`. It shows `resultsList(results)` under a header such as "No announcement seems to be about this; closest matches:".
+      - New strings go through `tooldef.py` → `generated/`. The change needs an ADR 0004 amendment.
+    - **Choosing θ:**
+      - θ is fitted only on e2e34 + Taglish10 replays (saved queries and results, no model calls). The pick is the largest θ that loses no answerable `answer` path.
+      - The 10 flow questions are not used for tuning. They get a read-out once θ is frozen. The held-out file is used only for the final comparison.
+    - **Testing:**
+      - A Python reference, with vectors exported for a TS port, run on Hermes like the guard vectors.
+      - A mutation check on the coverage and anchor code.
+      - Replay counts: answerable cases gated off (cost), against traps and wrong answers stopped (benefit), under the "nothing gets worse" rule.
+      - A cold run, then a phone run.
+    - **Note:** a "the named entity appears in a result" guard check would not have caught q01, because the office is in row 59. Aboutness is the missing check.
+  - **(b) UAT label on model text:**
+    - Put a fixed line before the reply on the `answer` path only, for example "AI answer, check the announcements below". The order becomes label + reply + `ANSWER_LIST_SEPARATOR` + `resultsList`.
+    - The label is added after the guard, so the guard never sees it.
+    - The string becomes a generated constant (`tooldef.py`). Then update the assistant vectors and re-vendor them into the test app.
+    - This is close to trivial, but it changes the UAT build mid-week. It waits for the user's go-ahead.
+  - **(c) Excerpt length chosen by measured phone speed:**
+    - On the phone (ADR 0006: search is local and the full plain text is in the index), pick L from a fixed ladder {500, 750, 1000, 1500}. L is the largest value whose predicted time (`predictMs` with the measured answer prompt speed) fits under 15 s minus a margin, and whose tokens fit under `n_ctx`.
+    - The margin should be at least the observed under-prediction (q01: +1.5 s).
+    - With an unknown speed, or under the 200-token rule, keep 500.
+    - This needs a contract decision: `excerpt` `maxLength` 500 is in v1/v2, so this is either a v3 contract or a phone-only render field.
+    - A comparison arm: a 500-character window centred on the first matched term instead of the prefix. It would have covered q08 at no extra speed cost.
+    - **Testing:**
+      - Replay e2e34/Taglish10 at simulated speeds (the phone's 138.9/s and a slower phone's rate) and count over-budget fallbacks and answer-correct cases per L.
+      - Ladder-choice vectors for the TS port.
+      - A phone run to check the predictions at the longer case lengths.
+- **How it was verified:** one-off scratch scripts (not committed) over `data/local/` with `load_snapshot` and `search_announcements`. No code changed, so no test run.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - Should the (b) label ship during UAT?
+  - The phone's reply texts are in the user's log, not in the repo.
+
+---
+
 ## 2026-11-07: per-kind speeds; ADR 0006 accepted; the feed index, and_v3 port and Live screen built
 
 - **Date:** 2026-11-07 (night, +08:00)
