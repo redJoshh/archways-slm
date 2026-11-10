@@ -32,6 +32,15 @@ NBSP = chr(0xA0)
         ("&lt;b&gt;not bold&lt;/b&gt;", "<b>not bold</b>"),
         ("a &amp; b", "a & b"),
         ("x&nbsp;&nbsp;y", "x y"),
+        # A reference at the very start of a body (snapshot rows 14 and 18
+        # start with a literal "&nbsp;"): decoded, then the leading space
+        # is dropped. A non-space reference there is kept.
+        ("&nbsp;Starts here", "Starts here"),
+        ("&nbsp;&nbsp;<p>&nbsp;Two</p>", "Two"),
+        ("&#160;&#xA0;Numeric", "Numeric"),
+        ("&amp; first", "& first"),
+        ("&nbsp no semicolon", "&nbsp no semicolon"),
+        ("Ends&nbsp;", "Ends"),
         ("&#65;&#x42;&#X43;", "ABC"),
         ("&#x1F600;", chr(0x1F600)),
         (

@@ -60,6 +60,30 @@
    "expected": "x y"
   },
   {
+   "body": "&nbsp;Starts here",
+   "expected": "Starts here"
+  },
+  {
+   "body": "&nbsp;&nbsp;<p>&nbsp;Two</p>",
+   "expected": "Two"
+  },
+  {
+   "body": "&#160;&#xA0;Numeric",
+   "expected": "Numeric"
+  },
+  {
+   "body": "&amp; first",
+   "expected": "& first"
+  },
+  {
+   "body": "&nbsp no semicolon",
+   "expected": "&nbsp no semicolon"
+  },
+  {
+   "body": "Ends&nbsp;",
+   "expected": "Ends"
+  },
+  {
    "body": "&#65;&#x42;&#X43;",
    "expected": "ABC"
   },
