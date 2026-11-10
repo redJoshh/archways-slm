@@ -19,6 +19,62 @@ Template:
 
 ---
 
+## 2026-11-10: UAT label shipped; q07 recorded; leading &nbsp; vectors; post-UAT plans approved
+
+- **Date:** 2026-11-10 (13:40–14:30 +08:00)
+- **Decisions (user, 2026-11-10):**
+  - Ship the UAT label before the UAT build. The UAT build doesn't exist yet, so this isn't a mid-week change.
+  - Plans (a) and (c) are approved as post-UAT. For (c), the centred window comes first, then speed-based length.
+  - Past-date framing becomes a fine-tuning target.
+- **1. UAT label (`02e0e83`, docs `2d63402`):**
+  - The `answer` path's text is now `ANSWER_LABEL` ("AI answer, please check the announcements below."), then `ANSWER_LABEL_SEPARATOR` (a line break), the guarded reply, `ANSWER_LIST_SEPARATOR` and the results list.
+  - The label is added after the guard, in `assistant.py` and `flow.ts`. No other path shows it.
+  - The constants come from `assistant.py` through `scripts/export_assistant_ts.py` → `generated.ts`. `assistant_vectors.json` was regenerated.
+  - Tests:
+    - Python and Node check that only the `answer` path has the label.
+    - The Node test of the answer layout was updated.
+  - ADR 0004 has a new subsection, "UAT label on model text", and the assistant-ts README was updated.
+  - **Correction to the previous entry:** it said the label string would come from `tooldef.py`. It comes from `export_assistant_ts.py`, which generates `assistant-ts/src/generated.ts`. `tooldef.py` generates only `generated/`.
+- **2. q07, recorded:**
+  - The facts came correctly from row 7.
+  - The reply echoed "weather" from the question, although row 7 is about a transport strike. The question-echo rule lets the word through.
+  - It also presented a past date (2026-09-14) as upcoming, although today's date is in the prompt.
+  - Past-date framing is added to `docs/plans/finetune-data-plan.md` under Decision 4 as "Target: past-date framing" (`9063fcf`).
+- **3. `&nbsp;` at the start of a body (`72f5fa4`):**
+  - Snapshot rows 14 and 18 are the only rows whose body starts with a reference, a literal `&nbsp;`.
+  - Python's `excerpt.plain_text` decodes it, and the leading-space trim drops it. Both rows' plain text starts with a letter, with no `&nbsp;` and no U+00A0 left, and equals the snapshot row body.
+  - The TS port is not just planned: it has existed since `ea55ed1` (`plaintext.ts`).
+  - Six cases were added to `tests/test_excerpt.py`, which feed the feed vectors' `plain_text`: a leading `&nbsp;`, repeated `&nbsp;` across a tag, a leading numeric NBSP, a leading `&amp;` (kept), `&nbsp` with no `;` (kept as text), and a trailing `&nbsp;`.
+- **4. Plans:**
+  - `docs/plans/post-uat-answerability-and-excerpts.md` (`9063fcf`) holds:
+    - (a) the gate rule, how θ is chosen and the tests
+    - (c) with the centred 500-character window first, under "nothing gets worse" on all sets, then speed-based length
+  - It records that since ADR 0006 the excerpt cap no longer binds Spring. It is an internal, versioned setting.
+  - It also flags the earlier `snip_v1` risk, that a window could expose the long-body trap's hidden fact, as part of that check.
+- **5. Build order (prediction fix, feed index, matcher port, mapping, live mode):** all already committed in `2d7cff7`, `852d8f8`, `ea55ed1`, `c5eb4f3` and test app `c11cda0` (2026-11-07). Nothing new was built.
+- **Test app (`C:\throw-away-app\gate1-llm`, not pushed):**
+  - `79b848d` re-vendors from `02e0e83` (the label).
+  - `dd2659d` re-vendors from `72f5fa4` (the feed vectors).
+  - `tsc --noEmit` is clean. The Android bundle was not rebuilt.
+- **How it was verified:**
+  - `uv run pytest -q` → `1180 passed, 2 skipped`.
+  - `ruff check` → clean. `ruff format --check` → 58 files formatted.
+  - `export_assistant_ts.py --check`, `export_assistant_vectors.py --check` and `export_feed_vectors.py --check` → up to date.
+  - assistant-ts `npm test` → 253/253.
+  - Hermes CLI → assistant 230/230, feed 194/194, askAssistant answer as expected.
+  - Mutation checks, each restored afterwards and confirmed with `cmp`:
+    - dropping the label's line break → Node 32 fail, Hermes 15 fail
+    - leaving a leading `&nbsp;` undecoded in `plaintext.ts` → Node 1 fail, Hermes feed 2 fail, caught only by the new cases
+- **Not verified:**
+  - The label on a phone.
+  - The live mode against a running Spring server. The 2026-11-10 phone run was a flow run.
+- **Commits:** `02e0e83`, `2d63402`, `72f5fa4`, `9063fcf`, this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - A phone check of the label and of the Live screen before the UAT build.
+  - Mobile-repo wiring is still blocked on the Expo 44 / RN 0.72 vs llama.rn risk (2026-11-07).
+
+---
+
 ## 2026-11-10: Nothing Phone 3a Pro flow run checked against the snapshot; plans for a gate, a UAT label and speed-chosen excerpts
 
 - **Date:** 2026-11-10 (13:30 +08:00)
