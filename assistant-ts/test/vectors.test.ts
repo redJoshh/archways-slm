@@ -281,7 +281,7 @@ test("non-finite predicted_ms is ignored (not expressible in the JSON vectors)",
   }
 });
 
-test("the answer path shows the guarded reply above the results list", async () => {
+test("the answer path shows the UAT label, then the guarded reply above the results list", async () => {
   const vector = file.flow.find((v) => v.id === "answer")!;
   const result = await askAssistant(vector.question, {
     nowMs: () => vector.now_ms,
@@ -291,7 +291,21 @@ test("the answer path shows the guarded reply above the results list", async () 
     countTokens: () => Promise.resolve(vector.case_tokens as number),
   });
   assert.equal(result.path, "answer");
-  assert.ok(result.text.startsWith((vector.answer_reply as string) + "\n\nThese announcements may help:\n- "));
+  assert.ok(
+    result.text.startsWith(
+      "AI answer, please check the announcements below.\n" +
+        (vector.answer_reply as string) +
+        "\n\nThese announcements may help:\n- ",
+    ),
+  );
+});
+
+test("only the answer path shows the UAT label", () => {
+  for (const vector of file.flow) {
+    if (vector.expected.path !== "answer") {
+      assert.ok(!vector.expected.text.includes("AI answer, please check"), vector.id);
+    }
+  }
 });
 
 test("each call kind updates only its own speed", async () => {

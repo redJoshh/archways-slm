@@ -210,13 +210,17 @@ def test_flow_shows_model_text_only_on_the_answer_path():
         if isinstance(reply, str) and reply.strip(assistant.ASCII_WHITESPACE):
             if expected["path"] == "answer":
                 assert expected["text"].startswith(
-                    reply.strip(assistant.ASCII_WHITESPACE)
+                    assistant.ANSWER_LABEL
+                    + assistant.ANSWER_LABEL_SEPARATOR
+                    + reply.strip(assistant.ASCII_WHITESPACE)
                     + assistant.ANSWER_LIST_SEPARATOR
                     + assistant.RESULTS_HEADER
                     + "\n- "
                 ), vector["id"]
             else:
                 assert reply.strip() not in expected["text"], vector["id"]
+            if expected["path"] != "answer":
+                assert assistant.ANSWER_LABEL not in expected["text"], vector["id"]
 
 
 def test_every_path_with_results_ends_with_the_results_list():

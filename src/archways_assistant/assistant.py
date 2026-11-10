@@ -108,6 +108,12 @@ ASCII_WHITESPACE = " \t\n\r\f\v"
 RESULTS_HEADER = "These announcements may help:"
 # Between the guarded answer and the results list.
 ANSWER_LIST_SEPARATOR = "\n\n"
+# UAT label (user decision, 2026-11-10): the first line of the answer path's
+# text, so a student knows the reply is model text. It is added after the
+# guard (the guard never sees it), and no other path shows it.
+ANSWER_LABEL = "AI answer, please check the announcements below."
+# Between the label and the guarded answer.
+ANSWER_LABEL_SEPARATOR = "\n"
 
 PATHS = (
     "answer",  # the guard passed the reply: the reply, then the results list
@@ -639,6 +645,12 @@ def flow(
         # without its list.
         outcome = Outcome("answer_error", LAST_RESORT_MESSAGE, (), budget, count)
     else:
-        text = guarded.text + ANSWER_LIST_SEPARATOR + listed
+        text = (
+            ANSWER_LABEL
+            + ANSWER_LABEL_SEPARATOR
+            + guarded.text
+            + ANSWER_LIST_SEPARATOR
+            + listed
+        )
         outcome = Outcome("answer", text, tuple(guarded.codes), budget, count)
     return outcome, calls, arguments

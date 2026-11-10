@@ -24,7 +24,10 @@
  * - the reply is exactly NOT_FOUND_MESSAGE (after the ASCII trim), although
  *   results exist ("answer_not_found")                   -> resultsList(results)
  * - the guard passed the reply ("answer")
- *              -> reply + ANSWER_LIST_SEPARATOR + resultsList(results)
+ *              -> ANSWER_LABEL + ANSWER_LABEL_SEPARATOR + reply
+ *                 + ANSWER_LIST_SEPARATOR + resultsList(results)
+ *   The label (UAT, 2026-11-10) is added after the guard; no other path
+ *   shows it.
  * resultsList() is RESULTS_HEADER and fallback()'s lines (titles and posted
  * dates): every path with results ends with it (ADR 0004, UAT configuration,
  * 2026-11-07). If it can't be built, the text is LAST_RESORT_MESSAGE.
@@ -33,6 +36,8 @@
 import { fallback, guard } from "../../guard-ts/src/guard.ts";
 import { decideBudget, type Budget, type Speed, type SpeedState } from "./budget.ts";
 import {
+  ANSWER_LABEL,
+  ANSWER_LABEL_SEPARATOR,
   ANSWER_LIST_SEPARATOR,
   FALLBACK_HEADER,
   LAST_RESORT_MESSAGE,
@@ -175,7 +180,8 @@ export function startQuestion(question: string, nowMs: number, speed?: Speed | n
     }
     // Unreachable for contract-checked results; never show the reply without its list.
     if (listed === null) return done("answer_error", LAST_RESORT_MESSAGE);
-    return done("answer", guarded.text + ANSWER_LIST_SEPARATOR + listed, guarded.codes.slice());
+    const text = ANSWER_LABEL + ANSWER_LABEL_SEPARATOR + guarded.text + ANSWER_LIST_SEPARATOR + listed;
+    return done("answer", text, guarded.codes.slice());
   };
 
   const afterCount = (results: Announcement[], call: ModelCall) => (input: StepInput, elapsedMs: number): Step => {

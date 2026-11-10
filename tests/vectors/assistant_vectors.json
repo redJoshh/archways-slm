@@ -2336,7 +2336,7 @@
    "speed": null,
    "expected": {
     "path": "answer",
-    "text": "Curriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
+    "text": "AI answer, please check the announcements below.\nCurriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
     "codes": [],
     "budget": {
      "rule": "tokens",
@@ -2375,7 +2375,7 @@
    "speed": null,
    "expected": {
     "path": "answer",
-    "text": "Curriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
+    "text": "AI answer, please check the announcements below.\nCurriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
     "codes": [],
     "budget": {
      "rule": "tokens",
@@ -2414,7 +2414,7 @@
    "speed": null,
    "expected": {
     "path": "answer",
-    "text": "\u00a0Curriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room.\u2028\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
+    "text": "AI answer, please check the announcements below.\n\u00a0Curriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room.\u2028\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
     "codes": [],
     "budget": {
      "rule": "tokens",
@@ -2471,7 +2471,7 @@
    "speed": null,
    "expected": {
     "path": "answer",
-    "text": "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
+    "text": "AI answer, please check the announcements below.\nThe student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
     "codes": [],
     "budget": {
      "rule": "tokens",
@@ -2820,7 +2820,7 @@
    "speed": null,
    "expected": {
     "path": "answer",
-    "text": "no official announcement was found for your question.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
+    "text": "AI answer, please check the announcements below.\nno official announcement was found for your question.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
     "codes": [],
     "budget": {
      "rule": "tokens",
@@ -2859,7 +2859,7 @@
    "speed": null,
    "expected": {
     "path": "answer",
-    "text": "No official announcement was found for your question. Please check with your college.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
+    "text": "AI answer, please check the announcements below.\nNo official announcement was found for your question. Please check with your college.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
     "codes": [],
     "budget": {
      "rule": "tokens",
@@ -2898,7 +2898,7 @@
    "speed": null,
    "expected": {
     "path": "answer",
-    "text": "No official announcement was found for your question.\u00a0\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
+    "text": "AI answer, please check the announcements below.\nNo official announcement was found for your question.\u00a0\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
     "codes": [],
     "budget": {
      "rule": "tokens",
@@ -3382,7 +3382,7 @@
    },
    "expected": {
     "path": "answer",
-    "text": "Curriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
+    "text": "AI answer, please check the announcements below.\nCurriculum advising session for second year students is scheduled on November 10, 2026, from 1:00 PM to 3:00 PM in their college function room.\n\nThese announcements may help:\n- Curriculum Advising for Second Year Students (posted October 27, 2026)",
     "codes": [],
     "budget": {
      "rule": "time",
@@ -3502,7 +3502,7 @@
    },
    "expected": {
     "path": "answer",
-    "text": "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
+    "text": "AI answer, please check the announcements below.\nThe student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
     "codes": [],
     "budget": {
      "rule": "time",
@@ -3562,7 +3562,7 @@
    },
    "expected": {
     "path": "answer",
-    "text": "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
+    "text": "AI answer, please check the announcements below.\nThe student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
     "codes": [],
     "budget": {
      "rule": "time",
@@ -3926,7 +3926,7 @@
    },
    "expected": {
     "path": "answer",
-    "text": "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
+    "text": "AI answer, please check the announcements below.\nThe student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
     "codes": [],
     "budget": {
      "rule": "tokens",
@@ -3986,7 +3986,7 @@
    },
    "expected": {
     "path": "answer",
-    "text": "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
+    "text": "AI answer, please check the announcements below.\nThe student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
     "codes": [],
     "budget": {
      "rule": "time",
@@ -4106,7 +4106,7 @@
    },
    "expected": {
     "path": "answer",
-    "text": "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
+    "text": "AI answer, please check the announcements below.\nThe student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
     "codes": [],
     "budget": {
      "rule": "time",
@@ -4166,7 +4166,7 @@
    },
    "expected": {
     "path": "answer",
-    "text": "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
+    "text": "AI answer, please check the announcements below.\nThe student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
     "codes": [],
     "budget": {
      "rule": "time",
@@ -4226,7 +4226,7 @@
    },
    "expected": {
     "path": "answer",
-    "text": "The student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
+    "text": "AI answer, please check the announcements below.\nThe student portal will be unavailable on November 7, 2026, from 10:00 PM until 2:00 AM the next day for maintenance.\n\nThese announcements may help:\n- Student Portal Maintenance (posted November 1, 2026)\n- Online Enrollment for the Second Term (posted October 20, 2026)\n- New Online Research Databases (posted October 9, 2026)",
     "codes": [],
     "budget": {
      "rule": "time",

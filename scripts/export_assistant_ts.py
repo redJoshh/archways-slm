@@ -65,6 +65,8 @@ def render() -> str:
         ("FALLBACK_HEADER", FALLBACK_HEADER),
         ("RESULTS_HEADER", assistant.RESULTS_HEADER),
         ("ANSWER_LIST_SEPARATOR", assistant.ANSWER_LIST_SEPARATOR),
+        ("ANSWER_LABEL", assistant.ANSWER_LABEL),
+        ("ANSWER_LABEL_SEPARATOR", assistant.ANSWER_LABEL_SEPARATOR),
         ("BUDGET_CASE_TOKENS", assistant.BUDGET_CASE_TOKENS),
         ("QUESTION_MAX_CHARS", assistant.QUESTION_MAX_CHARS),
         ("BAR_MS", assistant.BAR_MS),
