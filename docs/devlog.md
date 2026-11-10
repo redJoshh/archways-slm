@@ -19,6 +19,37 @@ Template:
 
 ---
 
+## 2026-11-10: Test app live mode: any @ust.edu.ph email, on a localhost base URL only
+
+- **Date:** 2026-11-10 (+08:00)
+- **Decision (user, 2026-11-10):** the `test.*` email rule blocked testing, because the local database rejects `test.*` emails.
+  - The new rule allows any `@ust.edu.ph` email, but only when the base URL's host is `localhost` or `127.0.0.1` (the local dev-profile server through `adb reverse`).
+  - **Live mode may use a real local account, read-only.**
+- **What changed** (test app `C:\throw-away-app\gate1-llm`, `1d512a6`, not pushed):
+  - `LiveTest.tsx`:
+    - `UST_EMAIL` replaces `TEST_EMAIL`.
+    - `LOCAL_BASE` is a hand-written host check, because React Native's `URL` has no `hostname`. It is checked before dev-login.
+    - The base URL is locked at login (the field is read-only while logged in) and checked again before every request.
+    - Feed requests set `method: "GET"` explicitly.
+    - Log out and a 401 also clear the locked base URL.
+  - The new `NOTES.md` records the rule and the read-only use of a real local account.
+  - Kept unchanged:
+    - The token stays in memory only and is never logged or displayed. The email is not logged.
+    - The read POST is never called.
+    - Besides dev-login, it sends only `GET` requests.
+- **How it was verified:**
+  - `npx tsc --noEmit` → clean.
+  - Both regexes were checked in Node against 21 cases:
+    - Accepted: `localhost` and `127.0.0.1`, with or without a port.
+    - Rejected:
+      - hosts: `localhost.evil.com`, `localhost@evil.com`, `127.0.0.1.nip.io`, `10.0.2.2`, a LAN IP, `ftp://`, `localhost:8080evil`
+      - emails: `a@ust.edu.ph.evil.com`, `a@sub.ust.edu.ph`, a `test.*` email at another domain, two `@`s, whitespace
+- **Not verified:** a login on the phone against the local server. That needs a Metro reload only; no native rebuild.
+- **Commits:** test app `1d512a6`, and this `docs:` commit. Not pushed.
+- **Open questions / next:** subdomain addresses (`@*.ust.edu.ph`) are rejected. Widen the rule if student accounts use one.
+
+---
+
 ## 2026-11-10: Correction: the mobile app's committed stack is Expo 57 / RN 0.86; the llama.rn risk is resolved
 
 - **Date:** 2026-11-10 (+08:00)
