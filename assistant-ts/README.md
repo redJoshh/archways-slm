@@ -66,7 +66,7 @@ show(result.text);   // only result.text, never log the question or any text
 
 | `path` | When | Text shown |
 |---|---|---|
-| `answer` | The guard passed the reply | The reply (ASCII whitespace trimmed), a blank line, then the results list |
+| `answer` | The guard passed the reply | `ANSWER_LABEL` ("AI answer, please check the announcements below."), a line break, the reply (ASCII whitespace trimmed), a blank line, then the results list |
 | `answer_not_found` | The reply is exactly `NOT_FOUND_MESSAGE` (after the ASCII trim) although results exist | The results list |
 | `guard_fired` | The guard rejected the reply | The results list |
 | `budget_fallback` | Over budget (below): **no answer call** | The results list |
@@ -77,7 +77,7 @@ show(result.text);   // only result.text, never log the question or any text
 | `search_error` | The search threw, or broke the result contract | `LAST_RESORT_MESSAGE` |
 | `question_invalid` | Empty, whitespace-only, over 500 code points, or lone surrogates | `LAST_RESORT_MESSAGE` |
 
-**The results list** (`resultsList()`): `These announcements may help:`, then one line per result with its title and posted date (guard-ts `fallback()`'s lines). Every path with results ends with it (ADR 0004, UAT configuration, 2026-11-07): on the Redmi on 2026-11-07, all 3 answers were the not-found sentence although a result was retrieved. The model's text is shown only on the `answer` path, above the list. If the list can't be built, the text is `LAST_RESORT_MESSAGE`. Put the timeout in `complete`/`search` (reject on timeout); the flow falls back as above.
+**The results list** (`resultsList()`): `These announcements may help:`, then one line per result with its title and posted date (guard-ts `fallback()`'s lines). Every path with results ends with it (ADR 0004, UAT configuration, 2026-11-07): on the Redmi on 2026-11-07, all 3 answers were the not-found sentence although a result was retrieved. The model's text is shown only on the `answer` path, below the UAT label (ADR 0004, 2026-11-10; added after the guard) and above the list. If the list can't be built, the text is `LAST_RESORT_MESSAGE`. Put the timeout in `complete`/`search` (reject on timeout); the flow falls back as above.
 
 **Decision to confirm:** an invalid query reply shows `LAST_RESORT_MESSAGE`, not the not-found message. The probe scores it as not found, but "not found" would be untrue when the model failed. qwen3:0.6b had 0/34 invalid on dev.
 

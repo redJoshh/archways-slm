@@ -203,6 +203,13 @@ Dev-set effect, from the qwen3:0.6b v1 `and_v1` baseline: 4 of 20 answer calls h
   - The phone's 8-token replies generated at 12.7–12.8 tokens/s, in line with longer answers (10.4–12.8).
 - **Gate 1 is unchanged.** These are UAT product settings: the list is built from data, not by the model. Dev eval scoring still scores the model's reply.
 
+#### UAT label on model text (user decision, 2026-11-10)
+
+- **Evidence:** the Nothing Phone 3a Pro flow run (devlog, 2026-11-10). q01's reply named the wrong office as the publisher, and the guard passed it. The office was copied from an unrelated top result, and the date was allowed because it was in the question.
+- **The `answer` path's text now starts with `AI answer, please check the announcements below.`**, then a line break, then the guarded reply, a blank line and the results list.
+- The label is added after the guard (the guard never sees it). No other path shows it.
+- It comes from `assistant.ANSWER_LABEL` / `ANSWER_LABEL_SEPARATOR` through `export_assistant_ts.py`. Gate 1 and dev scoring are unchanged: they score the model's reply.
+
 ## Caveats
 
 - **Dev set only:** 34 cases we wrote ourselves. The held-out set has not been run.
