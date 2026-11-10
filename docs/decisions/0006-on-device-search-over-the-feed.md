@@ -71,14 +71,22 @@ A new search endpoint would have to repeat every visibility rule of the feed, pe
   - The rebuild and edit-detection rules are in the plan.
 - **Privacy:** announcement text stays on the phone, in memory, and is cleared on sign-out. Nothing is written to disk.
 
-## Blocking risk
+## Blocking risk (resolved 2026-11-10 for the committed stack)
 
-- **The team mobile app's Expo / React Native versions against llama.rn 0.13.0-rc.8.**
+- **Resolved (user correction, 2026-11-10; checked read-only with `git show`):**
+  - The committed `archways-mobile` stack is `expo ~57.0.30` and `react-native 0.86.3`, both at `01f6ceb` and at `b43ffdc`. That matches the Gate 1 test app (`expo ~57.0.31`, `react-native 0.86.3`, `llama.rn ^0.13.0-rc.8`).
+  - The `expo ^44.0.6` / `react-native ^0.72.17` versions read on 2026-11-07 were uncommitted changes in the user's working copy, which the user is resetting.
+  - The version-compatibility risk is gone.
+  - What remains is ordinary integration work, not a blocker:
+    - `llama.rn` is not yet a dependency of `archways-mobile`.
+    - The assistant has not been built or run inside that app.
+- *Original text (2026-11-07), kept for the record:*
+  - The team mobile app's Expo / React Native versions against llama.rn 0.13.0-rc.8.
   - `archways-mobile` `package.json` (read on 2026-11-07) lists `expo ^44.0.6` and `react-native ^0.72.17`. The Gate 1 test app, where llama.rn 0.13.0-rc.8 runs, is on Expo 57 and React Native 0.86.
-  - Until the versions are confirmed compatible (or the mobile app is upgraded), the assistant cannot ship in the team app. The user is verifying the exact versions.
+  - Until the versions are confirmed compatible (or the mobile app is upgraded), the assistant cannot ship in the team app.
 
 ## Unverified
 
 - The exact JSON text of `publishedAt` from a live server (the Jackson defaults are assumed).
 - Whether body edits can happen in place on a live row. Approved edits create a new row and archive the parent (`AnnouncementService`), so a changed id set catches those.
-- llama.rn 0.13.0-rc.8 on the mobile app's stack (the blocking risk above).
+- llama.rn 0.13.0-rc.8 built and run inside `archways-mobile`. The stack is the same as the test app's (resolved, 2026-11-10), but the module isn't added there yet.

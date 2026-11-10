@@ -19,6 +19,21 @@ Template:
 
 ---
 
+## 2026-11-10: Correction: the mobile app's committed stack is Expo 57 / RN 0.86; the llama.rn risk is resolved
+
+- **Date:** 2026-11-10 (+08:00)
+- **Correction (user, 2026-11-10):** the entries of 2026-11-07 (both) and the "UAT label shipped" entry of 2026-11-10 said `archways-mobile` was on `expo ^44.0.6` / `react-native ^0.72.17`, and called that a blocking risk for llama.rn. Those versions were uncommitted local changes in the user's working copy, which the user is resetting (`git stash`, `npm ci`).
+- **Checked read-only** (`git show <commit>:package.json` in `C:\UST-Archways-Organization\archways-mobile`; nothing changed there):
+  - `expo ~57.0.30` and `react-native 0.86.3`, both at `01f6ceb` (the commit cited on 2026-11-07) and at HEAD `b43ffdc`.
+  - The Gate 1 test app has `expo ~57.0.31`, `react-native 0.86.3` and `llama.rn ^0.13.0-rc.8`.
+- **What changed:** ADR 0006's "Blocking risk" is marked resolved for the committed stack. The original text is kept below the resolution, and the "Unverified" line is updated.
+- **Remaining (not a blocker):** `llama.rn` is not yet a dependency of `archways-mobile`, and the assistant hasn't been built or run inside that app.
+- **How it was verified:** docs only, plus the read-only `git show` above.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** the mobile wiring (README guide, 2026-11-07) can proceed once the user's working copy is reset.
+
+---
+
 ## 2026-11-10: UAT label shipped; q07 recorded; leading &nbsp; vectors; post-UAT plans approved
 
 - **Date:** 2026-11-10 (13:40–14:30 +08:00)
