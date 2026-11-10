@@ -19,6 +19,54 @@ Template:
 
 ---
 
+## 2026-11-10: Live run on the Nothing Phone (real login, local Spring); q11–q13 added; plans for and_v4 and date ranking
+
+- **Date:** 2026-11-10 (+08:00)
+- **Live run** (user's log; test app live mode, a real local account, read-only, local dev-profile Spring through `adb reverse`):
+  - **Timings:** login 96 ms; model load 20,431 ms (cold; 1,104 ms on the previous, warm run); prime 3,697 ms.
+  - **`publishedAt`** from the API: `"2026-11-07T15:34:57+08:00"`, with the offset present. The index reported offset added 0.
+  - **Index:** 2 pages, 53 items, 53 details; fetch 4,042 ms, index 22 ms.
+  - **Q "Are there classes on November 30, 2026?"**
+    - Query `class` (the date was dropped). Results 34, 33, 20, 17, 16, newest first.
+    - Path `answer_not_found` → the list. 8.3 s.
+    - Row 16, the one that answers it, was 5th of 5.
+  - **Q "When is the Misa de Apertura?"**
+    - A correct answer from row 10, with the UAT label shown. 4.0 s.
+    - It stated a past date (2026-08-07) as "is held": the past-date framing failure again (fine-tuning target, 2026-11-10).
+  - **Q "When is the pasok for Second Term?"**
+    - Query `pasok`, 0 results: a false `not_found`.
+    - Row 14 (the start of Second Term classes) exists.
+- **Checked locally** (snapshot of 2026-11-07, and_v3 with Python's `search_announcements`; ids and yes/no only):
+  - `class` → 34, 33, 20, 17, 16 and `pasok` → none, the same as the phone.
+  - Row 16 has November 30, and it is the only row whose guard-parsed dates include (11, 30).
+  - Row 10 has the event name and August 7.
+  - Row 14 has January 15 and "Second Term".
+- **ADR 0006:**
+  - The `publishedAt` format check is closed: ISO-8601, whole seconds, `+08:00`, matching row 59's stored time.
+  - The time-zone check is closed as well. The development laptop's clock is `+0800`; any other machine still needs Docker or a Manila clock.
+- **Flow dev set:** q11–q13 were added to `data/local/flow_test_questions.json`, which is gitignored. The four keys are unchanged, and q01–q10 are byte-identical apart from the separating comma.
+  - **Labels:** q11 row 16, q12 row 10, q13 row 14. The full labels are now q01 18, q02 57, q03 50, q04 39, q05 28+8, q06 44+21+29, q07 7 (9 two-part, not counted), q08 56, q09 53, q10 trap, q11 16, q12 10, q13 14.
+  - The test app's `local-data/flow_test.json` is not re-exported yet. That needs `export_flow_test.py` with Ollama.
+- **Plans (PLAN ONLY):** `docs/plans/post-uat-and_v4-and-date-ranking.md`:
+  - **(1) and_v4:**
+    - A frozen `search_synonyms_v2.json` with `pasok` → `class`.
+    - Report taglish-08's trap and whether the answer step stays honest.
+    - The recording replay already shows that `class` under `limit` 5 doesn't reach row 14. The plan says this, as an observation rather than a score.
+  - **(2) Date-aware ranking:**
+    - Rows whose full text has a question date come first, then newest, ranked **before** the limit cut.
+    - The raw question is passed to the search, because the query call drops dates.
+    - Parity: `e2escore.claims()` in Python, and guard-ts `claims()` exported and reused in `search.ts`.
+    - Hand-written rank vectors; limits documented (month and day only, ranges give the first day, no relative dates).
+  - **(3) Model load and priming** go in the background at app start, never on the first question. Recorded in the assistant-ts README's "What the mobile app must do" and wiring sections.
+- **Correction:** the assistant-ts README's wiring section still listed the Expo 44 / RN 0.72 blocker after ADR 0006 was corrected (earlier today). It now gives the committed Expo 57 / RN 0.86 stack.
+- **How it was verified:** docs only, plus a one-off scratch replay on the snapshot (not committed). No code changed.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - Re-export the test app's `flow_test.json` with 13 questions when Ollama is up.
+  - Both plans wait for post-UAT.
+
+---
+
 ## 2026-11-10: Test app live mode: any @ust.edu.ph email, on a localhost base URL only
 
 - **Date:** 2026-11-10 (+08:00)

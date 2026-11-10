@@ -223,7 +223,10 @@ uv run python scripts/export_assistant_vectors.py   # after a reference change; 
   - Completion: a raw `prompt`; `temperature: 0`, `stop: ["<|im_end|>", "<|im_start|>"]`.
     - The Gate 1 app set only `temperature: 0`. Adding `top_k: 1`, `top_p: 1` and `seed: 42` (as in the evaluation) is a proposal; whether it changes phone replies is unverified.
   - No JSON grammar in UAT: none was used on the phone, and Ollama gave the same e2e-009 query reply with or without the schema.
-- **Priming:** on first use each Manila day, with a progress message (about 30 s, apart from model load: 1.0–2.5 s measured). Keep `speedState(speedsFromPriming(reports).answer)` and `querySpeedState(speedsFromPriming(reports).query)` in memory and pass both to every `askAssistant()`.
+- **Load and priming in the background at app start, never on the first question** (user, 2026-11-10). On the Nothing Phone 3a Pro live run, a cold model load took 20,431 ms, against 1,104 ms on a warm run, and priming took about 3.7 s. A student's first question must not pay for either.
+  - Start `initLlama` and `primeSessions` in the background once the app is up and the user is signed in. Prime again on the first use of each Manila day.
+  - If a question arrives before both are done, wait for them with a progress message rather than starting a second load.
+  - Priming took about 30 s on the Redmi 10C (Gate 1), apart from the load. Keep `speedState(speedsFromPriming(reports).answer)` and `querySpeedState(speedsFromPriming(reports).query)` in memory and pass both to every `askAssistant()`.
 - **Timeouts:** don't add an app timeout under 15 s around `askAssistant()`. The budget already decides when to skip the model.
 - **The UAT log:** keep every `deps.log` entry (above).
 - **One context, kept loaded.** With `use_mmap`, the app survived being swapped out and still answered (Gate 1, development build).
@@ -251,7 +254,8 @@ Spring needs **no search change**: the assistant searches the student's own feed
 
 ## Wiring into the team mobile app (to do in the team repo only after approval)
 
-- **Blocking first:** llama.rn 0.13.0-rc.8 against the app's `expo ^44.0.6` / `react-native ^0.72.17` (ADR 0006, "Blocking risk").
+- **Stack:** the app's committed stack (`expo ~57.0.30`, `react-native 0.86.3`) matches the test app where llama.rn 0.13.0-rc.8 runs (ADR 0006, risk resolved 2026-11-10). Add `llama.rn` as a dependency, pinned exactly.
+- **Model load and priming:** in the background at app start (see "What the mobile app must do"), never on the first question.
 - **Copy:** `assistant-ts/src/*.ts` and `guard-ts/src/*.ts`, in the same layout, with the source commit hash recorded (as the Gate 1 test app's `vendor/archways/VENDORED.md` does).
 - **One hook, `useAssistant()`:**
   - A module-level `createFeedIndex(fetchJson)`, where `fetchJson = (path) => api.get(path).then((r) => r.data)` through the existing axios `api` client (its base URL already ends in `/api/v1`). Axios errors are rethrown as `HttpError(error.response?.status ?? 0)`.

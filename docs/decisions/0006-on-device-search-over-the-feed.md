@@ -65,7 +65,11 @@ A new search endpoint would have to repeat every visibility rule of the feed, pe
 - **Time:**
   - **The server clock is Manila only in the Docker image.** `publishedAt` is written with `LocalDateTime.now()` in the JVM's default zone, and the API then labels it `+08:00`. Under Docker (`TZ=Asia/Manila`, `-Duser.timezone=Asia/Manila`) that is right. A local run on a machine whose zone is not Manila would store that machine's local time, and every posted date and the days window would shift by the zone difference.
   - The adapter trusts the API's offset.
-  - This is correct only if the server's JVM ran on Manila time when `publishedAt` was written. Docker guarantees it; a local run outside Docker on a non-Manila clock does not. The time-zone check is still open.
+  - This is correct only if the server's JVM ran on Manila time when `publishedAt` was written. Docker guarantees it; a local run outside Docker on a non-Manila clock does not.
+  - **Closed 2026-11-10 (user):**
+    - The live API sent `+08:00`, and the time matched the stored row time.
+    - The development laptop's clock is `+0800`, so a local run on it writes Manila time.
+    - The rule stands for any other machine: run the server under Docker, or on a Manila clock.
 - **Cost and freshness:**
   - The phone downloads every detail it indexes. The fetch and index times are logged so this can be measured.
   - The rebuild and edit-detection rules are in the plan.
@@ -87,6 +91,9 @@ A new search endpoint would have to repeat every visibility rule of the feed, pe
 
 ## Unverified
 
-- The exact JSON text of `publishedAt` from a live server (the Jackson defaults are assumed).
+- ~~The exact JSON text of `publishedAt` from a live server.~~ **Closed 2026-11-10:**
+  - The Nothing Phone 3a Pro live run logged `"2026-11-07T15:34:57+08:00"` from the detail endpoint of the local dev-profile server. That is ISO-8601, whole seconds, with the offset present, as assumed above.
+  - The index reported `offset added 0` for all 53 items.
+  - The value matches the stored time of row 59 in the 2026-11-07 snapshot (`2026-11-07T15:34:57`) with `+08:00` attached.
 - Whether body edits can happen in place on a live row. Approved edits create a new row and archive the parent (`AnnouncementService`), so a changed id set catches those.
 - llama.rn 0.13.0-rc.8 built and run inside `archways-mobile`. The stack is the same as the test app's (resolved, 2026-11-10), but the module isn't added there yet.
