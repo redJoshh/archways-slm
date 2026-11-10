@@ -62,6 +62,23 @@ const result = await askAssistant(question, {
 show(result.text);   // only result.text, never log the question or any text
 ```
 
+**Use the runtime in an app (2026-11-10).** The lines above show the parts. An app should use `createAssistantRuntime({ llama, settings })` (`runtime.ts`, plan `docs/plans/model-queue-and-speed-recovery.md`) instead:
+
+```ts
+const runtime = createAssistantRuntime({ llama, settings });
+runtime.onChange(() => setState(runtime.state()));   // "priming" / "measuring": show "getting ready"
+runtime.prime(Date.now());                            // in the background at app start; not awaited
+const index = createFeedIndex(fetchJson, { activity: runtime.beginActivity });
+const result = await runtime.ask(question, { nowMs: Date.now, search: makeFeedSearch(index), log });
+```
+
+- **The model queue:** every model call and token count goes through one serial queue (`queue.ts`). llama.rn runs one completion at a time; on the Redmi 10C a query call made during priming failed after 118 ms.
+- **Priming:** each call is an exclusive job. Jobs already queued finish first, a running activity (the index build) is waited for, and new activities wait until priming ends.
+- **A question asked during priming or a re-measure** waits (`whenReady`) instead of failing. The wait is `readyWaitMs` in the result and the UAT log, and it is not counted in the budget's elapsed time.
+- **Overlapped samples:** a priming report or completion overlapped by an activity is not a speed sample (`speedsFromPriming` skips it, and `askAssistant` doesn't update the speeds).
+- **Re-measure:** after priming and after each question, if `answerSpeedSuspect(answer, query)`, one exclusive `primeOne(answer, measure)` runs, at most `REMEASURE_MAX_PER_DAY` (2) per Manila day. It is suspect when the answer generation rate is unknown, or below `SUSPECT_RATIO` (0.6) times the query's.
+- **No async arrow functions** in files the Hermes smoke test bundles: the Hermes 0.12 CLI rejects them (`async function` expressions work).
+
 `askAssistant()` never rejects, and every path returns text to show. The model's text is shown only after the guard has passed it.
 
 | `path` | When | Text shown |
@@ -224,9 +241,9 @@ uv run python scripts/export_assistant_vectors.py   # after a reference change; 
     - The Gate 1 app set only `temperature: 0`. Adding `top_k: 1`, `top_p: 1` and `seed: 42` (as in the evaluation) is a proposal; whether it changes phone replies is unverified.
   - No JSON grammar in UAT: none was used on the phone, and Ollama gave the same e2e-009 query reply with or without the schema.
 - **Load and priming in the background at app start, never on the first question** (user, 2026-11-10). On the Nothing Phone 3a Pro live run, a cold model load took 20,431 ms, against 1,104 ms on a warm run, and priming took about 3.7 s. A student's first question must not pay for either.
-  - Start `initLlama` and `primeSessions` in the background once the app is up and the user is signed in. Prime again on the first use of each Manila day.
-  - If a question arrives before both are done, wait for them with a progress message rather than starting a second load.
-  - Priming took about 30 s on the Redmi 10C (Gate 1), apart from the load. Keep `speedState(speedsFromPriming(reports).answer)` and `querySpeedState(speedsFromPriming(reports).query)` in memory and pass both to every `askAssistant()`.
+  - Start `initLlama`, then `createAssistantRuntime(...)` and `runtime.prime(...)`, in the background once the app is up and the user is signed in. Prime again on the first use of each Manila day.
+  - A question that arrives before priming is done waits (the runtime's `whenReady`). Show a "getting ready" message while `runtime.state()` is `"priming"` or `"measuring"`. A question that arrives before the model has even loaded must wait for the load in the app.
+  - Priming took about 30 s on the Redmi 10C (Gate 1), apart from the load. The runtime keeps both speeds in memory.
 - **Timeouts:** don't add an app timeout under 15 s around `askAssistant()`. The budget already decides when to skip the model.
 - **The UAT log:** keep every `deps.log` entry (above).
 - **One context, kept loaded.** With `use_mmap`, the app survived being swapped out and still answered (Gate 1, development build).
@@ -260,7 +277,8 @@ Spring needs **no search change**: the assistant searches the student's own feed
 - **One hook, `useAssistant()`:**
   - A module-level `createFeedIndex(fetchJson)`, where `fetchJson = (path) => api.get(path).then((r) => r.data)` through the existing axios `api` client (its base URL already ends in `/api/v1`). Axios errors are rethrown as `HttpError(error.response?.status ?? 0)`.
   - `index.ensure()` when the assistant screen opens.
-  - `ask(question)` calls `askAssistant` with `makeFeedSearch(index)`, `makeComplete(llama, settings)`, `speed` and `querySpeed` from `speedsFromPriming()`, and the UAT log.
+  - One `createAssistantRuntime({ llama, settings })` per loaded context. Pass `activity: runtime.beginActivity` to `createFeedIndex`.
+  - `ask(question)` calls `runtime.ask(question, { nowMs, search: makeFeedSearch(index), log })`.
 - **Sign-out:** in `src/features/auth/auth-context.tsx` `signOut()`, call the index's `clear()` next to `queryClient.clear()`. The 401 handler already calls `signOut()`.
 
 ## Unverified

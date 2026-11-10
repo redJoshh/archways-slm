@@ -210,6 +210,19 @@ Dev-set effect, from the qwen3:0.6b v1 `and_v1` baseline: 4 of 20 answer calls h
 - The label is added after the guard (the guard never sees it). No other path shows it.
 - It comes from `assistant.ANSWER_LABEL` / `ANSWER_LABEL_SEPARATOR` through `export_assistant_ts.py`. Gate 1 and dev scoring are unchanged: they score the model's reply.
 
+#### One model queue, exclusive priming and the answer-speed re-measure (user decision, 2026-11-10)
+
+- **Evidence: the Redmi 10C live run of 2026-11-10** (devlog).
+  - A question asked during Prime, while the index was building, failed after 118 ms in `query_error`.
+  - Priming measured 6.7 generated tokens/s under that overlap, against 13.6–15.0 for the session's query calls. The Misa question was then predicted at 17,440 ms and fell back.
+- **What changed** (plan `docs/plans/model-queue-and-speed-recovery.md`):
+  - **One serial queue:** every model call goes through it, and priming runs as exclusive jobs (the feed index waits).
+  - **Questions wait for priming,** with `readyWaitMs` logged and kept out of the budget.
+  - **Samples overlapped by other work are ignored.**
+  - **A suspect answer generation rate is re-measured:** one exclusive measuring call on the answer prefix, at most 2 a day. It is suspect when it is unknown, or below 0.6 times the query rate.
+- **The prediction formula is unchanged.** There is no bounded correction.
+- **`SUSPECT_RATIO` 0.6 comes from the honest Redmi samples of 2026-11-07** (ratios 0.71–0.90), not from any question.
+
 ## Caveats
 
 - **Dev set only:** 34 cases we wrote ourselves. The held-out set has not been run.

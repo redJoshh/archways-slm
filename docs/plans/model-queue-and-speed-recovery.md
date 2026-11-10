@@ -108,6 +108,13 @@ Source: the Redmi 10C live run of 2026-11-10 (devlog).
 - **Test app:** `phoneModel.ts` and the screens use `createAssistantRuntime`. The live screen's index build goes through `beginActivity`, and the screens show the runtime state.
 - **Phone runs (user):** on the Redmi, ask during Prime and during the index build.
 
+## Built (2026-11-10)
+
+- **Commits:** `c790d06` (Python rule and vectors), `3c69ba5` (queue, runtime, tests, Hermes scenario). Test app `b337626`.
+- **Found while building:**
+  - **Exclusive jobs can't be overlapped by a registered activity:** they wait for running activities, and new ones wait for them. So the "overlapped re-measure is discarded" branch is defensive. It is tested as the invariant instead: an activity asked for during a re-measure waits.
+  - **The Hermes 0.12 CLI rejects async arrow functions** (`async function` expressions are fine), so the new files use `async function`. `makeComplete` had async arrows that the smoke test never bundled before.
+
 ## Not in this plan
 
 - Background loading at app start (the mobile note of 2026-11-10) is the app's job: call `runtime.prime()` once the model is loaded.

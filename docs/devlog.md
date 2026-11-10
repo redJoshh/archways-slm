@@ -19,6 +19,73 @@ Template:
 
 ---
 
+## 2026-11-10: Redmi 10C live run (two bugs); one serial model queue, exclusive priming and an answer-speed re-measure
+
+- **Date:** 2026-11-10 (+08:00)
+- **Redmi 10C live run** (user's log; real login, real feed, local Spring):
+  - **Timings:** login 195 ms; model load 2,506 ms; index fetch 6,870 ms and index 110 ms (2 pages, 53 details).
+  - **Prime 16,867 ms:** answer prompt 30.7/s, generation 6.7/s; query prompt 29.9/s.
+  - **Misa question:** the list, in 2.4 s. **Pasok question:** `not_found`, in 2.2 s.
+  - **Memory:** PSS 476,944 kB, RSS 534,672 kB.
+  - **Bug 1, concurrency:**
+    - A question asked while Prime was running (and the index was building): the query call failed after 118 ms with no timings, so `query_error` and the last-resort text.
+  - **Bug 2, speed lock-in:**
+    - The 6.7/s generation sample was taken while the index fetch and the failed call overlapped it. The session's query calls ran at 13.6–15.0.
+    - The Misa question (212 case tokens) was predicted at 17,440 ms, so `budget_fallback`; at the real speed it would have taken about 13–14 s.
+    - The answer speed updates only from answer calls, so the bad sample never corrected.
+- **Plan first (`7d0edeb`):** `docs/plans/model-queue-and-speed-recovery.md` was committed before any code, with `SUSPECT_RATIO` 0.6 and `REMEASURE_MAX_PER_DAY` 2 fixed in it.
+- **Built:**
+  - **`c790d06`:**
+    - Python `speeds_from_priming()` ignores reports flagged `overlap`.
+    - New `answer_speed_suspect()`: the answer generation rate is unknown, or `answer < 0.6 × query`.
+    - Both constants go through `export_assistant_ts.py`.
+    - Vectors: 5 priming-overlap cases and 12 suspect cases, including the exact boundary.
+    - TS ports in `budget.ts`, plus the vector runner.
+  - **`3c69ba5`:**
+    - **`queue.ts`:** serial `run`, `exclusive`, `beginActivity` and `overlap`.
+    - **`runtime.ts`, `createAssistantRuntime`:** `prime` (exclusive jobs, overlapped reports ignored, then the re-measure check), `ask`, `whenReady`, `state` / `onChange`, `remeasureIfNeeded` (one at a time, 2 per Manila day), `beginActivity`.
+    - **Other files:**
+      - `makeComplete` and `primeSessions` take an optional queue.
+      - `createFeedIndex` takes an `activity` option.
+      - In `askAssistant`: `deps.whenReady` (`readyWaitMs` in the result and the `QuestionLog`, kept out of the budget), and an overlapped `Completion` updates no speed.
+    - **New Node tests** (`test/runtime.test.ts`):
+      - **Queue:** FIFO order, exclusive against activity in both directions, the overlap flag.
+      - **Runtime:**
+        - A question during priming answers, with no query call before priming ends.
+        - The wait is logged.
+        - Two concurrent questions don't collide.
+        - The index build waits for priming.
+      - **Speeds:**
+        - An overlapped completion updates no speed.
+        - The Redmi scenario: priming measures 6.7, the question falls back, its query call measures 13.6, one re-measure follows, and its 12.0 replaces 6.7.
+        - The day limit holds, and a confirmed slow phone is kept.
+    - **Hermes scenario:** a question during priming, through the real runtime.
+  - **Docs:** ADR 0004 subsection "One model queue, exclusive priming and the answer-speed re-measure", the assistant-ts README (runtime use and wiring), and "Built" notes in the plan.
+- **Found while building:**
+  - **The Hermes 0.12 CLI rejects async arrow functions,** so the new files use `async function`. `makeComplete`'s async arrows had never been in the Hermes bundle.
+  - **Exclusive jobs can't be overlapped by a registered activity,** so the overlapped-re-measure branch is defensive. It is tested as the invariant instead.
+- **Test app** (`C:\throw-away-app\gate1-llm`, `b337626`, not pushed):
+  - Re-vendored from `3c69ba5`.
+  - `phoneModel.ts` builds one runtime per loaded context; Prime goes through `runtime.prime` and logs the overlap flags, the suspect flag and the re-measures.
+  - `questionRun.ts` uses the runtime's dependencies, logs the readiness wait and per-call overlap, and re-measures in the background.
+  - The screens show the runtime state ("getting ready …").
+  - The live index build is a runtime activity.
+- **How it was verified:**
+  - `uv run pytest -q` → `1183 passed, 2 skipped`. ruff check and format clean. Generators `--check` up to date.
+  - assistant-ts `npm test` → 270/270.
+  - Hermes CLI → assistant 247/247, feed 194/194, askAssistant answer as expected, and the runtime question-during-priming scenario as expected (calls: answer 1, query 16, query 64, answer 200; no collisions).
+  - Test app: `tsc --noEmit` clean; `expo export --platform android` builds (2 MB hbc).
+  - **Mutation checks** (restored from backup copies, never `git checkout`; tree clean after):
+    - All 10 planned mutations were caught.
+    - The "queue not serial" and "day limit off" mutations were at first only compile errors (an unused binding), which proves nothing. Re-run in forms that compile, both were caught by Node only (1 test each), not by the Hermes scenario.
+- **Not verified:** anything on a phone. The next Redmi run should ask during Prime and during the index build.
+- **Commits:** `7d0edeb`, `c790d06`, `3c69ba5`, this `docs:` commit; test app `b337626`. Not pushed.
+- **Open questions / next:**
+  - The Redmi re-run.
+  - Overlap from CPU work the app doesn't register as an activity (for example a heavy render) is not detected.
+
+---
+
 ## 2026-11-10: Plan revised: question-overlap ranking (rank_v1) before the cut, shared with the answerability gate
 
 - **Date:** 2026-11-10 (+08:00)
