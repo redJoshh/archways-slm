@@ -4,7 +4,14 @@
  */
 
 import { checkResults, parseQueryReply } from "./contract.ts";
-import { speedsFromPriming, updateAnswerSpeed, updateSpeed, type Pending, type Speed } from "./budget.ts";
+import {
+  answerSpeedSuspect,
+  speedsFromPriming,
+  updateAnswerSpeed,
+  updateSpeed,
+  type Pending,
+  type Speed,
+} from "./budget.ts";
 import { startQuestion, type Step, type StepInput } from "./flow.ts";
 import { answerSystem, answerUserMessage, casePart, querySystem, systemTurn, todayText } from "./render.ts";
 
@@ -61,9 +68,10 @@ export interface VectorFile {
   speed: { id: string; speed: SpeedJson | null; timings: unknown; expected: SpeedJson }[];
   priming: {
     id: string;
-    reports: { kind: "answer" | "query"; timings: unknown }[];
+    reports: { kind: "answer" | "query"; timings: unknown; overlap?: boolean }[];
     expected: { answer: SpeedJson | null; query: SpeedJson | null };
   }[];
+  suspect: { id: string; answer: SpeedJson | null; query: SpeedJson | null; expected: boolean }[];
   answer_speed: {
     id: string;
     speed: SpeedJson | null;
@@ -194,6 +202,9 @@ export function runVectors(file: VectorFile, maxFailures = 20): VectorReport {
         pending.ms === e.pending.ms;
     }
     record("answer_speed " + v.id, ok);
+  }
+  for (const v of file.suspect) {
+    record("suspect " + v.id, answerSpeedSuspect(toSpeed(v.answer), toSpeed(v.query)) === v.expected);
   }
   return { total: total, passed: total - failed, failed: failed, failures: failures };
 }

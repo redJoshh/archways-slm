@@ -5673,6 +5673,308 @@
      "gen_tps": 14.2
     }
    }
+  },
+  {
+   "id": "overlap-measuring-query",
+   "reports": [
+    {
+     "kind": "answer",
+     "timings": {
+      "prompt_n": 197,
+      "prompt_per_second": 27.1,
+      "predicted_n": 1,
+      "predicted_per_second": 30.0
+     }
+    },
+    {
+     "kind": "query",
+     "timings": {
+      "prompt_n": 213,
+      "prompt_per_second": 29.9,
+      "predicted_n": 16,
+      "predicted_per_second": 6.7
+     },
+     "overlap": true
+    }
+   ],
+   "expected": {
+    "answer": {
+     "prompt_tps": 27.1,
+     "gen_tps": null
+    },
+    "query": null
+   }
+  },
+  {
+   "id": "overlap-answer-only",
+   "reports": [
+    {
+     "kind": "answer",
+     "timings": {
+      "prompt_n": 197,
+      "prompt_per_second": 27.1,
+      "predicted_n": 1,
+      "predicted_per_second": 30.0
+     },
+     "overlap": true
+    },
+    {
+     "kind": "query",
+     "timings": {
+      "prompt_n": 213,
+      "prompt_per_second": 23.8,
+      "predicted_n": 16,
+      "predicted_per_second": 14.2
+     }
+    }
+   ],
+   "expected": {
+    "answer": {
+     "prompt_tps": null,
+     "gen_tps": 14.2
+    },
+    "query": {
+     "prompt_tps": 23.8,
+     "gen_tps": 14.2
+    }
+   }
+  },
+  {
+   "id": "overlap-both",
+   "reports": [
+    {
+     "kind": "answer",
+     "timings": {
+      "prompt_n": 197,
+      "prompt_per_second": 27.1,
+      "predicted_n": 1,
+      "predicted_per_second": 30.0
+     },
+     "overlap": true
+    },
+    {
+     "kind": "query",
+     "timings": {
+      "prompt_n": 213,
+      "prompt_per_second": 29.9,
+      "predicted_n": 16,
+      "predicted_per_second": 6.7
+     },
+     "overlap": true
+    }
+   ],
+   "expected": {
+    "answer": null,
+    "query": null
+   }
+  },
+  {
+   "id": "overlap-false-is-valid",
+   "reports": [
+    {
+     "kind": "answer",
+     "timings": {
+      "prompt_n": 197,
+      "prompt_per_second": 27.1,
+      "predicted_n": 1,
+      "predicted_per_second": 30.0
+     }
+    },
+    {
+     "kind": "query",
+     "timings": {
+      "prompt_n": 213,
+      "prompt_per_second": 23.8,
+      "predicted_n": 16,
+      "predicted_per_second": 14.2
+     },
+     "overlap": false
+    }
+   ],
+   "expected": {
+    "answer": {
+     "prompt_tps": 27.1,
+     "gen_tps": 14.2
+    },
+    "query": {
+     "prompt_tps": 23.8,
+     "gen_tps": 14.2
+    }
+   }
+  },
+  {
+   "id": "overlap-later-report-ignored",
+   "reports": [
+    {
+     "kind": "answer",
+     "timings": {
+      "prompt_n": 197,
+      "prompt_per_second": 27.1,
+      "predicted_n": 1,
+      "predicted_per_second": 30.0
+     }
+    },
+    {
+     "kind": "query",
+     "timings": {
+      "prompt_n": 213,
+      "prompt_per_second": 23.8,
+      "predicted_n": 16,
+      "predicted_per_second": 14.2
+     }
+    },
+    {
+     "kind": "answer",
+     "timings": {
+      "prompt_n": 197,
+      "prompt_per_second": 9.0,
+      "predicted_n": 16,
+      "predicted_per_second": 3.0
+     },
+     "overlap": true
+    }
+   ],
+   "expected": {
+    "answer": {
+     "prompt_tps": 27.1,
+     "gen_tps": 14.2
+    },
+    "query": {
+     "prompt_tps": 23.8,
+     "gen_tps": 14.2
+    }
+   }
+  }
+ ],
+ "suspect": [
+  {
+   "id": "redmi-live-2026-11-10",
+   "answer": {
+    "prompt_tps": 30.7,
+    "gen_tps": 6.7
+   },
+   "query": {
+    "prompt_tps": 29.9,
+    "gen_tps": 13.6
+   },
+   "expected": true
+  },
+  {
+   "id": "redmi-honest-low",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": 10.4
+   },
+   "query": {
+    "prompt_tps": 23.8,
+    "gen_tps": 14.6
+   },
+   "expected": false
+  },
+  {
+   "id": "equal",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": 14.2
+   },
+   "query": {
+    "prompt_tps": 23.8,
+    "gen_tps": 14.2
+   },
+   "expected": false
+  },
+  {
+   "id": "answer-faster",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": 20.0
+   },
+   "query": {
+    "prompt_tps": 23.8,
+    "gen_tps": 14.2
+   },
+   "expected": false
+  },
+  {
+   "id": "boundary-equal",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": 6.0
+   },
+   "query": {
+    "prompt_tps": 23.8,
+    "gen_tps": 10.0
+   },
+   "expected": false
+  },
+  {
+   "id": "boundary-just-under",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": 5.999999999
+   },
+   "query": {
+    "prompt_tps": 23.8,
+    "gen_tps": 10.0
+   },
+   "expected": true
+  },
+  {
+   "id": "answer-none",
+   "answer": null,
+   "query": {
+    "prompt_tps": 23.8,
+    "gen_tps": 14.2
+   },
+   "expected": true
+  },
+  {
+   "id": "answer-gen-unknown",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": null
+   },
+   "query": {
+    "prompt_tps": 23.8,
+    "gen_tps": 14.2
+   },
+   "expected": true
+  },
+  {
+   "id": "answer-gen-unknown-query-none",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": null
+   },
+   "query": null,
+   "expected": true
+  },
+  {
+   "id": "query-none",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": 3.0
+   },
+   "query": null,
+   "expected": false
+  },
+  {
+   "id": "query-gen-unknown",
+   "answer": {
+    "prompt_tps": 27.1,
+    "gen_tps": 3.0
+   },
+   "query": {
+    "prompt_tps": 23.8,
+    "gen_tps": null
+   },
+   "expected": false
+  },
+  {
+   "id": "both-none",
+   "answer": null,
+   "query": null,
+   "expected": true
   }
  ]
 }

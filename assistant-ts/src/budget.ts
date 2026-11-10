@@ -38,6 +38,7 @@ import {
   PROMPT_N_MIN,
   RATE_MAX,
   RATE_MIN,
+  SUSPECT_RATIO,
 } from "./generated.ts";
 
 /** This phone's measured rates in tokens/s; null means not measured. */
@@ -184,11 +185,15 @@ export interface SpeedState {
  * Both null if nothing was primed (files already existed, e.g. after an app
  * restart): the speed is never saved, so the 200-token rule applies until
  * answer calls report timings. query is null if no query report was given.
+ * A report with overlap: true (other work competed for the CPU during the
+ * call; plan "model queue and speed recovery", 2026-11-10) is invalid and
+ * treated as if it had not been given.
  * Pure (session.ts re-exports it), so the Hermes CLI vectors can run it.
  */
 export function speedsFromPriming(
-  reports: { kind: string; timings?: unknown }[],
+  allReports: { kind: string; timings?: unknown; overlap?: boolean }[],
 ): { answer: Speed | null; query: Speed | null } {
+  const reports = allReports.filter((report) => report.overlap !== true);
   let answer: Speed | null = null;
   let query: Speed | null = null;
   for (const report of reports) {
@@ -201,6 +206,18 @@ export function speedsFromPriming(
     answerOut = { promptTps: answerOut.promptTps, genTps: query.genTps };
   }
   return { answer: answerOut, query: query };
+}
+
+/**
+ * Whether the answer generation rate should be re-measured (a port of
+ * answer_speed_suspect()): it is unknown, or both generation rates are known
+ * and answer < SUSPECT_RATIO * query. An unknown query rate never makes a
+ * known answer rate suspect.
+ */
+export function answerSpeedSuspect(answer: Speed | null | undefined, query: Speed | null | undefined): boolean {
+  if (!answer || answer.genTps === null) return true;
+  if (!query || query.genTps === null) return false;
+  return answer.genTps < SUSPECT_RATIO * query.genTps;
 }
 
 /**

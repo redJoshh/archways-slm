@@ -78,6 +78,8 @@ def render() -> str:
         ("RATE_MAX", assistant.RATE_MAX),
         ("PROMPT_N_MIN", assistant.PROMPT_N_MIN),
         ("PREDICTED_N_MIN", assistant.PREDICTED_N_MIN),
+        ("SUSPECT_RATIO", assistant.SUSPECT_RATIO),
+        ("REMEASURE_MAX_PER_DAY", assistant.REMEASURE_MAX_PER_DAY),
         ("QUERY_MIN_CHARS", arguments["query"]["minLength"]),
         ("QUERY_MAX_CHARS", arguments["query"]["maxLength"]),
         ("DAYS_MIN", arguments["days"]["minimum"]),

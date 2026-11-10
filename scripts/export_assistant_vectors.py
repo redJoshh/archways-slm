@@ -610,10 +610,28 @@ def priming_vectors() -> list[dict]:
         # Generation from answer priming is used too if it was measured.
         ("both-measure", [report("answer", 197, 27.1, 16, 11.0), query]),
     ]
+
+    def overlapped(r):
+        return {**r, "overlap": True}
+
+    # Overlap (plan "model queue and speed recovery", 2026-11-10): a report
+    # taken while other work competed for the CPU is ignored. The Redmi live
+    # run of 2026-11-10 measured 6.7 generated tokens/s under overlap.
+    redmi_overlap = report("query", 213, 29.9, 16, 6.7)
+    cases += [
+        ("overlap-measuring-query", [answer, overlapped(redmi_overlap)]),
+        ("overlap-answer-only", [overlapped(answer), query]),
+        ("overlap-both", [overlapped(answer), overlapped(redmi_overlap)]),
+        ("overlap-false-is-valid", [answer, {**query, "overlap": False}]),
+        (
+            "overlap-later-report-ignored",
+            [answer, query, overlapped(report("answer", 197, 9.0, 16, 3.0))],
+        ),
+    ]
     out = []
     for id_, reports in cases:
         answer_speed, query_speed = speeds_from_priming(
-            [(r["kind"], r["timings"]) for r in reports]
+            [(r["kind"], r["timings"], r.get("overlap", False)) for r in reports]
         )
         out.append(
             {
@@ -626,6 +644,38 @@ def priming_vectors() -> list[dict]:
             }
         )
     return out
+
+
+def suspect_vectors() -> list[dict]:
+    """answer_speed_suspect(): (id, answer speed, query speed)."""
+    ratio = assistant.SUSPECT_RATIO
+    cases = [
+        # Redmi live run 2026-11-10: answer gen 6.7 (borrowed from the
+        # overlapped measuring call), query calls 13.6.
+        ("redmi-live-2026-11-10", Speed(30.7, 6.7), Speed(29.9, 13.6)),
+        # Redmi 2026-11-07, honest: answer 10.4 against query 14.6.
+        ("redmi-honest-low", Speed(27.1, 10.4), Speed(23.8, 14.6)),
+        ("equal", Speed(27.1, 14.2), Speed(23.8, 14.2)),
+        ("answer-faster", Speed(27.1, 20.0), Speed(23.8, 14.2)),
+        # The boundary: exactly SUSPECT_RATIO * query is not suspect.
+        ("boundary-equal", Speed(27.1, ratio * 10.0), Speed(23.8, 10.0)),
+        ("boundary-just-under", Speed(27.1, ratio * 10.0 - 1e-9), Speed(23.8, 10.0)),
+        ("answer-none", None, Speed(23.8, 14.2)),
+        ("answer-gen-unknown", Speed(27.1, None), Speed(23.8, 14.2)),
+        ("answer-gen-unknown-query-none", Speed(27.1, None), None),
+        ("query-none", Speed(27.1, 3.0), None),
+        ("query-gen-unknown", Speed(27.1, 3.0), Speed(23.8, None)),
+        ("both-none", None, None),
+    ]
+    return [
+        {
+            "id": id_,
+            "answer": speed_json(answer),
+            "query": speed_json(query),
+            "expected": assistant.answer_speed_suspect(answer, query),
+        }
+        for id_, answer, query in cases
+    ]
 
 
 def answer_timings(predicted_n, predicted_ms, **extra) -> dict:
@@ -763,6 +813,7 @@ def build() -> str:
         "speed": speed_vectors(),
         "answer_speed": answer_speed_vectors(),
         "priming": priming_vectors(),
+        "suspect": suspect_vectors(),
     }
     return json.dumps(data, ensure_ascii=True, indent=1) + "\n"
 

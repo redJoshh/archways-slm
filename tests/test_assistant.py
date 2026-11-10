@@ -380,12 +380,54 @@ def test_query_and_answer_prompts_start_with_their_own_prefixes():
 
 
 def test_priming_vectors_reproduce():
-    assert len(DATA["priming"]) >= 9
+    assert len(DATA["priming"]) >= 14
     for vector in DATA["priming"]:
-        reports = [(r["kind"], r["timings"]) for r in vector["reports"]]
+        reports = [
+            (r["kind"], r["timings"], r.get("overlap", False))
+            for r in vector["reports"]
+        ]
         answer, query = assistant.speeds_from_priming(reports)
         assert answer == speed_of(vector["expected"]["answer"]), vector["id"]
         assert query == speed_of(vector["expected"]["query"]), vector["id"]
+
+
+def test_an_overlapped_priming_report_is_ignored():
+    """Redmi live run 2026-11-10: the measuring call ran under overlap."""
+    by_id = {vector["id"]: vector["expected"] for vector in DATA["priming"]}
+    # The answer prompt rate stays; the overlapped 6.7 never becomes the
+    # answer generation rate, so it is unknown (re-measured, not borrowed).
+    assert by_id["overlap-measuring-query"]["answer"] == {
+        "prompt_tps": 27.1,
+        "gen_tps": None,
+    }
+    assert by_id["overlap-measuring-query"]["query"] is None
+    assert by_id["overlap-both"] == {"answer": None, "query": None}
+    assert by_id["overlap-false-is-valid"] == by_id["redmi-2026-11-07"]
+    assert by_id["overlap-later-report-ignored"] == by_id["redmi-2026-11-07"]
+    # Two-item reports still work (no overlap).
+    plain = assistant.speeds_from_priming([("answer", None), ("query", None)])
+    assert plain == (assistant.Speed(), assistant.Speed())
+
+
+def test_suspect_vectors_reproduce():
+    assert len(DATA["suspect"]) >= 12
+    for vector in DATA["suspect"]:
+        got = assistant.answer_speed_suspect(
+            speed_of(vector["answer"]), speed_of(vector["query"])
+        )
+        assert got is vector["expected"], vector["id"]
+
+
+def test_suspect_rule_on_the_recorded_samples():
+    by_id = {vector["id"]: vector["expected"] for vector in DATA["suspect"]}
+    assert by_id["redmi-live-2026-11-10"] is True
+    # The honest Redmi samples the ratio was fixed from are never suspect.
+    assert by_id["redmi-honest-low"] is False
+    assert by_id["boundary-equal"] is False
+    assert by_id["boundary-just-under"] is True
+    assert by_id["answer-gen-unknown"] is True
+    assert by_id["query-none"] is False
+    assert by_id["query-gen-unknown"] is False
 
 
 def test_query_priming_never_sets_the_answer_prompt_rate():

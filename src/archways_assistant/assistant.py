@@ -86,6 +86,13 @@ PROMPT_N_MIN = 100
 # Answer replies shorter than this add up (update_answer_speed()) until
 # their total reaches it.
 PREDICTED_N_MIN = 10
+# answer_speed_suspect(): an answer generation rate below this share of the
+# query generation rate is re-measured. Fixed from the honest Redmi samples of
+# 2026-11-07 only (answer 10.4-12.8 against query 14.2-14.6 tokens/s: ratios
+# 0.71-0.90), below the lowest with a margin; never tuned to a question.
+SUSPECT_RATIO = 0.6
+# Re-measures of the answer speed per Manila day (assistant-ts runtime.ts).
+REMEASURE_MAX_PER_DAY = 2
 # Questions longer than this (code points) are refused before any call, so
 # a pasted text can't overflow n_ctx 2048. Proposal, not measured.
 QUESTION_MAX_CHARS = 500
@@ -410,10 +417,16 @@ def speeds_from_priming(reports) -> tuple[Speed | None, Speed | None]:
       reads it (the query call is measured, not predicted).
     The answer speed is None if no report at all was given; the query speed
     is None if no query report was given.
+
+    A report may carry a third item, overlap (plan "model queue and speed
+    recovery", 2026-11-10): True if other work competed for the CPU during
+    the call. Such a report is invalid and is treated as if it had not been
+    given (so if every report overlapped, both speeds are None).
     """
+    reports = [report for report in reports if not (len(report) > 2 and report[2])]
     answer = None
     query = None
-    for kind, timings in reports:
+    for kind, timings, *_ in reports:
         if kind == "answer":
             answer = update_speed(answer, timings)
         else:
@@ -424,6 +437,23 @@ def speeds_from_priming(reports) -> tuple[Speed | None, Speed | None]:
     if answer.gen_tps is None and query is not None and query.gen_tps is not None:
         answer = Speed(answer.prompt_tps, query.gen_tps)
     return answer, query
+
+
+def answer_speed_suspect(answer: Speed | None, query: Speed | None) -> bool:
+    """Whether the answer generation rate should be re-measured.
+
+    True if the answer speed has no generation rate, or if both generation
+    rates are known and the answer's is below SUSPECT_RATIO times the
+    query's (plan "model queue and speed recovery", 2026-11-10). The
+    comparison is answer < SUSPECT_RATIO * query, in that order, so Python
+    and TypeScript agree exactly. An unknown query rate never makes a known
+    answer rate suspect.
+    """
+    if answer is None or answer.gen_tps is None:
+        return True
+    if query is None or query.gen_tps is None:
+        return False
+    return answer.gen_tps < SUSPECT_RATIO * query.gen_tps
 
 
 @dataclass(frozen=True)
