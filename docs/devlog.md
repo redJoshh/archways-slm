@@ -19,6 +19,38 @@ Template:
 
 ---
 
+## 2026-11-10: Plan revised: question-overlap ranking (rank_v1) before the cut, shared with the answerability gate
+
+- **Date:** 2026-11-10 (+08:00)
+- **Decision (user, 2026-11-10):**
+  - Replace the date-only ranking with a ranking of all matched rows by overlap with the raw question, before the 5-result cut. Newest first is only the tie-breaker.
+  - Dates and numbers are anchors with a higher weight.
+  - The answerability gate reuses the same score.
+  - PLAN ONLY.
+- **Checked on the snapshot** (and_v3, ids and counts only; observations, not a score):
+  - **q01:** `office` matches 17 rows. Row 18 matches because it has "offices", but it is 10th newest, so the 5-result cut dropped it.
+  - **q11:** `class` matches 11 rows; row 16 is 5th.
+  - **q13:** under and_v4 the same 11 rows would match, and row 14 is 7th. So rank_v1 (or a larger limit) is what can lift it; the synonym alone can't.
+  - **Correction to the previous entry:** it said "11 rows contain class" without the place. Row 14 is 7th of 11.
+- **What changed:**
+  - `docs/plans/post-uat-and_v4-and-date-ranking.md`, section 2, was rewritten as rank_v1:
+    - Content words come from the raw question: dates blanked, and_v3 tokenizer, digits dropped, matcher stopwords plus a new frozen `rank_stopwords_v1.json` of Filipino function words and domain words.
+    - Words are found with the matcher's own per-word test, synonyms included.
+    - Date and number anchors use the guard's `claims()`.
+    - Score: integers, `points = words + 3 × anchors` out of `possible`. The weight 3 is fixed now.
+    - Ranked over the full match set, then cut.
+    - The gate is the top result's `points/possible ≥ θ`, with θ the only fitted number.
+    - Arms: rank_v1 alone, and_v4 alone, both, then the gate.
+    - Parity: guard-ts `claims()` reused, hand-written rank vectors, mutation checks listed.
+  - The file name keeps "date-ranking" so the earlier entry's link still works.
+  - In `post-uat-answerability-and-excerpts.md`, (a) is marked superseded by the shared score; the old rule is kept for the record.
+- **How it was verified:** docs only, plus a one-off scratch replay on the snapshot (not committed).
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The rank stopword list is written in the plan. It is frozen as a file when the build starts (post-UAT), before any run.
+
+---
+
 ## 2026-11-10: Live run on the Nothing Phone (real login, local Spring); q11–q13 added; plans for and_v4 and date ranking
 
 - **Date:** 2026-11-10 (+08:00)

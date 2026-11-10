@@ -22,6 +22,8 @@ Source: the Nothing Phone 3a Pro flow run and the snapshot checks (devlog, 2026-
 
 ## (a) Answerability gate
 
+> **Superseded 2026-11-10 (user):** the gate now uses rank_v1's overlap score, the same score that ranks results before the cut (`post-uat-and_v4-and-date-ranking.md`, section 2, step 7): one mechanism, not two. The coverage/anchor rule below is kept for the record only. θ is still the only fitted number, fitted on the e2e34 and Taglish10 replays, with the flow set as a read-out.
+
 **Goal:** skip the answer call when no result is about the question. The flow q01 case shows why: the reply took an office from an unrelated top result (row 59), and the guard passed it.
 
 **Proposed rule:**
