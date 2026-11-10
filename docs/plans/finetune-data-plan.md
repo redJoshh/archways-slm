@@ -149,6 +149,15 @@ Inputs must look exactly like evaluation inputs. Build them with the real code, 
   - If more than 2 in a category's sample are bad, the user reviews the whole category.
 - **Not-found targets** are the exact `NOT_FOUND_MESSAGE` string, set by rule rather than taken from the teacher.
 
+### Target: past-date framing (added 2026-11-10, user)
+
+- **Evidence:** flow q07 on the Nothing Phone 3a Pro (devlog, 2026-11-10). The facts came correctly from row 7, but the reply presented a date before today as upcoming. Today's date was in the system prompt.
+- **What to train:** when an announcement's event date is before `{today}`, the target describes it in the past tense, or says it has passed. It never presents the date as upcoming or as a deadline still to meet. Dates on or after today are unchanged.
+- **Data:** generated cases put the same synthetic announcement at different `{today}` values: before, on and after its event date. This tests the framing, not the date itself.
+- **Filter:** an automatic check flags a target that names a date earlier than `{today}` together with future-tense cues ("will", "upcoming", "until", "deadline is"). Flagged targets go to the hand review rather than being dropped silently. The cue list is written before the teacher runs and is not tuned on the flow questions.
+- **Scoring:** dev cases with a past event date, scored the same way. Never with the flow questions or the held-out file.
+- **Not covered:** the guard does not check tense. The question-echo rule also lets words from the question, such as q07's "weather", into a reply. That is recorded in the devlog (2026-11-10), not trained here.
+
 ### License texts
 
 Quoted verbatim from what is on this machine. Anything not quoted is unverified.
