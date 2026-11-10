@@ -19,6 +19,41 @@ Template:
 
 ---
 
+## 2026-11-10: Redmi re-check of the model queue passed; fix: the budget reads the speed after the readiness wait; plan for a query-speed drop
+
+- **Date:** 2026-11-10 (+08:00)
+- **Redmi 10C re-check** (user's log; test app `b337626`):
+  - **A question during Prime:** it waited 6,746 ms, then fell back normally. There was no last-resort text.
+  - **A question during the index build:** it waited 35 ms.
+  - **Priming was clean:** generation 13.9 tokens/s, not suspect, 0 re-measures.
+  - **q03:** answered in 13,102 ms (predicted 14,330), correct, with the label shown.
+  - **Observation:** query-call generation fell from about 15 to about 7 tokens/s from q01 to q08, likely thermal. The answer estimate didn't follow, because no answer calls ran.
+- **Bug (user):** the question asked during Prime used the `tokens` rule (speed unknown), although priming had finished during the wait.
+  - **Cause:** `runtime.prime()` replaced its speed objects, while `deps()` had already handed out the old ones. `askAssistant` reads the speed after the wait, but from the stale object. The test app's `questionRun` also takes `deps()` before the wait.
+  - **Fix (`4b09671`):** the runtime hands out stable speed handles that always forward to its current speeds.
+  - **Tests:**
+    - A new Node test (the question asked during priming must use the `time` rule, through `runtime.ask` and through `deps()` taken before priming ended). It failed before the fix, and passes now.
+    - The Hermes scenario now also checks the `time` rule.
+- **Plan only:** "Proposed, post-UAT: a large query-speed drop triggers the re-measure" is in `docs/plans/model-queue-and-speed-recovery.md`.
+  - **Trigger:** the answer rate is stale when a clean query rate falls below 0.7 × the query rate at the answer rate's last clean measurement. The answer estimate is then optimistic, and an overrun is worse than a fallback.
+  - **Action:** the same exclusive re-measure, sharing the day limit.
+  - **Option:** a slow-side-only scaling of the answer rate until the re-measure finishes.
+  - **Testing:** vectors, runtime tests, an offline replay of the re-check log, and a long phone session.
+- **Test app:** `431e595` re-vendors from `4b09671` (not pushed).
+- **How it was verified:**
+  - `uv run pytest -q` → `1183 passed, 2 skipped`.
+  - assistant-ts `npm test` → 271/271.
+  - Hermes CLI → assistant 247/247, feed 194/194, the runtime scenario as expected (rule `time`).
+  - Mutation (`deps()` hands out the replaced speed object) → Node 1 fail, Hermes scenario fails with rule `tokens`; restored and confirmed with `cmp`.
+  - Test app `tsc --noEmit` clean.
+- **Not verified:** the fix on the phone.
+- **Commits:** `4b09671`, this `docs:` commit; test app `431e595`. Not pushed.
+- **Open questions / next:**
+  - A Redmi re-run of "question during Prime", expecting the `time` rule.
+  - The query-drop rule waits for post-UAT.
+
+---
+
 ## 2026-11-10: Redmi 10C live run (two bugs); one serial model queue, exclusive priming and an answer-speed re-measure
 
 - **Date:** 2026-11-10 (+08:00)

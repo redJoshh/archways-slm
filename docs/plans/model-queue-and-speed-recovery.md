@@ -115,6 +115,43 @@ Source: the Redmi 10C live run of 2026-11-10 (devlog).
   - **Exclusive jobs can't be overlapped by a registered activity:** they wait for running activities, and new ones wait for them. So the "overlapped re-measure is discarded" branch is defensive. It is tested as the invariant instead: an activity asked for during a re-measure waits.
   - **The Hermes 0.12 CLI rejects async arrow functions** (`async function` expressions are fine), so the new files use `async function`. `makeComplete` had async arrows that the smoke test never bundled before.
 
+## Proposed, post-UAT (PLAN ONLY, 2026-11-10): a large query-speed drop triggers the re-measure
+
+**Observation** (the Redmi re-check, devlog 2026-11-10):
+
+- Query-call generation fell from about 15 to about 7 tokens/s over the run (q01 → q08), likely thermal.
+- The answer estimate stayed at the clean priming value of 13.9, because no answer calls ran to update it.
+- The current suspect rule can't see this. It only fires when the answer rate is *below* 0.6 × the query rate. Here the answer estimate is *above* the query rate, which makes it **optimistic**: the budget may let through an answer call that overruns 15 s. That is worse than a fallback.
+
+**Proposed rule (`stale_v1`):**
+
+1. **Baseline:** the runtime records `q0`, the query generation rate in force when the answer generation rate was last measured cleanly (priming, a re-measure, or an answer call).
+   - With no query rate at that moment, `q0` is the first clean query-call rate after it.
+2. **Stale:** the answer rate is stale when a clean query-call rate `q` gives `q < DROP_RATIO × q0`, with `DROP_RATIO = 0.7`.
+   - **Why 0.7:** the session's honest query rates spread 13.6–15.0 (about ±5%), so a 30% drop is far outside the noise. It is fixed before any run and not tuned on the re-check, whose drop to about 7 is about 0.47.
+3. **Action:** the same exclusive re-measure as `answerSpeedSuspect`, with the same day limit. The two triggers share the count.
+4. **Until the re-measure finishes (optional, safe-side only):** predict with `genTps × (q / q0)`, capped at 1, so slower and never faster. The worst case is an extra fallback, never an overrun.
+   - This is the only bounded correction proposed. It is acceptable here because it errs slow, unlike the floor rejected above.
+
+**Trade-offs to report:**
+
+- A re-measure on a hot phone adds about 8 s of model work, in the background but exclusive. Questions wait for it, and it adds heat.
+- The day limit of 2 may be spent early on a hot day. Whether stale re-measures need their own limit is decided from the replay, before any phone run.
+
+**How it would be tested:**
+
+- **Python reference plus TS port:**
+  - `answer_speed_stale(q, q0)` and the scaled prediction.
+  - Vectors at the 0.7 boundary, with no `q0`, with `q` above `q0` (never stale), and with the cap.
+- **Node runtime tests:**
+  - `q0` is recorded at each clean measurement.
+  - A drop triggers one re-measure, the shared day limit holds, and an overlapped query call is never `q`.
+- **Offline replay** of the re-check's per-question log (query rates, case tokens, elapsed times):
+  - The decisions with and without the rule: when it would re-measure, and which questions would answer or fall back.
+  - Where an answer call actually ran, how far its prediction differed from the actual time.
+  - The answer is what the log shows; no question is targeted.
+- **Phone:** a long Redmi session (all 13 flow questions twice) with the rule on, compared on predicted-versus-actual error and on overruns of 15 s.
+
 ## Not in this plan
 
 - Background loading at app start (the mobile note of 2026-11-10) is the app's job: call `runtime.prime()` once the model is loaded.
