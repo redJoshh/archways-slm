@@ -78,6 +78,19 @@ export function createAssistantRuntime(options: RuntimeOptions): AssistantRuntim
   const queue = createModelQueue();
   let speed = speedState(null);
   let querySpeed = querySpeedState(null);
+  // Stable handles: prime() replaces the speeds, and a caller may hold deps()
+  // from before (a question asked during priming waits, then must be budgeted
+  // with the speed priming measured: Redmi re-check, 2026-11-10).
+  const speedHandle: SpeedState = {
+    get: () => speed.get(),
+    update: (timings: unknown) => speed.update(timings),
+    pending: () => speed.pending(),
+  };
+  const querySpeedHandle: SpeedState = {
+    get: () => querySpeed.get(),
+    update: (timings: unknown) => querySpeed.update(timings),
+    pending: () => querySpeed.pending(),
+  };
   let primed = false;
   let priming = false;
   let measuring = false;
@@ -155,8 +168,8 @@ export function createAssistantRuntime(options: RuntimeOptions): AssistantRuntim
     return {
       complete: complete,
       countTokens: countTokens,
-      speed: speed,
-      querySpeed: querySpeed,
+      speed: speedHandle,
+      querySpeed: querySpeedHandle,
       whenReady: whenReady,
       clockMs: clock,
     };
@@ -193,8 +206,8 @@ export function createAssistantRuntime(options: RuntimeOptions): AssistantRuntim
     },
     whenReady: whenReady,
     beginActivity: () => queue.beginActivity(),
-    speed: () => speed,
-    querySpeed: () => querySpeed,
+    speed: () => speedHandle,
+    querySpeed: () => querySpeedHandle,
     deps: deps,
     ask: async function (question, extra) {
       const result = await askAssistant(question, { ...extra, ...deps() });

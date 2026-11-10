@@ -231,6 +231,31 @@ test("a question asked during priming waits for it, instead of a query_error", a
   assert.equal(runtime.state(), "ready");
 });
 
+test("a question asked during priming is budgeted with the speed priming measured (Redmi 2026-11-10)", async () => {
+  // The Redmi re-check: the question waited for Prime, then used the "tokens"
+  // rule (speed unknown) although priming had finished during the wait.
+  const gates = [deferred(), deferred()];
+  const llama = fakeLlama({ gates });
+  const runtime = createAssistantRuntime({ llama, settings: SETTINGS });
+  const priming = runtime.prime(VECTOR.now_ms);
+  const logs: QuestionLog[] = [];
+  // Like the test app: the dependencies are taken before priming finishes.
+  const deps = runtime.deps();
+  const asked = runtime.ask(VECTOR.question, { nowMs: () => VECTOR.now_ms, search, log: (e) => logs.push(e) });
+  const direct = askAssistant(VECTOR.question, { ...deps, nowMs: () => VECTOR.now_ms, search });
+  await settle();
+  gates[0].resolve();
+  gates[1].resolve();
+  await priming;
+  const result = await asked;
+  assert.equal(result.budget!.rule, "time");
+  assert.equal(logs[0].rule, "time");
+  assert.equal((await direct).budget!.rule, "time");
+  // The speeds the caller holds are the runtime's current ones.
+  assert.deepEqual(deps.speed!.get(), runtime.speed().get());
+  assert.notEqual(runtime.speed().get(), null);
+});
+
 test("the wait is logged and kept out of the question's time", async () => {
   const gates = [deferred(), deferred()];
   let now = 1000;

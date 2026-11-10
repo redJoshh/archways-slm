@@ -112,8 +112,9 @@ settle(30).then(function () {
   gateResolvers[1]();
   return priming.then(function () { return asked; }).then(function (result) {
     var ok = stateDuring === "priming" && callsBefore === "answer 1" && collisions === 0 &&
-      result.path === "answer" && callLog.join(",") === "answer 1,query 16,query 64,answer 200";
-    log("hermes runtime question during priming: " + result.path + " calls [" + callLog.join(", ") + "]" +
+      result.path === "answer" && callLog.join(",") === "answer 1,query 16,query 64,answer 200" &&
+      result.budget !== null && result.budget.rule === "time";
+    log("hermes runtime question during priming: " + result.path + " rule " + (result.budget ? result.budget.rule : "none") + " calls [" + callLog.join(", ") + "]" +
         (ok ? " (as expected)" : " (WRONG: state " + stateDuring + ", before [" + callsBefore + "], collisions " + collisions + ")"));
     if (!ok) { throw new Error("runtime differs"); }
   });
