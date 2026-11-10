@@ -27,6 +27,10 @@
  *   model being read in after load; not confirmed. The saved session is the
  *   same either way (tokenSize = the prefix).
  *
+ * - The model queue (queue.ts, 2026-11-10): with a queue, each priming call
+ *   is an exclusive job and each model call one serial job, and the reports
+ *   and completions say whether other work overlapped them.
+ *
  * This module never imports llama.rn: the app passes an adapter.
  */
 
@@ -35,6 +39,7 @@ import { speedsFromPriming, type Speed } from "./budget.ts";
 export { speedsFromPriming };
 import { ANSWER_PROMPT_SHA256, QUERY_PROMPT_SHA256 } from "./generated.ts";
 import type { Completion, ModelCall } from "./flow.ts";
+import type { ModelQueue } from "./queue.ts";
 import { answerSystem, casePart, querySystem, systemTurn, todayText } from "./render.ts";
 
 /** n_predict per call: the values the Gate 1 app ran on the Redmi 10C. */
@@ -103,6 +108,8 @@ export interface PrimeReport {
   ms: number;
   /** llama.rn's timings for the priming completion, if reported. */
   timings?: unknown;
+  /** Set when run through a queue: other work overlapped the call. */
+  overlap?: boolean;
 }
 
 /** Process and save one kind's system turn. Throws if the save is short. */
@@ -137,6 +144,7 @@ export async function primeSessions(
   settings: SessionSettings,
   nowMs: number,
   clockMs: () => number = Date.now,
+  queue?: ModelQueue,
 ): Promise<PrimeReport[]> {
   const reports: PrimeReport[] = [];
   const kinds: Kind[] = [];
@@ -145,7 +153,13 @@ export async function primeSessions(
   }
   for (let i = 0; i < kinds.length; i++) {
     const last = i === kinds.length - 1;
-    reports.push(await primeOne(llama, settings, kinds[i], nowMs, clockMs, last));
+    const kind = kinds[i];
+    if (queue) {
+      const done = await queue.exclusive(() => primeOne(llama, settings, kind, nowMs, clockMs, last));
+      reports.push({ ...done.value, overlap: done.overlap });
+    } else {
+      reports.push(await primeOne(llama, settings, kind, nowMs, clockMs, last));
+    }
   }
   return reports;
 }
@@ -159,12 +173,15 @@ export function speedFromPriming(reports: PrimeReport[]): Speed | null {
  * AssistantDeps.complete for askAssistant(): loads the call's session file
  * (priming it if missing or if it loads the wrong number of tokens, once),
  * then runs the whole prompt. Any failure rejects, and the flow falls back.
+ * With a queue, the whole call (load and completion) is one serial job, and
+ * the Completion carries overlap.
  */
 export function makeComplete(
   llama: LlamaAdapter,
   settings: SessionSettings,
+  queue?: ModelQueue,
 ): (call: ModelCall) => Promise<Completion> {
-  return async (call: ModelCall): Promise<Completion> => {
+  const one = async function (call: ModelCall): Promise<Completion> {
     if (call.prompt.indexOf(call.prefix) !== 0) throw new Error("prompt does not start with its prefix");
     if (call.prefix !== sessionPrefix(call.kind, call.nowMs)) throw new Error("unexpected prefix");
     const file = sessionFile(call.kind, settings, call.nowMs);
@@ -177,5 +194,10 @@ export function makeComplete(
       if (loaded !== tokens) throw new Error(call.kind + " session loaded " + loaded + " of " + tokens);
     }
     return llama.completion(call.prompt, N_PREDICT[call.kind]);
+  };
+  if (!queue) return one;
+  return async function (call: ModelCall): Promise<Completion> {
+    const done = await queue.run(() => one(call));
+    return { text: done.value.text, timings: done.value.timings, overlap: done.overlap };
   };
 }

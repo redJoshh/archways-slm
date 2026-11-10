@@ -53,6 +53,71 @@ askAssistant(flowVector.question, {
   log("hermes askAssistant " + flowVector.id + ": " + result.path + (ok ? " (as expected)" : " (WRONG)"));
   if (!ok) { throw new Error("askAssistant differs"); }
 });
+
+// A question asked during priming (plan "model queue and speed recovery",
+// 2026-11-10): the real createAssistantRuntime with a fake llama.rn adapter
+// that rejects a second completion while one runs, and promise gates.
+var answerVector = null;
+for (var k = 0; k < VECTORS.flow.length; k++) if (VECTORS.flow[k].id === "answer") answerVector = VECTORS.flow[k];
+var gates = [];
+var gateResolvers = [];
+for (var g = 0; g < 2; g++) {
+  gates.push(new Promise(function (resolve) { gateResolvers.push(resolve); }));
+}
+var files = {};
+var running = false;
+var collisions = 0;
+var callLog = [];
+var gateIndex = 0;
+var fakeLlama = {
+  countTokens: function (text) { return Promise.resolve(Math.ceil(text.length / 4)); },
+  completion: function (prompt, nPredict, measure) {
+    if (running) { collisions++; return Promise.reject(new Error("Context is busy")); }
+    running = true;
+    var kind = prompt.indexOf("You turn a student") !== -1 ? "query" : "answer";
+    callLog.push(kind + " " + nPredict);
+    var gate = gateIndex < gates.length ? gates[gateIndex++] : Promise.resolve();
+    return gate.then(function () {
+      running = false;
+      var priming = nPredict === 1 || !!measure;
+      return {
+        text: priming ? "x" : (kind === "query" ? answerVector.query_reply : answerVector.answer_reply),
+        timings: { prompt_n: Math.ceil(prompt.length / 4), prompt_per_second: 500,
+                   predicted_n: measure ? 16 : (priming ? 1 : 20), predicted_per_second: 500 },
+      };
+    });
+  },
+  saveSession: function (path, n) { files[path] = n; return Promise.resolve(n); },
+  loadSession: function (path) { return Promise.resolve(files[path]); },
+  fileExists: function (path) { return Promise.resolve(Object.prototype.hasOwnProperty.call(files, path)); },
+};
+var runtime = createAssistantRuntime({
+  llama: fakeLlama,
+  settings: { dir: "/d", modelSha256: "0123456789abcdef", llamaRnVersion: "0.13.0-rc.8", nCtx: 2048, nThreads: 4 },
+});
+var priming = runtime.prime(answerVector.now_ms);
+var asked = runtime.ask(answerVector.question, {
+  nowMs: function () { return answerVector.now_ms; },
+  search: function () { return Promise.resolve(answerVector.search_reply); },
+});
+var stateDuring = runtime.state();
+function settle(n) {
+  var p = Promise.resolve();
+  for (var r = 0; r < n; r++) p = p.then(function () { return undefined; });
+  return p;
+}
+settle(30).then(function () {
+  var callsBefore = callLog.join(",");
+  gateResolvers[0]();
+  gateResolvers[1]();
+  return priming.then(function () { return asked; }).then(function (result) {
+    var ok = stateDuring === "priming" && callsBefore === "answer 1" && collisions === 0 &&
+      result.path === "answer" && callLog.join(",") === "answer 1,query 16,query 64,answer 200";
+    log("hermes runtime question during priming: " + result.path + " calls [" + callLog.join(", ") + "]" +
+        (ok ? " (as expected)" : " (WRONG: state " + stateDuring + ", before [" + callsBefore + "], collisions " + collisions + ")"));
+    if (!ok) { throw new Error("runtime differs"); }
+  });
+});
 `;
 
 // Top-level names must be unique in the plain-script bundle (one shared
@@ -68,6 +133,9 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "contract.js"],
   ["assistant-ts", "src", "budget.js"],
   ["assistant-ts", "src", "flow.js"],
+  ["assistant-ts", "src", "session.js"],
+  ["assistant-ts", "src", "queue.js"],
+  ["assistant-ts", "src", "runtime.js"],
   ["assistant-ts", "src", "vectors.js"],
   ["assistant-ts", "src", "searchData.js"],
   ["assistant-ts", "src", "plaintext.js"],
@@ -114,6 +182,10 @@ process.stdout.write(run.stdout ?? "");
 process.stderr.write(run.stderr ?? "");
 if (run.status === 0 && !/hermes askAssistant .* \(as expected\)/.test(run.stdout ?? "")) {
   console.error("askAssistant did not finish under Hermes");
+  process.exit(1);
+}
+if (run.status === 0 && !/hermes runtime question during priming: .* \(as expected\)/.test(run.stdout ?? "")) {
+  console.error("the runtime scenario did not finish under Hermes");
   process.exit(1);
 }
 process.exit(run.status ?? 1);

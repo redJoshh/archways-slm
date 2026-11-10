@@ -146,6 +146,7 @@ for (const vector of file.flow) {
         actualMs: result.actualMs,
         resultCount: vector.expected.result_count,
         caseTokens: result.caseTokens,
+        readyWaitMs: 0,
       },
     ]);
   });

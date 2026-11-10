@@ -13,6 +13,7 @@ export type {
   Trace,
 } from "./flow.ts";
 export {
+  answerSpeedSuspect,
   decideBudget,
   predictMs,
   querySpeedState,
@@ -56,7 +57,14 @@ export {
   NOT_FOUND_MESSAGE,
   QUERY_PROMPT_SHA256,
   QUESTION_MAX_CHARS,
+  REMEASURE_MAX_PER_DAY,
+  SUSPECT_RATIO,
 } from "./generated.ts";
+// One serial model queue and the runtime (plan "model queue and speed recovery", 2026-11-10).
+export { createModelQueue } from "./queue.ts";
+export type { ModelQueue, QueueResult } from "./queue.ts";
+export { createAssistantRuntime } from "./runtime.ts";
+export type { AssistantRuntime, RuntimeDeps, RuntimeOptions, RuntimeState } from "./runtime.ts";
 // On-phone search over the student's feed (ADR 0006).
 export { createFeedIndex, HttpError, makeFeedSearch } from "./feedIndex.ts";
 export type { FeedIndex, FeedIndexOptions, FetchJson, IndexReport } from "./feedIndex.ts";

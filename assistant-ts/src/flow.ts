@@ -233,6 +233,11 @@ export function startQuestion(question: string, nowMs: number, speed?: Speed | n
 export interface Completion {
   text: string;
   timings?: unknown;
+  /**
+   * Other work competed for the CPU during the call (queue.ts): its timings
+   * are not a clean sample and update no speed.
+   */
+  overlap?: boolean;
 }
 
 /**
@@ -247,6 +252,8 @@ export interface QuestionLog {
   actualMs: number;
   resultCount: number | null;
   caseTokens: number | null;
+  /** ms spent waiting for priming or a re-measure (deps.whenReady); 0 if none. */
+  readyWaitMs: number;
 }
 
 export interface AssistantDeps {
@@ -273,13 +280,22 @@ export interface AssistantDeps {
   querySpeed?: SpeedState;
   /** Called once per question with the UAT log entry. Errors are ignored. */
   log?: (entry: QuestionLog) => void;
+  /**
+   * Resolves when the model is ready (runtime.ts: no priming or re-measure
+   * queued or running). Awaited before the question starts; the question's
+   * clock and the budget's elapsed time start after it. A rejection is
+   * ignored. Omitted: no wait.
+   */
+  whenReady?: () => Promise<void>;
 }
 
 export interface AssistantResult extends Outcome {
   /** ms per step: query, search, count, answer (only the steps that ran). */
   timings: { [step: string]: number };
-  /** The whole question, from askAssistant() to the final text. */
+  /** The question, from the end of the readiness wait to the final text. */
   actualMs: number;
+  /** ms spent in deps.whenReady before the question started; 0 if none. */
+  readyWaitMs: number;
   caseTokens: number | null;
   trace: Trace;
 }
@@ -287,6 +303,16 @@ export interface AssistantResult extends Outcome {
 /** One question, end to end. Never rejects; always returns text to show. */
 export async function askAssistant(question: string, deps: AssistantDeps): Promise<AssistantResult> {
   const clock = deps.clockMs || Date.now;
+  let readyWaitMs = 0;
+  if (deps.whenReady) {
+    const waitStarted = clock();
+    try {
+      await deps.whenReady();
+    } catch (error) {
+      // Not ready is not fatal: the queue still serialises the calls.
+    }
+    readyWaitMs = clock() - waitStarted;
+  }
   const begun = clock();
   const timings: { [step: string]: number } = {};
   let caseTokens: number | null = null;
@@ -303,8 +329,11 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
           value = completion.text;
           // Only answer calls update the speed: query replies are short and
           // generate faster (14.6 against 10.4 tokens/s on the Redmi 10C).
-          if (step.kind === "answer" && deps.speed) deps.speed.update(completion.timings);
-          if (step.kind === "query" && deps.querySpeed) deps.querySpeed.update(completion.timings);
+          // A call overlapped by other work is not a clean sample.
+          if (completion.overlap !== true) {
+            if (step.kind === "answer" && deps.speed) deps.speed.update(completion.timings);
+            if (step.kind === "query" && deps.querySpeed) deps.querySpeed.update(completion.timings);
+          }
         } else if (step.kind === "search") value = await deps.search(step.arguments);
         else {
           value = await deps.countTokens(step.casePart);
@@ -325,6 +354,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
       resultCount: step.outcome.resultCount,
       timings: timings,
       actualMs: clock() - begun,
+      readyWaitMs: readyWaitMs,
       caseTokens: caseTokens,
       trace: step.trace,
     };
@@ -338,6 +368,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
       resultCount: null,
       timings: timings,
       actualMs: clock() - begun,
+      readyWaitMs: readyWaitMs,
       caseTokens: caseTokens,
       trace: { arguments: null, queryPrompt: null, answerPrompt: null, answerCasePart: null, results: null },
     };
@@ -351,6 +382,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
         actualMs: result.actualMs,
         resultCount: result.resultCount,
         caseTokens: result.caseTokens,
+        readyWaitMs: result.readyWaitMs,
       });
     } catch (error) {
       // Logging must never change what the user sees.

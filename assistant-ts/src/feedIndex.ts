@@ -53,6 +53,11 @@ export interface FeedIndexOptions {
   maxPages?: number;
   clockMs?: () => number;
   log?: (report: IndexReport) => void;
+  /**
+   * The model queue's beginActivity (queue.ts): each build or refresh waits
+   * while priming or a re-measure runs, and marks model calls it overlaps.
+   */
+  activity?: () => Promise<() => void>;
 }
 
 export interface IndexReport {
@@ -218,8 +223,18 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
     return report;
   }
 
+  async function runAsActivity(kind: "full" | "refresh"): Promise<IndexReport> {
+    if (!options.activity) return run(kind);
+    const end = await options.activity();
+    try {
+      return await run(kind);
+    } finally {
+      end();
+    }
+  }
+
   function start(kind: "full" | "refresh"): Promise<IndexReport> {
-    const promise = run(kind);
+    const promise = runAsActivity(kind);
     inFlight = promise;
     const done = () => {
       if (inFlight === promise) inFlight = null;
