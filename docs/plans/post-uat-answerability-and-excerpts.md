@@ -1,5 +1,7 @@
 # Post-UAT plan: answerability gate and excerpt length
 
+> **2026-11-14:** superseded for order and metrics by [`accuracy-phase.md`](accuracy-phase.md); accuracy-phase.md reuses the rule texts here.
+
 **Status:** both parts **approved as post-UAT** (user, 2026-11-10). Nothing is built yet.
 Source: the Nothing Phone 3a Pro flow run and the snapshot checks (devlog, 2026-11-10).
 

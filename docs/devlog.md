@@ -19,6 +19,29 @@ Template:
 
 ---
 
+## 2026-11-14: Accuracy phase plan approved; sections 0 and 2 frozen; ADR 0007 proposed
+
+- **Date:** 2026-11-14 (+08:00)
+- **Decisions (user):**
+  - Traps: "clean" = no AI answer shown; traps with an unrelated list are counted too.
+  - Helpfulness needs any one source row shown; coverage `k/n` is reported separately.
+  - Unsafe is checked case by case; helpfulness on totals, with every per-case regression listed by id.
+  - e2e-003 is reported outside the (e) check, with the reason. Recorded before any run.
+  - Fixed now: flow13 2026-11-10T10:00+08:00; held-out 2026-11-14T10:00+08:00.
+  - Gate header: "I couldn't find an announcement that answers this exactly. These may be related:"
+  - ADR 0007 drafted.
+  - Known product limitation, not fixed in this phase: the model's query usually asks for 30 days, so evergreen announcements become unsearchable after a month.
+  - UAT is not scheduled (not cleared).
+- **What changed:**
+  - `docs/plans/accuracy-phase.md`: status APPROVED, decisions folded in, sections 0 and 2 FROZEN. This commit is made before any harness code.
+  - New `docs/decisions/0007-no-training-and-held-out-protocol.md`, PROPOSED.
+  - A one-line "superseded for order and metrics" note at the top of both post-UAT plans.
+- **How it was verified:** docs only.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** ADR 0007 acceptance. Step 1 (harness), stopping at the flow13 labels.
+
+---
+
 ## 2026-11-14: Accuracy phase plan drafted (metrics, real-data harness, held-out protocol, improvement order)
 
 - **Date:** 2026-11-14 (+08:00)

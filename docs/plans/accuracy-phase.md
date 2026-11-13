@@ -1,7 +1,7 @@
 # Accuracy phase (before UAT): metrics, real-data harness, held-out protocol, improvement order
 
-**Status:** DRAFT, awaiting the user's approval (2026-11-14). Nothing is built, nothing has been run.
-Once approved, section 0 (the metrics) and section 2 (the held-out rule) are **frozen**: a change is a new, dated section below, never an edit.
+**Status:** APPROVED (user, 2026-11-14), with the decisions at the end folded in.
+Section 0 (the metrics) and section 2 (the held-out protocol) are **FROZEN as of 2026-11-14**, before any harness code or run: a change is a new, dated section at the end of this file, never an edit.
 
 **Constraint (panel commitment):** no training or fine-tuning. Only tools, code-level safeguards and prompt design.
 qwen3:0.6b only. Search stays on the phone (ADR 0006). No backend change.
@@ -19,7 +19,7 @@ qwen3:0.6b only. Search stays on the phone (ADR 0006). No backend change.
 
 ---
 
-## 0. Metrics (frozen on approval)
+## 0. Metrics (FROZEN 2026-11-14)
 
 ### Definitions, per case
 
@@ -44,13 +44,14 @@ The `must_include` check reads only the AI answer, never the list (titles in the
 
 **Answerable case** (`expects_not_found: false`):
 
-- **Helpful** = no wrong AI answer, AND (a correct AI answer, OR every labelled source row is in the shown list).
-- A fact-free or incomplete AI answer is not wrong; the case is still helpful if the source rows are listed.
+- **Helpful** = no wrong AI answer, AND (a correct AI answer, OR **at least one** labelled source row is in the shown list).
+- A fact-free or incomplete AI answer is not wrong; the case is still helpful if a source row is listed.
 - A `not_found` message on an answerable case is not helpful (false "not found").
 
 **Trap** (`expects_not_found: true`, flow q10):
 
-- **Clean** = no wrong AI answer. The path is reported with it (`not_found`, list, or an `answer` that states no fact).
+- **Clean** = no AI answer is shown: the path is `not_found`, a list-only path (`guard_fired`, `answer_error`, `not_about`) or `answer_not_found`. A trap on the `answer` path is not clean, whatever the answer says.
+- **Trap with an unrelated list:** a clean trap whose shown list is not empty (every listed row is unrelated, since a trap has no source row). Not unsafe, but counted and reported.
 - Traps are not in the helpfulness count. They are reported as their own row.
 
 **Unsafe** = the case has a wrong AI answer. Counted on all cases, traps included.
@@ -62,16 +63,17 @@ The `must_include` check reads only the AI answer, never the list (titles in the
 | Metric | Numerator | Denominator |
 |---|---|---|
 | Helpfulness | answerable cases that are helpful | answerable cases |
-| AI answer accuracy | `answer`-path replies that are correct (traps: not wrong and no fact) | replies on the `answer` path |
+| AI answer accuracy | `answer`-path replies that are correct (a trap's `answer`-path reply is never correct) | replies on the `answer` path |
 | Unsafe | cases with a wrong AI answer | all cases |
 
-- Also reported: trap clean / traps, and the path counts.
+- Also reported: traps clean / traps, traps with an unrelated list / traps, source-row coverage (below), and the path counts.
 - **Reported per set (e2e34, taglish10, flow13) and in total, always as counts `n/N`.** A percentage may follow a count, never replace it.
 - Per case: id, path, result ids, source rows found (place in the list), correct / wrong / helpful flags, and the reason codes (`must_include missing`, `wrong_row`, `entity`, ...). Ids, numbers and codes only on screen; the full texts go in the run file.
 
 ### Multi-source cases
 
-- For the list route, **every** labelled source row must be in the list (q05: 28 and 8; q06: 44, 21 and 29).
+- For helpfulness through the list, **any one** labelled source row in the list is enough (q05: 28 or 8; q06: 44, 21 or 29).
+- **Source-row coverage** is a separate number: per case `k/n` (labelled source rows shown / labelled source rows), and in total `Σk/Σn` over answerable cases.
 - q07: row 7 only. Row 9 (the second part) is not counted, as recorded on 2026-11-10.
 
 ---
@@ -112,7 +114,8 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
 ### Fixed "now" per case
 
 - e2e34 and taglish10 keep their own `now`.
-- **flow13 gets `now = 2026-11-10T10:00:00+08:00`** (the live-run day; the snapshot is from 2026-11-07, so all rows fall inside the default 7 days). The harness prints how many rows are visible at that instant.
+- **flow13 gets `now = 2026-11-10T10:00:00+08:00`** (the live-run day; the snapshot rows were published 2026-11-06 to 2026-11-07, so all fall inside a 7-day or 30-day window). The harness prints how many rows are visible at that instant.
+- The held-out set gets its own fixed `now` (section 2).
 
 ### Query-reply cache
 
@@ -136,18 +139,19 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
 
 ---
 
-## 2. Held-out protocol (frozen on approval)
+## 2. Held-out protocol (FROZEN 2026-11-14)
 
 ### The script, `scripts/eval_heldout.py PATH --config baseline|final`
 
 - Runs the same pipeline and scorer_v1 as section 1.
+- **Fixed `now = 2026-11-14T10:00:00+08:00` for every held-out case,** written here before the baseline and never changed. A `now` field in the file is not read. This also keeps the snapshot rows (published 2026-11-06 and 2026-11-07) inside the model's usual 30-day window in both runs.
 - **Prints only:**
   - the file's SHA-256 and the case count
   - the config's rule versions and prompt SHA-256s
   - the totals of section 0, for answerable cases, traps and all cases (counts)
 - **Prints no** per-case line, question, reply or id. Writes **nothing** to disk, and uses no query cache (no read, no write).
 - On a malformed file it prints the line number and the field name only, never a value.
-- **File format** (written into the script's docstring): the e2e JSONL fields (`id`, `question`, `now`, `source_ids`, `must_include`, `must_not_include`, `expects_not_found`, optional `wrong_claims`, `superseded`, `out_of_scope`), plus `data: "snapshot"`. `source_ids` must exist in the snapshot.
+- **File format** (written into the script's docstring): the e2e JSONL fields (`id`, `question`, `source_ids`, `must_include`, `must_not_include`, `expects_not_found`, optional `wrong_claims`, `superseded`, `out_of_scope`), plus `data: "snapshot"`. `source_ids` must exist in the snapshot.
 - `tests/test_e2e_harness.py::test_no_code_reads_the_held_out_file` stays: the path comes only from the command line.
 
 ### The rule
@@ -157,7 +161,7 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
   2. once after all fixes in section 3 are frozen
 - **Never in between,** and never to choose between changes.
 - **You run it yourself.** Claude Code never runs `eval_heldout.py`, never opens or reads the file, and never asks for its contents. You paste the totals; they go into the devlog with the file's SHA-256, which must be the same in both runs.
-- Proposed record: ADR 0007 (no training; this held-out protocol, which replaces ADR 0002's Gate 2), drafted for your approval.
+- Recorded in ADR 0007 (PROPOSED, 2026-11-14): no training, and this held-out protocol, replacing ADR 0002's Gate 2.
 
 ---
 
@@ -172,7 +176,7 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
    - At least one mutation check per rule, restored afterwards from a copy.
 3. **Cumulative:** each change is tested on top of every earlier kept change, and compared with that state (and with the baseline).
 4. **"Nothing gets worse",** on every dev set (e2e34, taglish10, flow13) separately. A change is kept only if, on each set:
-   - the helpful count does not fall
+   - the helpful count does not fall (on the total; every per-case helpful → not-helpful regression is still listed by id in the report)
    - no case becomes unsafe that was safe before (per case, not just the total)
    - the number of wrong AI answers does not rise
    - Traps are reported separately: clean count and path per trap.
@@ -238,7 +242,8 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
 
 - **Rule:** that plan's section 2, step 7.
   - The gate passes if the top result's `points × q ≥ p × possible`.
-  - If it fails, the new path is `not_about`: no answer call; a header, then the list. The header is generated, the path is added to `PATHS`, and ADR 0004 gets an amendment. **You choose the header text.**
+  - If it fails, the new path is `not_about`: no answer call; a header, then the list. The header is generated, the path is added to `PATHS`, and ADR 0004 gets an amendment.
+  - **Header (user, 2026-11-14):** "I couldn't find an announcement that answers this exactly. These may be related:"
 - **Fitting θ (the only fitted number):**
   - θ comes from the grid {0, 1/4, 1/3, 1/2, 2/3, 3/4}, fixed now.
   - It is fitted on **e2e34 and taglish10 only**, by exact replay of the saved (a)–(c) run files. The gate only turns `answer` paths into list paths, so no model call is needed.
@@ -262,7 +267,8 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
 - **Vectors:** an anchor inside the first 500; an anchor at 509; an anchor near the end; title-only matches; a surrogate pair at the cut; the whitespace snap.
 - **Targets:** q08 (the banned items at characters 509–590 of row 56).
 - **Could get worse:**
-  - **e2e-003** (the long-body trap): the deadline after character 500 becomes visible, so a correct answer would hit its frozen `must_not_include`. **Decision needed before any run** (below).
+  - **e2e-003** (the long-body trap): the deadline after character 500 becomes visible, so a correct answer would hit its frozen `must_not_include`.
+  - **Exception, recorded 2026-11-14 before any run (user):** under (e), e2e-003 is reported **outside** the "nothing gets worse" check, with this reason: its `must_not_include` assumes the fact is hidden past character 500, which (e) changes. Its result is still printed. Its label is not edited.
   - The text before the window (a heading, the date line) is lost, so supported claims change for the guard.
   - The model may read the `…` start as a full sentence.
 
@@ -290,12 +296,17 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
 
 ---
 
-## Decisions needed before approval
+## Decisions (user, 2026-11-14), folded in above
 
-1. **Traps:** they are out of the helpfulness count, with their own "clean" row. Or should a trap count as helpful only on the `not_found` path?
-2. **Multi-source list route:** **all** labelled source rows must be listed (as written). Or any one?
-3. **"Nothing gets worse" granularity:** per case for Unsafe, totals for helpful (as written). Or per case for both?
-4. **e2e-003 under (e):** keep its frozen label (a correct deadline then counts as wrong, so (e) almost certainly fails), report it outside the check with both readings, or drop (e)?
-5. **flow13 `now`:** 2026-11-10T10:00+08:00?
-6. **The `not_about` header text** for (d).
-7. **ADR 0007** for the no-training constraint and the held-out protocol?
+1. **Traps:** a separate "clean" row = no AI answer shown (`not_found`, list-only or `answer_not_found`). Traps that show an unrelated list are counted too (not unsafe).
+2. **Multiple source rows:** helpfulness needs any one source row shown; coverage `k/n` is reported separately.
+3. **"Nothing gets worse":** Unsafe case by case (no new unsafe case). Helpfulness on totals, but every per-case regression is listed by id in each report.
+4. **e2e-003 under (e):** reported outside the check, with the reason (section 3 (e)).
+5. **Fixed now:** flow13 2026-11-10T10:00+08:00; held-out 2026-11-14T10:00+08:00 (section 2).
+6. **Gate header:** "I couldn't find an announcement that answers this exactly. These may be related:"
+7. **ADR 0007:** drafted as PROPOSED.
+
+## Known product limitation (recorded, not fixed in this phase)
+
+- **The model's query usually asks for the last 30 days** (`days` 30), so evergreen announcements (dress code, uniform rules, Arch guidelines, the Good Moral process) become unsearchable a month after they are published.
+- Not fixed now: it needs a change to the query rule or the window, which is outside this phase's order. The fixed `now` values keep it out of the scores; it does not stop it in real use.

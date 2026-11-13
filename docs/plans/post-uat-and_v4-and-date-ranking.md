@@ -1,5 +1,7 @@
 # Post-UAT plan: and_v4 ("pasok") and question-overlap ranking (rank_v1), shared with the answerability gate
 
+> **2026-11-14:** superseded for order and metrics by [`accuracy-phase.md`](accuracy-phase.md); accuracy-phase.md reuses the rule texts here.
+
 **Status:** PLAN ONLY (user, 2026-11-10). Nothing is built and nothing has been scored.
 
 - Source: the Nothing Phone 3a Pro live run (devlog, 2026-11-10), questions q11–q13, and the q01 check.
