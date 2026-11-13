@@ -38,7 +38,7 @@ The three metrics of `accuracy-phase.md` section 0 (Helpfulness, AI answer accur
 
 ## Consequences
 
-- Known failures that only training could fix stay open and are documented, for example the past-date framing ("is held" for a past event, flow q12).
+- Prompt design is in scope, so failures once filed as fine-tuning targets are candidates for prompt-level fixes. Example: the past-date framing ("is held" for a past event, flow q12) is a candidate prompt fix for a later phase. In this phase q12 scores only the date (user, 2026-11-14).
 - Every gain must come from rules that are written and frozen before they are measured, with Python/TS parity vectors.
 - `tests/test_e2e_harness.py::test_no_code_reads_the_held_out_file` stays: the held-out path is given only on the command line.
 

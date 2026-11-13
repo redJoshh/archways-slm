@@ -19,6 +19,50 @@ Template:
 
 ---
 
+## 2026-11-14: Dev baseline run twice (identical); scorer audit pending; eval_heldout.py built
+
+- **Date:** 2026-11-14 (+08:00)
+- **flow13 labels confirmed (user)** as proposed.
+  - `data/local/flow_cases.jsonl` SHA-256 `1fdad1bdea22e3c8ad2f9945cb77f7109c3ec786056fc407a90c053fed55a754`, byte-identical to the proposal.
+  - q05/q06 stay strict: the AI answer must name every source.
+- **Correction (user) to the 2026-11-14 harness entry:** q12's past-date framing is not out of scope. Prompt design is allowed under the no-training rule, so it is a candidate prompt-level fix for a later phase. In this phase q12 scores only the date. ADR 0007 (still PROPOSED) says so now.
+- **Baseline** (`eval_flow.py`, commit `43196e1`, clean tree, Ollama 0.40.15, qwen3:0.6b digest `7df6b6e0…`; query v1, answer v1, and_v3, budget off, scorer_v1):
+  - Run twice: `--compare` → `cases 57 identical 57`. Run files `data/local/runs/baseline-1.json` and `-2.json` (gitignored).
+  - Case files: e2e `d52682d4…`, Taglish `a2877e63…`, snapshot `9787b9a3…`.
+
+  | Set | Helpful | AI correct | Unsafe | Traps clean | Traps with an unrelated list | Coverage | Out of scope |
+  |---|---|---|---|---|---|---|---|
+  | e2e34 | 22/24 | 18/18 | 0/34 | 10/10 | 1/10 | 22/24 | 0 |
+  | taglish10 | 5/6 | 3/3 | 0/10 | 3/3 | 1/3 | 5/6 | 1 |
+  | flow13 | 10/12 | 4/7 | 1/13 | 1/1 | 0/1 | 13/15 | 0 |
+  | **Total** | **37/42** | **25/28** | **1/57** | **14/14** | **2/14** | **40/45** | 1 |
+
+  - Paths (total): answer 28, answer_not_found 12, not_found 17.
+  - **Flagged cases:**
+    - Unsafe: q01 (entity: row 59's office).
+    - AI not correct: q01, q06 (no "Security Measures"), q08 (no banned item).
+    - Unhelpful: e2e-014, e2e-023, taglish-04, q13 (0 results), q01.
+    - Unrelated list: e2e-021, taglish-09.
+  - **This is not frozen:** the scorer audit is with the user.
+- **`eval_heldout.py` (`db032ef`):**
+  - Same pipeline and scorer; fixed `now` 2026-11-14T10:00:00+08:00; the snapshot only.
+  - Prints only the settings, the file SHA-256 and case count, and the totals. Writes nothing.
+  - `--config baseline` is the only choice until the final freeze.
+  - **Tests:**
+    - The output never holds a case's id, question or reply.
+    - A failing case prints only its number and the error type.
+    - No write call in the script.
+    - The new file is in the no-system-clock test.
+  - Mutation: a per-case `print` was caught; restored, `cmp` clean.
+  - The held-out file was not read or run.
+- **How it was verified:** `uv run pytest -q` → `1220 passed, 2 skipped`. ruff clean.
+- **Commits:** `db032ef`, this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The user's scorer audit, then freezing scorer_v1 and the baseline.
+  - Then the user runs the held-out baseline.
+
+---
+
 ## 2026-11-14: Accuracy-phase harness built (Step 1); flow13 labels proposed, awaiting confirmation
 
 - **Date:** 2026-11-14 (+08:00)
