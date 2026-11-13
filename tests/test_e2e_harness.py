@@ -19,6 +19,7 @@ MODULES = [
     ROOT / "src" / "archways_assistant" / "e2escore.py",
     # The accuracy-phase harness (docs/plans/accuracy-phase.md, section 1).
     SCRIPTS / "eval_flow.py",
+    SCRIPTS / "eval_heldout.py",
     ROOT / "src" / "archways_assistant" / "evalflow.py",
 ]
 # Helpers the harness imports from the tool-call probe.

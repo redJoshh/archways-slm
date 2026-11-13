@@ -1,0 +1,160 @@
+"""Held-out run: the accuracy-phase harness, printing totals only.
+
+Usage (the user runs this; Claude Code never does):
+    uv run python scripts/eval_heldout.py PATH --config baseline
+
+docs/plans/accuracy-phase.md, section 2 (frozen 2026-11-14), and ADR 0007:
+
+- Runs exactly eval_flow.py's pipeline (run_case: full flow, cold, budget
+  off) and scorer_v1 over the snapshot, with a FIXED now of
+  2026-11-14T10:00:00+08:00 for every case. A "now" field in the file is
+  not read.
+- Prints only: the settings, the file's SHA-256 and case count, and the
+  section 0 totals (counts). Never a per-case line, id, question or reply.
+- Writes nothing to disk and uses no cache.
+- At most two runs ever: --config baseline (now) and --config final
+  (added when every change is frozen). Never in between.
+
+File format: JSON Lines, one case per line, every case over the snapshot
+("data" may be omitted or "snapshot"):
+
+    id                 string, unique
+    question           string
+    source_ids         list of snapshot row ids (strings); empty for a trap
+    must_include       list of groups; each group is a non-empty list of
+                       phrases, any one of which must be in the AI answer
+                       (ignoring case); every group must match
+    must_not_include   list of phrases that make an AI answer wrong
+    expects_not_found  true for a trap (clean = no AI answer shown)
+    optional: wrong_claims (list), wrong_rows (snapshot ids),
+              superseded ({current: [...], old: [...]}),
+              out_of_scope (bool), and notes (label, note, expected,
+              category, english_twin, exclusion) that are never read.
+
+A malformed file stops the run with the line number and the field name,
+never a value.
+"""
+
+import argparse
+import hashlib
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import httpx
+from eval_flow import (
+    ANSWER_PROMPT,
+    BASE_OPTIONS,
+    KEEP_ALIVE,
+    MATCHER,
+    QUERY_N_PREDICT,
+    QUERY_PROMPT,
+    SNAPSHOT,
+    load_sources,
+    model_digest,
+    run_case,
+    tree_is_dirty,
+)
+from probe_tool_call import SCHEMA_PATH, git_commit, ollama_version
+
+from archways_assistant import assistant
+from archways_assistant.evalflow import (
+    SCORER,
+    CaseFileError,
+    format_totals,
+    load_cases,
+    score_case,
+    totals,
+)
+
+FIXED_NOW = datetime.fromisoformat("2026-11-14T10:00:00+08:00")
+CONFIGS = ("baseline",)  # "final" is added when every change is frozen
+MODEL = "qwen3:0.6b"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("path", type=Path)
+    parser.add_argument("--config", required=True, choices=CONFIGS)
+    args = parser.parse_args()
+
+    try:
+        data = args.path.read_bytes()
+    except OSError:
+        sys.exit("cannot read the held-out file")
+    rows = load_sources()["snapshot"]
+    by_id = {row["id"]: row for row in rows}
+    offices = {row["office"] for row in rows}
+    try:
+        cases = load_cases(
+            args.path,
+            {"snapshot": set(by_id)},
+            fixed_now=FIXED_NOW,
+            default_data="snapshot",
+        )
+    except CaseFileError as error:
+        sys.exit(f"held-out file: {error}")
+    contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    prompts = {
+        "query": QUERY_PROMPT.read_text(encoding="utf-8"),
+        "answer": ANSWER_PROMPT.read_text(encoding="utf-8"),
+    }
+
+    with httpx.Client(timeout=600, trust_env=False) as client:
+        settings = {
+            "config": args.config,
+            "fixed_now": FIXED_NOW.isoformat(),
+            "ollama": ollama_version(client),
+            "model": MODEL,
+            "model_digest": model_digest(client, MODEL),
+            "commit": git_commit(),
+            "tree_dirty": tree_is_dirty(),
+            "scorer": SCORER,
+            "matcher": MATCHER,
+            "budget": "off",
+            "options": BASE_OPTIONS,
+            "keep_alive": KEEP_ALIVE,
+            "n_predict": {
+                "query": QUERY_N_PREDICT,
+                "answer": assistant.ANSWER_N_PREDICT,
+            },
+            "prompts": {
+                "query": [
+                    QUERY_PROMPT.name,
+                    hashlib.sha256(QUERY_PROMPT.read_bytes()).hexdigest(),
+                ],
+                "answer": [
+                    ANSWER_PROMPT.name,
+                    hashlib.sha256(ANSWER_PROMPT.read_bytes()).hexdigest(),
+                ],
+            },
+            "snapshot_sha256": hashlib.sha256(SNAPSHOT.read_bytes()).hexdigest(),
+        }
+        print(f"settings: {json.dumps(settings, ensure_ascii=True)}")
+        print(
+            f"held-out file sha256 {hashlib.sha256(data).hexdigest()}  cases {len(cases)}"
+        )
+        scores = []
+        for number, case in enumerate(cases, start=1):
+            try:
+                record = run_case(client, MODEL, case, prompts, rows, contract)
+                scores.append(
+                    score_case(
+                        case,
+                        record["path"],
+                        record["text"],
+                        record["results"],
+                        by_id,
+                        offices,
+                    )
+                )
+            except Exception as error:  # noqa: BLE001 - never print a value
+                sys.exit(
+                    f"case number {number} failed ({type(error).__name__}); no totals"
+                )
+    print(format_totals("HELD-OUT", totals(scores)))
+
+
+if __name__ == "__main__":
+    main()
