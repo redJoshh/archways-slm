@@ -19,6 +19,44 @@ Template:
 
 ---
 
+## 2026-11-14: Accuracy-phase harness built (Step 1); flow13 labels proposed, awaiting confirmation
+
+- **Date:** 2026-11-14 (+08:00)
+- **What changed (`e2ab07f`):**
+  - **`src/archways_assistant/evalflow.py` (scorer_v1):** the frozen section 0 rules.
+    - The AI answer is split from the list; `must_include` reads only the answer.
+    - Wrong = `must_not_include`, `wrong_claims`, unsupported, wrong-row, stale, or entity_v1 (office names).
+    - Helpful (any one source row shown), coverage `k/n`, trap clean / unrelated list, Unsafe, out of scope on Unsafe only.
+    - `load_cases()` errors name a line and a field, never a value. It takes an optional fixed `now` for the held-out script.
+  - **`scripts/eval_flow.py`:**
+    - `flow()` builds every prompt. The harness runs the cold Ollama calls (`num_ctx` 2048, `num_gpu` 0, `keep_alive` 0, greedy, `QWEN3_STOP`; query 64 / answer 200 tokens).
+    - Search is `search_feed` on the seed rows or the snapshot. Case tokens are the `prompt_eval_count` of the case part.
+    - Output: per-case lines (ids, flags, codes), totals per set and in total, and a run file that must be in `data/local/`.
+    - `--compare A B` is the determinism check.
+  - **`assistant.flow(..., budget="off")`:** keyword-only and evaluation only. It keeps the `n_ctx` rule. The default path is unchanged (all flow vectors still reproduce), and assistant-ts is not touched.
+  - **Tests:** 28 scorer tests, 2 flow budget tests, and the new files added to the no-system-clock test.
+- **flow13 labels, PROPOSED (not confirmed):**
+  - `data/local/flow_cases.jsonl` (gitignored), SHA-256 `1fdad1bd…a754` at proposal.
+  - The SHA-256 is recorded again once the user confirms.
+  - Every proposed phrase was checked to appear in its source row (q01's office is in the row's `office` field).
+- **How it was verified:**
+  - `uv run pytest -q` → `1215 passed, 2 skipped`. ruff check and format clean.
+  - **Mutations,** restored from copies (`cmp` clean). Each was caught by 1 test:
+    - `must_include` read from the whole text
+    - budget off dropping the `n_ctx` rule
+    - entity_v1 without the trailing word boundary
+    - (A first try of the third mutation didn't apply and was re-run.)
+  - **Smoke run** (plumbing only, not the baseline): e2e-001 and e2e-016, Ollama 0.40.15, qwen3:0.6b digest `7df6b6e0…`.
+    - Every step was recorded: query, search, case tokens 170, answer call, budget `off`.
+    - e2e-001: `answer_not_found`, helpful through the list. e2e-016: `not_found`, clean.
+- **Not run:** no baseline, and no flow13 case (labels unconfirmed). `eval_heldout.py` (Step 2's script) is not built yet.
+- **Commits:** `e2ab07f`, this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The user confirms the flow13 labels.
+  - Then the baseline runs twice, `--compare`, and the scorer audit.
+
+---
+
 ## 2026-11-14: Accuracy phase plan approved; sections 0 and 2 frozen; ADR 0007 proposed
 
 - **Date:** 2026-11-14 (+08:00)
