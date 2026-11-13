@@ -203,6 +203,51 @@ def test_flow_vectors_reproduce():
         assert (calls.answer_prompt if calls else None) == expected["answer_prompt"]
 
 
+def test_flow_budget_off_skips_only_the_speed_and_tokens_rules():
+    """accuracy-phase.md, section 1: evaluation runs with the budget off."""
+    prompts = {
+        "query": (ROOT / "prompts" / "e2e_query_v1.txt").read_text(encoding="utf-8"),
+        "answer": (ROOT / "prompts" / "e2e_answer_v1.txt").read_text(encoding="utf-8"),
+    }
+
+    def decode(value):
+        return assistant.ERROR if value == {"throws": True} else value
+
+    lifted = kept_n_ctx = 0
+    for vector in DATA["flow"]:
+        args = (
+            vector["question"],
+            from_ms(vector["now_ms"]),
+            prompts,
+            decode(vector["query_reply"]),
+            decode(vector["search_reply"]),
+            decode(vector["case_tokens"]),
+            decode(vector["answer_reply"]),
+            vector["elapsed_ms"],
+            speed_of(vector["speed"]),
+        )
+        on, on_calls, on_arguments = assistant.flow(*args)
+        off, off_calls, off_arguments = assistant.flow(*args, budget="off")
+        assert (off_calls, off_arguments) == (on_calls, on_arguments), vector["id"]
+        if on.budget is None or on.budget.rule == "n_ctx":
+            assert off == on, vector["id"]
+            kept_n_ctx += on.budget is not None
+            continue
+        assert off.budget == assistant.Budget("off", False), vector["id"]
+        if on.budget.fallback:
+            lifted += 1
+            assert off.path != "budget_fallback", vector["id"]
+        else:
+            assert (off.path, off.text, off.codes) == (on.path, on.text, on.codes)
+    # Not vacuous: some vectors fell back on speed or tokens, some on n_ctx.
+    assert lifted and kept_n_ctx
+
+
+def test_flow_rejects_an_unknown_budget_mode():
+    with pytest.raises(ValueError):
+        assistant.flow("q", datetime(2026, 11, 10, tzinfo=UTC), {}, "", budget="x")
+
+
 def test_flow_shows_model_text_only_on_the_answer_path():
     for vector in DATA["flow"]:
         expected = vector["expected"]

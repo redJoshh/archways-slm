@@ -362,7 +362,7 @@ class Speed:
 class Budget:
     """Which rule decided the answer call, and the predicted whole question."""
 
-    rule: str  # "time", "tokens" (speed unknown) or "n_ctx"
+    rule: str  # "time", "tokens" (speed unknown), "n_ctx", or "off" (evaluation)
     fallback: bool
     predicted_ms: float | None = None
 
@@ -578,6 +578,8 @@ def flow(
     answer_reply=None,
     elapsed_ms: int = 0,
     speed: Speed | None = None,
+    *,
+    budget: str = "on",
 ) -> tuple[Outcome, Calls | None, dict | None]:
     """One question through the UAT flow, with every step's result scripted.
 
@@ -586,9 +588,15 @@ def flow(
     answer_reply are each the step's value, or ERROR if the step throws.
     elapsed_ms is the time already spent when the budget is decided, and
     speed this phone's measured rates (None: unknown, so the tokens rule).
+    budget "off" is for quality evaluation only (accuracy-phase.md, section
+    1): the speed and tokens rules are skipped, so every case that fits
+    n_ctx gets its answer call; the n_ctx rule (capacity, not speed) stays.
+    The phone always runs "on"; assistant-ts has no such switch.
     Returns the outcome, the prompts sent (None if no call was made) and the
     search arguments (None if no search was made).
     """
+    if budget not in ("on", "off"):
+        raise ValueError(f"budget must be 'on' or 'off', not {budget!r}")
     try:
         check_question(question)
     except ContractError:
@@ -639,7 +647,10 @@ def flow(
             "answer_error", list_or_last_resort(results), result_count=count
         )
         return outcome, calls, arguments
-    budget = decide_budget(case_tokens, elapsed_ms, speed)
+    if budget == "off" and case_tokens <= CASE_TOKENS_CTX_MAX:
+        budget = Budget("off", False)
+    else:
+        budget = decide_budget(case_tokens, elapsed_ms, speed)
     if budget.fallback:
         outcome = Outcome(
             "budget_fallback", list_or_last_resort(results), (), budget, count
