@@ -19,6 +19,32 @@ Template:
 
 ---
 
+## 2026-11-14: Accuracy phase plan drafted (metrics, real-data harness, held-out protocol, improvement order)
+
+- **Date:** 2026-11-14 (+08:00)
+- **What changed:** new `docs/plans/accuracy-phase.md`, status DRAFT, awaiting the user's approval. It covers:
+  - **Constraint (user, panel commitment):** no training or fine-tuning; qwen3:0.6b only; search on the phone; no backend change.
+  - **Section 0, metrics:**
+    - Helpfulness, AI answer accuracy and Unsafe.
+    - Counts per set and in total.
+    - A wrong-entity rule (entity_v1, office names) for the q01 failure.
+  - **Section 1, harness:**
+    - `eval_flow.py`: the full `flow()` with budget off (the `n_ctx` rule kept), and the cold ADR 0002 settings.
+    - Search is `search_feed` on the seed rows or the snapshot.
+    - flow13 is fixed at `now` 2026-11-10T10:00+08:00.
+    - STOP points: the flow13 labels, and the scorer audit before the baseline is frozen.
+  - **Section 2, held-out:**
+    - `eval_heldout.py PATH` prints totals and SHA-256s only and writes nothing.
+    - It is run at most twice (baseline, final), only by the user.
+  - **Section 3, cumulative order:** rank_v1 → retry_v1 → and_v4 → gate_v1 (θ from a fixed grid, fitted on e2e34 and taglish10 replays) → excerpt_v2_centred → answer v4 (one sentence, written in the plan).
+  - Seven decisions are listed for the user.
+- **Why:** the user asked for a plan before any change in the new accuracy phase.
+- **How it was verified:** docs only. Read the existing plans, the latest devlog entries, `assistant.flow()`, `e2escore` and the case formats. No model or replay was run.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** the user's approval and the seven decisions. Then build the scorer and harness, and propose the flow13 scored cases.
+
+---
+
 ## 2026-11-10: Redmi re-check of the model queue passed; fix: the budget reads the speed after the readiness wait; plan for a query-speed drop
 
 - **Date:** 2026-11-10 (+08:00)
