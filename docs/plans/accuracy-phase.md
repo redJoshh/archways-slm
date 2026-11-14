@@ -594,3 +594,12 @@ Committed with the hand-written `tests/vectors/gate_vectors.json`, **before any 
   - The decision function and the replay stay in the repo, unused.
   - The pre-registered **"retry_v1 + gate_v1 combined" is not run**, because (d) was not kept. **Retry stays off for good**, as registered.
 - **Next:** (e) excerpt_v2_centred, on top of rank_v1 + and_v4, with the e2e-003 exception as recorded.
+
+## 2026-11-14 (user): finding: word-overlap scoring is biased against Taglish and informal questions
+
+- **Evidence:** taglish-02 ("anu oras ung advising sa 2nd yr?") scores 1 of 8 against its correct row (ann-005).
+  - Informal spellings ("anu", "ung", "yr") never appear in announcements.
+  - Informal numbers ("2nd") become number anchors the row doesn't contain.
+- **Consequence:** an overlap-based answerability gate (gate_v1) would suppress correct answers for Taglish speakers. That is why (d) was dropped: θ = 1/4 already lost taglish-02.
+- **rank_v1 is unaffected:** it only reorders the rows the matcher already found. With weak overlap everywhere, the rows tie and the order falls back to newest first, as before rank_v1.
+- **For any later aboutness check:** it must not rely on literal word overlap with the question alone. Taglish questions need to be part of its fit set from the start.

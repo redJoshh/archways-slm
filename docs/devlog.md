@@ -19,6 +19,20 @@ Template:
 
 ---
 
+## 2026-11-14: Finding: word-overlap scoring is biased against Taglish and informal questions
+
+- **Date:** 2026-11-14 (+08:00)
+- **Finding (user):** taglish-02 ("anu oras ung advising sa 2nd yr?") scores 1 of 8 against its correct row.
+  - Its informal spellings and "yr" are not in the announcement.
+  - "2nd" becomes a number anchor (weight 3) that the row doesn't contain.
+- **Consequence:** an overlap-based answerability gate would suppress correct answers for Taglish speakers. That is the reason gate_v1 was dropped.
+- **rank_v1 is unaffected:** it only reorders matched rows. Weak overlap means ties, and ties fall back to newest first.
+- **Recorded in:** `accuracy-phase.md`, dated section.
+- **How it was verified:** the numbers come from the gate fit of the same day (`f2fc0f1`). Docs only.
+- **Commits:** this `docs:` commit. Not pushed.
+
+---
+
 ## 2026-11-14: Fix (g) strip_nf_v1 pre-registered; Step 3 (d) gate_v1 pre-registered, built, fitted: DROPPED (θ* = 0)
 
 - **Date:** 2026-11-14 (+08:00)
