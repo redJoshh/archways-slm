@@ -637,3 +637,27 @@ Committed with `tests/vectors/window_vectors.json` (13 cases; positions worked o
 9. **Must report:**
    - q08: whether the banned items reach the excerpt, and the answer.
    - **The long-body trap explicitly** (the 2026-10-31 risk that a window surfaces its hidden fact): e2e-003's anchor, whether its hidden deadline enters the excerpt, its path and reply. Also any other case whose excerpt now contains a fact past character 500 that it didn't before.
+
+## 2026-11-14: excerpt_v2_centred result: passes the keep rule with NO effect on any dev case (decision with the user)
+
+- **Built (`aaba630`):**
+  - Python `window.py` and TS `window.ts`.
+  - `claims_and_rest` / guard-ts `claimsAndRest` also return the date spans (guard results unchanged: Node 461/461, Hermes 453/453).
+  - `IndexRow.plain`; `searchRows(..., excerptFor)`; `makeFeedSearch(..., excerpt)` (phone default: the first 500).
+  - `eval_flow.py --excerpt` / `--excerpt-replay`.
+- **Vectors and checks:**
+  - The 13 hand-derived window vectors, E13 (the 500 boundary, `7e27292`) and a search integration vector pass in Python, Node (285/285) and Hermes (window 15/15).
+  - **Mutations,** all caught: words before dates (4 fail), no snap (6), snap backward (6), `<` at the boundary (1); TS UTF-16 units (1), words before dates (1), `<` (1).
+- **Retrieval replay** (rank_v1 + and_v4, every dev case): **no excerpt changed.**
+- **Cold run** (`window-1.json`, `aaba630`, clean tree): `--compare` with `and_v4-1.json` → **57/57 identical.**
+  - "Nothing gets worse" with AI-correct case by case and e2e-003 outside the check: OK on every set.
+  - Totals unchanged: helpful 39/42, AI correct 27/29, Unsafe 0/57, traps clean 14/14.
+- **The target, q08:** not reached.
+  - The rule's anchor is the *earliest* question word, and row 56 names the initiative early ("Verde" at 168).
+  - So the window stays at the start, and the banned items (from 509) stay hidden.
+- **The long-body trap, explicitly** (the 2026-10-31 risk):
+  - e2e-003 is not exercised in this run. The model's query ("accruement deadline") retrieves nothing, so there is no excerpt.
+  - If ann-004 were retrieved, its anchor would be "org" at 47. The window would not move, and the hidden deadline (at 772) would stay hidden.
+  - No dev case shows any newly visible date or number.
+- **Decision:** by the letter of rule 4 it passes, because nothing got worse. But it changed nothing on any dev case, including its one target, so there is no dev evidence of benefit. On the phone it would only change behaviour on unseen data. **Whether it is enabled at the final freeze is left to the user.** The code stays, off by default, until then.
+- **Next:** (f) answer prompt v4 (one sentence, false "not found"), on top of rank_v1 + and_v4.

@@ -19,6 +19,35 @@ Template:
 
 ---
 
+## 2026-11-14: Step 3 (e) excerpt_v2_centred: pre-registered, built, run: no effect on any dev case
+
+- **Date:** 2026-11-14 (+08:00)
+- **Pre-registered (`334c398`):** the exact rule and 13 window vectors (positions worked out by hand; the writing script only asserts them).
+  - E13 (`7e27292`): the "anchor ends exactly at 500" boundary, which the rule asked for. Added with the code, before any run.
+- **Built (`aaba630`):**
+  - Python `window.py`; `e2escore.date_scan` / guard-ts `claimsAndRest` spans.
+  - TS `window.ts`, `IndexRow.plain`, `searchRows` `excerptFor`, `makeFeedSearch` `excerpt` (default: the first 500).
+  - `eval_flow.py --excerpt` / `--excerpt-replay`.
+- **Verified:**
+  - Python 15 window tests; Node 285/285; Hermes window 15/15; guard-ts 461/461 and 453/453 unchanged.
+  - `uv run pytest -q` → `1335 passed, 2 skipped`. ruff clean. Generators `--check` up to date.
+  - **Mutations,** all caught and restored: Python 4 (words before dates, no snap, snap backward, `<`); TS 3 (UTF-16 units, words before dates, `<`).
+- **Retrieval replay:** no excerpt changed on any dev case.
+- **Cold run** (`aaba630`, clean tree): `--compare` with the and_v4 run → 57/57 identical. "Nothing gets worse" with AI-correct case by case and e2e-003 outside: OK.
+- **q08 (the target) not reached:**
+  - The earliest question word in row 56 is "Verde" at 168. The window stays at the start, and the banned items (from 509) stay hidden.
+- **Long-body trap (e2e-003), explicitly:**
+  - Not exercised: the query "accruement deadline" retrieves nothing.
+  - If ann-004 were retrieved, the anchor would be "org" at 47 and its deadline at 772 would stay hidden.
+  - No dev case shows a newly visible fact.
+- **Decision:** it passes rule 4 with no effect at all. Enabling it at the final freeze is left to the user. The code stays, off by default.
+- **Commits:** `334c398`, `7e27292`, `aaba630`, this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The user's call on (e).
+  - Then (f) answer prompt v4, pre-registered.
+
+---
+
 ## 2026-11-14: Finding: word-overlap scoring is biased against Taglish and informal questions
 
 - **Date:** 2026-11-14 (+08:00)
