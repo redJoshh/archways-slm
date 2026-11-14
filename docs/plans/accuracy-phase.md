@@ -392,3 +392,32 @@ Committed with `contracts/rank_stopwords_v1.json` and the hand-written `tests/ve
   - q11 is still `answer_not_found` with row 16 now 1st: the model says not found with the right row first. That is (f)'s target.
 - **Decision:** rank_v1 is kept. Every later step is tested with rank_v1 on.
 - **Not yet changed:** the phone default stays newest first (`makeFeedSearch` rank null) until the final freeze of all kept versions.
+
+## 2026-11-14: retry_v1 rule, pre-registered (section 3 (b))
+
+Committed with the hand-written `tests/vectors/retry_vectors.json`, **before any retry_v1 code or run**. It makes section 3 (b) exact. It runs on top of rank_v1 (kept).
+
+1. **When:** the model's arguments are valid (contract-checked) and the search returns **0 results**.
+   - Never on `query_invalid`, and never when the arguments break the contract (a search error).
+   - At most one retry.
+2. **Retry words:** rank_v1's content words of the raw question (`question_terms(question).words`: dates blanked, word-character runs, digit tokens, one-character tokens and both stopword lists dropped).
+   - No content words (only stopwords, or only a date): no retry, and the path stays `not_found`.
+   - Anchors alone never trigger a retry.
+3. **Match:** a row matches if **at least one** retry word is found by the matcher's own one-word test: substring, synonyms of the active synonym version, or plural alternative as a whole word (rank_v1's `word_found`).
+   - The model's `days` and `limit` are kept, with the contract defaults when absent. The days window applies as usual.
+4. **Order:** rank_v1 points (the full question: words and anchors), then newest, then id. Then the cut to `limit`.
+5. **Recorded:** `retried` (true when a retry was attempted, whatever it found). The phone log carries the flag and the result count only.
+6. **Parity:**
+   - Python `feedindex.search_feed_retry(...) -> (results, retried)` and TS `searchWithRetry(...)` / `makeFeedSearch(..., rank, retry)`.
+   - Both pass `retry_vectors.json`, on Node and the Hermes CLI.
+7. **Mutations to check:**
+   - AND in place of OR
+   - the retry firing when the first search found rows
+   - the model's days ignored
+   - newest first in place of rank_v1
+   - the retry on a question with no content words
+8. **Keep or drop** (section 3 (b), pre-registered):
+   - Compared against the rank_v1 run, with the "nothing gets worse" rule on every dev set.
+   - If it breaks the rule **only on traps** (a trap no longer clean, or a new unsafe trap), (b) is **held** and re-tested together with (d), as one step (b+d).
+   - If it breaks an answerable case, it is **dropped**.
+   - The run reuses the baseline's query replies and re-runs the answer calls cold.

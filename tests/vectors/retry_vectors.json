@@ -1,0 +1,260 @@
+{
+ "$comment": "retry_v1 parity vectors, HAND-WRITTEN 2026-11-14 before any retry_v1 code or run (docs/plans/accuracy-phase.md, 'retry_v1 rule, pre-registered'). Expected values worked out by hand; never regenerate from the implementation. The details are the same synthetic rows as rank_vectors.json. Every case runs with rank_v1 on (kept 2026-11-14).",
+ "format": "archways retry vectors v1",
+ "retry": "retry_v1",
+ "rank": "rank_v1",
+ "matcher": "and_v3",
+ "now": "2026-11-10T10:00:00+08:00",
+ "details": [
+  {
+   "id": 1,
+   "title": "Library Hours Update",
+   "body": "The library is open until 9 PM on November 16, 2026.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 2,
+   "title": "Campus Offices Closed for the Outing",
+   "body": "All offices are closed on May 14, 2027 for the annual outing.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-08T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 3,
+   "title": "Classes Suspended",
+   "body": "There are no classes on November 30, 2026 because of Bonifacio Day.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-07T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 4,
+   "title": "Class Schedule Reminder",
+   "body": "Regular class schedules apply this week.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-06T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 5,
+   "title": "Office Hours",
+   "body": "The registrar office is open from 8 to 5.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-05T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 6,
+   "title": "Long Notice About Class Make-up Sessions",
+   "body": "Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Make-up classes are on 2026-12-05.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-04T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 7,
+   "title": "December 5 Class Make-up",
+   "body": "Details to follow.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-03T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 8,
+   "title": "Fee Deadline",
+   "body": "Pay the fee of 500 pesos by 30 Nov.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-02T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 9,
+   "title": "Class Cards",
+   "body": "Class cards are released on November 30, 2025.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 10,
+   "title": "Fee Payment Reminder",
+   "body": "Fees are due soon.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T12:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 11,
+   "title": "Library Renovation",
+   "body": "The library annex closes on November 18.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T15:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 12,
+   "title": "Office Supplies",
+   "body": "Request office supplies online.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T18:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  }
+ ],
+ "cases": [
+  {
+   "name": "R1: zero results, retried with the question's words, ranked",
+   "question": "When does the library annex close?",
+   "arguments": {
+    "query": "annex hours",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [
+    "11",
+    "1",
+    "2"
+   ],
+   "retried": true,
+   "why": "'annex hours' needs both words: no row. Words [does, library, annex, close]: row 11 library+annex+close = 3; rows 1 (library) and 2 (close, in 'closed') = 1, newest first"
+  },
+  {
+   "name": "R2: only stopwords: no retry",
+   "question": "What is the announcement about?",
+   "arguments": {
+    "query": "zzz",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [],
+   "retried": false,
+   "why": "no content words"
+  },
+  {
+   "name": "R3: only a date: no retry",
+   "question": "November 30?",
+   "arguments": {
+    "query": "zzz",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [],
+   "retried": false,
+   "why": "the date is blanked; no content words (anchors alone never retry)"
+  },
+  {
+   "name": "R4: the retry also finds nothing",
+   "question": "Is there a swimming pool?",
+   "arguments": {
+    "query": "swimming pool",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [],
+   "retried": true,
+   "why": "words [swimming, pool]; no row has either"
+  },
+  {
+   "name": "R5: the retry keeps the model's days",
+   "question": "When does the library annex close?",
+   "arguments": {
+    "query": "annex hours",
+    "days": 1
+   },
+   "ok": true,
+   "expected_ids": [
+    "11"
+   ],
+   "retried": true,
+   "why": "since 2026-11-09T10:00: rows 10, 11, 12 only (row 1 is 09:00); only row 11 has a word"
+  },
+  {
+   "name": "R6: the retry keeps the model's limit, cut after ranking",
+   "question": "Which offices close for the outing?",
+   "arguments": {
+    "query": "offices closure",
+    "days": 30,
+    "limit": 2
+   },
+   "ok": true,
+   "expected_ids": [
+    "2",
+    "12"
+   ],
+   "retried": true,
+   "why": "no row has 'closure'. Row 2 = 3; rows 12, 11, 5 = 1 each (12 newest); limit 2"
+  },
+  {
+   "name": "R7: the model's query found rows: no retry",
+   "question": "Which offices close for the outing?",
+   "arguments": {
+    "query": "office",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [
+    "2",
+    "12",
+    "5"
+   ],
+   "retried": false,
+   "why": "rank_v1 vector I, unchanged"
+  },
+  {
+   "name": "R8: invalid arguments: an error, no retry",
+   "question": "When does the library annex close?",
+   "arguments": {
+    "query": "office",
+    "days": 99
+   },
+   "ok": false,
+   "expected_ids": null,
+   "retried": false,
+   "why": "days over 30 breaks the contract"
+  },
+  {
+   "name": "R9: the retry uses the matcher's synonyms",
+   "question": "May klase ba bukas?",
+   "arguments": {
+    "query": "bukas",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [
+    "3",
+    "4",
+    "6",
+    "7",
+    "9"
+   ],
+   "retried": true,
+   "why": "words [klase, bukas] ('may', 'ba' are rank stopwords); klase finds 'class' (synonyms v1) in rows 3, 4, 6, 7, 9; all 1 point, newest first"
+  }
+ ]
+}
