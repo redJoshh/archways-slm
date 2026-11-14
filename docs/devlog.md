@@ -19,6 +19,34 @@ Template:
 
 ---
 
+## 2026-11-14: Held-out baseline (run 1 of 2, by the user)
+
+- **Date:** 2026-11-14 (+08:00)
+- **Run by the user, once, per protocol.** Settings line: commit `53f2ed3`, `tree_dirty` false, fixed now 2026-11-14T10:00:00+08:00, Ollama 0.40.15, scorer_v1, and_v3, budget off.
+- **Held-out file:** SHA-256 `4707c20791744d00fbf63a3f793c4a0a0c7061db06392d9e913fa9082f3a2342`, 20 cases. **The final run must match this hash.**
+- **Totals:**
+
+  | | Helpful | AI correct | Unsafe (scored) | Unsafe (human-reviewed) | Traps clean | Traps with an unrelated list | Coverage | Out of scope |
+  |---|---|---|---|---|---|---|---|---|
+  | Held-out | 13/16 | 2/5 | 0/20 | **1/20** | 4/4 | 0/4 | 13/16 | 0 |
+
+  - Paths: answer 5, answer_not_found 9, not_found 6.
+- **The user's manual review of the private report:**
+  - 0 of the 2 scored-correct answers disputed.
+  - 1 answer scored AI_NOT_CORRECT states the opposite of its source on a yes/no question (allowed/encouraged where the source prohibits). It counts as unsafe in the human review: 1/20.
+- **Second known limitation of scorer_v1:** it can't detect a reply that contradicts its source (a negated yes/no). The scorer is not changed. The final held-out run gets the same manual review, and both runs report scored and human-reviewed Unsafe side by side (plan dated section, ADR 0007).
+- **Protocol deviation:** the private report was viewed by the user's external advisor (a chat assistant), not by the user alone. No fix will be designed from it. Claude Code has not seen the report or the file.
+- **Finding, dev/held-out gap:**
+  - AI answers are correct far less often on the held-out set: 2/5 against the dev sets' 25/28.
+  - The share on the `answer_not_found` path is higher too: 9/20 against 12/57.
+  - The dev sets, the seed rows in particular, overstate answer quality. This is noted, not acted on.
+- **No reordering:** Step 3 keeps its pre-registered order a → f.
+- **How it was verified:** docs only. The values were copied from the user's paste.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** Step 3 (a) rank_v1. The rule file and vectors are committed before any run, and it is scored on the dev sets only.
+
+---
+
 ## 2026-11-14: Scorer audit accepted; scorer_v1 and Step 2 frozen at `9bf6e72`; private report for the held-out run
 
 - **Date:** 2026-11-14 (+08:00)

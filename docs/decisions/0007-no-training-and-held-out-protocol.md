@@ -36,6 +36,7 @@ The three metrics of `accuracy-phase.md` section 0 (Helpfulness, AI answer accur
 - **The user runs it.** Claude Code never runs the script, opens or reads the held-out file, or asks for its contents. The user pastes the totals; the devlog records them with the file's SHA-256, which must match between the two runs.
 - **Private report (amendment, 2026-11-14):** `--private-report PATH` writes a per-case report to a path outside the repository, for the user's manual review. Only the user reads it; it never enters the repo, the devlog or a chat. Without the option nothing is written.
 - **Frozen at `9bf6e72`:** scorer_v1 and the held-out script.
+- **Human review (2026-11-14):** the user reviews the private report of both held-out runs. Each run reports Unsafe as scored and as human-reviewed, side by side. scorer_v1 can't detect a reply that contradicts its source on a yes/no question, or one that mixes up which listed announcement says what.
 - **No pass/fail thresholds** are set in this ADR. The held-out run reports the baseline and final counts side by side. With so few cases it is a check that the dev-set gains carry over, not an error rate.
 
 ## Consequences

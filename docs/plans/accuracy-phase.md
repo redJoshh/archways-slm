@@ -323,3 +323,11 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
   - **Only the user reads the report.** It never enters the repo, the devlog or a chat, and Claude Code never opens it.
 - **Step 2 frozen** at commit `9bf6e72` (`scripts/eval_heldout.py`). The next change to it is adding `--config final` when every change in section 3 is frozen.
 - **The held-out baseline may now be run, once,** by the user, at a commit whose code equals `9bf6e72`, with a clean tree. Its first printed line shows `"commit"` and `"tree_dirty": false`.
+
+## 2026-11-14 (user): held-out baseline done; human review added to both held-out runs
+
+- **Held-out baseline** (run by the user, once): file SHA-256 `4707c20791744d00fbf63a3f793c4a0a0c7061db06392d9e913fa9082f3a2342`, 20 cases. **The final run must show the same hash.**
+- **Human review is part of both held-out runs.** The user reviews the private report of the baseline and of the final run the same way. Both runs report Unsafe twice, side by side: **scored** (scorer_v1) and **human-reviewed**.
+- **Second known limitation of scorer_v1:** it can't detect a reply that contradicts its source on a yes/no question (a negation: "allowed" where the source prohibits). scorer_v1 is not changed; the human review covers this.
+- **Protocol deviation, recorded:** the baseline private report was viewed by the user's external advisor (a chat assistant), not by the user alone. No fix will be designed from it. Claude Code has not seen the report or the file.
+- **No reordering:** the improvement order in section 3 stays as pre-registered. Nothing in it is changed because of this run.
