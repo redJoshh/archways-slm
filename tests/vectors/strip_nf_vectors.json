@@ -1,0 +1,53 @@
+{
+ "$comment": "strip_nf_v1 vectors, HAND-WRITTEN 2026-11-14 before any code or run (accuracy-phase.md, 'strip_nf_v1 rule, pre-registered', fix (g)). 'reply' is the raw answer reply; 'expected' is the reply after the flow's ASCII-whitespace strip and the rule, or null for the answer_not_found path. Never regenerate from the implementation.",
+ "format": "archways strip_nf vectors v1",
+ "rule": "strip_nf_v1",
+ "not_found": "No official announcement was found for your question.",
+ "cases": [
+  {
+   "name": "N1: answer then the sentence",
+   "reply": "The term starts on January 15, 2027. No official announcement was found for your question.",
+   "expected": "The term starts on January 15, 2027."
+  },
+  {
+   "name": "N2: the sentence then the answer",
+   "reply": "No official announcement was found for your question. The term starts on January 15, 2027.",
+   "expected": "The term starts on January 15, 2027."
+  },
+  {
+   "name": "N3: the sentence alone (unchanged rule)",
+   "reply": "No official announcement was found for your question.",
+   "expected": null
+  },
+  {
+   "name": "N4: the sentence twice, nothing else",
+   "reply": "No official announcement was found for your question. No official announcement was found for your question.",
+   "expected": null
+  },
+  {
+   "name": "N5: in the middle; inner spacing untouched",
+   "reply": "A. No official announcement was found for your question. B.",
+   "expected": "A.  B."
+  },
+  {
+   "name": "N6: no sentence",
+   "reply": "The term starts on January 15, 2027.",
+   "expected": "The term starts on January 15, 2027."
+  },
+  {
+   "name": "N7: a near miss is not the sentence",
+   "reply": "No official announcement was found. X",
+   "expected": "No official announcement was found. X"
+  },
+  {
+   "name": "N8: other case is not the sentence",
+   "reply": "no official announcement was found for your question. X",
+   "expected": "no official announcement was found for your question. X"
+  },
+  {
+   "name": "N9: surrounding whitespace and newlines",
+   "reply": "  Jan 15.\nNo official announcement was found for your question.\n",
+   "expected": "Jan 15."
+  }
+ ]
+}

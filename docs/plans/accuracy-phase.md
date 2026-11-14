@@ -522,3 +522,46 @@ Committed with `contracts/search_synonyms_v2.json` and the hand-written `tests/v
   - **taglish-08:** retrieval stays clean. The model's query was "swimming pool", not "pasok", so the synonym never applied. The path is `not_found`, honest. The trap is not exercised by this dev run.
   - **No reply presents a non-class row as being about classes.** q13's is the only answer reply that changed.
 - **Decision:** and_v4 is kept. Every later step runs with rank_v1 + and_v4. The phone default changes only at the final freeze.
+
+## 2026-11-14 (user): fix (g) strip_nf_v1, pre-registered (tested after (f))
+
+Committed with the hand-written `tests/vectors/strip_nf_vectors.json`, before any code or run, and before (d) runs. Evidence: flow q13 under and_v4. Its reply gave the right answer, then the exact not-found sentence.
+
+1. **Where:** in the flow, on a reply that would reach the guard. That is, after the ASCII-whitespace strip and after the existing "the reply is exactly the not-found sentence → `answer_not_found`" check.
+2. **Rule:** if the reply contains the exact not-found sentence (`NOT_FOUND_MESSAGE`, case-sensitive, byte-exact) together with other text:
+   - remove every occurrence of the sentence
+   - strip ASCII whitespace from both ends; inner spacing is left as it is
+   - if nothing is left, the path is `answer_not_found`. Otherwise the remainder goes to the guard and on, as the reply.
+3. A near miss or a different case is not the sentence and stays (vectors N7, N8).
+4. **Parity:** Python `flow()` and TS `flow.ts`, both checked against `strip_nf_vectors.json`, plus new flow vectors. It is a flow setting with a version name, off until kept.
+5. **Order and rule:** tested after (f), on top of every kept change, under section 3's rules. That means "nothing gets worse" on every dev set, no new unsafe case, traps reported, and the AI-correct comparison case by case.
+
+## 2026-11-14: gate_v1 rule, pre-registered (section 3 (d))
+
+Committed with the hand-written `tests/vectors/gate_vectors.json`, **before any gate code, fit or run**. On top of rank_v1 + and_v4 (kept).
+
+1. **Decision:** for a search with at least one result, take the **top result** (first after rank_v1) and its full row (lowercased title and whole plain-text body). The gate passes if `points × q ≥ p × possible` for θ = p/q, with rank_v1's points and possible under the matcher in use (its synonyms). `possible = 0` always passes.
+2. **If it fails:**
+   - The new path is `not_about`: no counting and no answer call.
+   - The text is the results list with its header line replaced by "I couldn't find an announcement that answers this exactly. These may be related:" (the user's text).
+   - For scoring, `not_about` is a list-only path (section 0 already names it): the shown list is the results, and there is no AI answer. The harness passes the plain results list to the frozen scorer_v1 for it, and the scorer's code is unchanged.
+3. **θ grid, fixed now:** {0, 1/4, 1/3, 1/2, 2/3, 3/4}.
+4. **Fit (user's conditions, 2026-11-14):**
+   - **Fit sets:** e2e34 and taglish10 only.
+   - **Method:** an exact replay of the saved rank_v1 + and_v4 run (`and_v4-1.json`). The gate only removes answer calls, so no model call is needed.
+   - **Pick:** θ\* is the **largest** θ in the grid at which, on the fit sets, compared with θ = 0:
+     - (i) **no case that was AI-correct loses it** (no correct AI answer lost, case by case)
+     - (ii) the helpful count does not fall
+     - (iii) no case becomes unsafe
+   - If θ\* = 0, the gate does nothing and (d) is dropped.
+5. **Read-out and keep rule:**
+   - With θ\* frozen, the replay is applied to every dev set (flow13 included) and compared with the rank_v1 + and_v4 run.
+   - The check is the section 3 "nothing gets worse" rule **plus AI-correct case by case**: no case on any set may go from AI-correct to not AI-correct (helpfulness alone can't see a correct answer turned into a list).
+   - Traps are reported separately (clean, unrelated list).
+   - Any failure → (d) dropped.
+6. **Parity:**
+   - The decision function `gate_v1(question, top row, matcher, p, q)` is built in Python (`rank.py`) and TS (`rank.ts`) and checked against `gate_vectors.json` on Node and the Hermes CLI **before the fit**.
+   - The `not_about` flow path is built (Python `flow()`, `flow.ts`, `PATHS`, generated strings, ADR 0004 amendment) only if (d) is kept.
+   - A confirming cold run with the integrated flow must then reproduce the replay case by case.
+7. **Mutations to check:** `≥` → `>`; the excerpt in place of the whole body; the second result in place of the first; v3 synonyms under and_v4.
+8. **Then:** if (d) is kept, the registered "retry_v1 + gate_v1 combined" experiment follows, with θ\* unchanged.

@@ -1,0 +1,293 @@
+{
+ "$comment": "gate_v1 decision vectors, HAND-WRITTEN 2026-11-14 before any gate code or run (accuracy-phase.md, 'gate_v1 rule, pre-registered'). The gate passes if points x q >= p x possible for theta = p/q, on the top result's full row (title + whole body), with the matcher's synonyms; possible 0 always passes. Details: and_v4_vectors.json's rows (rank rows plus row 13). Never regenerate from the implementation.",
+ "format": "archways gate vectors v1",
+ "gate": "gate_v1",
+ "details": [
+  {
+   "id": 1,
+   "title": "Library Hours Update",
+   "body": "The library is open until 9 PM on November 16, 2026.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 2,
+   "title": "Campus Offices Closed for the Outing",
+   "body": "All offices are closed on May 14, 2027 for the annual outing.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-08T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 3,
+   "title": "Classes Suspended",
+   "body": "There are no classes on November 30, 2026 because of Bonifacio Day.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-07T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 4,
+   "title": "Class Schedule Reminder",
+   "body": "Regular class schedules apply this week.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-06T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 5,
+   "title": "Office Hours",
+   "body": "The registrar office is open from 8 to 5.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-05T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 6,
+   "title": "Long Notice About Class Make-up Sessions",
+   "body": "Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Make-up classes are on 2026-12-05.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-04T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 7,
+   "title": "December 5 Class Make-up",
+   "body": "Details to follow.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-03T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 8,
+   "title": "Fee Deadline",
+   "body": "Pay the fee of 500 pesos by 30 Nov.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-02T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 9,
+   "title": "Class Cards",
+   "body": "Class cards are released on November 30, 2025.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 10,
+   "title": "Fee Payment Reminder",
+   "body": "Fees are due soon.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T12:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 11,
+   "title": "Library Renovation",
+   "body": "The library annex closes on November 18.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T15:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 12,
+   "title": "Office Supplies",
+   "body": "Request office supplies online.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T18:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 13,
+   "title": "Classroom Assignments",
+   "body": "Rooms for the second term are posted.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-08T12:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  }
+ ],
+ "cases": [
+  {
+   "name": "G1a: full overlap passes theta 1",
+   "question": "Which offices close for the outing?",
+   "top_id": "2",
+   "matcher": "and_v3",
+   "theta": [
+    1,
+    1
+   ],
+   "points": 3,
+   "possible": 3,
+   "passes": true,
+   "why": "3x1 >= 1x3"
+  },
+  {
+   "name": "G1b: on the boundary passes",
+   "question": "Which offices close for the outing?",
+   "top_id": "5",
+   "matcher": "and_v3",
+   "theta": [
+    1,
+    3
+   ],
+   "points": 1,
+   "possible": 3,
+   "passes": true,
+   "why": "1x3 >= 1x3"
+  },
+  {
+   "name": "G1c: just under fails",
+   "question": "Which offices close for the outing?",
+   "top_id": "5",
+   "matcher": "and_v3",
+   "theta": [
+    1,
+    2
+   ],
+   "points": 1,
+   "possible": 3,
+   "passes": false,
+   "why": "1x2 < 1x3"
+  },
+  {
+   "name": "G2: possible 0 always passes",
+   "question": "What is the announcement about?",
+   "top_id": "12",
+   "matcher": "and_v3",
+   "theta": [
+    3,
+    4
+   ],
+   "points": 0,
+   "possible": 0,
+   "passes": true,
+   "why": "only stopwords"
+  },
+  {
+   "name": "G3a: anchors weigh; 3 of 7 fails 1/2",
+   "question": "Are there classes on November 30, 2026?",
+   "top_id": "9",
+   "matcher": "and_v3",
+   "theta": [
+    1,
+    2
+   ],
+   "points": 3,
+   "possible": 7,
+   "passes": false,
+   "why": "row 9: the date, not 2026 nor 'classes'; 6 < 7"
+  },
+  {
+   "name": "G3b: 3 of 7 passes 1/3",
+   "question": "Are there classes on November 30, 2026?",
+   "top_id": "9",
+   "matcher": "and_v3",
+   "theta": [
+    1,
+    3
+   ],
+   "points": 3,
+   "possible": 7,
+   "passes": true,
+   "why": "9 >= 7"
+  },
+  {
+   "name": "G3c: 7 of 7 passes 3/4",
+   "question": "Are there classes on November 30, 2026?",
+   "top_id": "3",
+   "matcher": "and_v3",
+   "theta": [
+    3,
+    4
+   ],
+   "points": 7,
+   "possible": 7,
+   "passes": true,
+   "why": "28 >= 21"
+  },
+  {
+   "name": "G4a: the matcher's synonyms count (and_v4)",
+   "question": "Kailan ang pasok ng make-up classes?",
+   "top_id": "7",
+   "matcher": "and_v4",
+   "theta": [
+    3,
+    4
+   ],
+   "points": 3,
+   "possible": 4,
+   "passes": true,
+   "why": "pasok via class: 12 >= 12"
+  },
+  {
+   "name": "G4b: the same row under and_v3",
+   "question": "Kailan ang pasok ng make-up classes?",
+   "top_id": "7",
+   "matcher": "and_v3",
+   "theta": [
+    3,
+    4
+   ],
+   "points": 2,
+   "possible": 4,
+   "passes": false,
+   "why": "8 < 12"
+  },
+  {
+   "name": "G5a: theta 0 passes a 0-point row",
+   "question": "Are there classes on November 30, 2026?",
+   "top_id": "4",
+   "matcher": "and_v3",
+   "theta": [
+    0,
+    1
+   ],
+   "points": 0,
+   "possible": 7,
+   "passes": true,
+   "why": "0 >= 0"
+  },
+  {
+   "name": "G5b: a 0-point row fails any theta above 0",
+   "question": "Are there classes on November 30, 2026?",
+   "top_id": "4",
+   "matcher": "and_v3",
+   "theta": [
+    1,
+    4
+   ],
+   "points": 0,
+   "possible": 7,
+   "passes": false,
+   "why": "0 < 7"
+  }
+ ]
+}
