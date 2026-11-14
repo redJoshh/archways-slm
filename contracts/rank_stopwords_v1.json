@@ -1,0 +1,6 @@
+{
+  "$comment": "Frozen extra stopwords for rank_v1 (docs/plans/accuracy-phase.md, section 3 (a), pre-registered 2026-11-14 before any run). Never edit; a change is rank_stopwords_v2.json and a new rank version. Used only to pick the question's content words for ranking; the matcher's own stopwords (fakebackend.AND_V2_STOPWORDS) are dropped too. Lists copied from docs/plans/post-uat-and_v4-and-date-ranking.md, section 2, step 3.",
+  "name": "rank_stopwords_v1",
+  "filipino": ["ang", "ng", "sa", "ba", "na", "mga", "ano", "kailan", "saan", "sino", "may", "para", "po", "ko", "ako", "namin", "natin", "yung", "at", "kung", "pag", "ay"],
+  "domain": ["announcement", "announcements", "ust", "university", "santo", "tomas", "official"]
+}

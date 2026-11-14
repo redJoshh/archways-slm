@@ -331,3 +331,43 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
 - **Second known limitation of scorer_v1:** it can't detect a reply that contradicts its source on a yes/no question (a negation: "allowed" where the source prohibits). scorer_v1 is not changed; the human review covers this.
 - **Protocol deviation, recorded:** the baseline private report was viewed by the user's external advisor (a chat assistant), not by the user alone. No fix will be designed from it. Claude Code has not seen the report or the file.
 - **No reordering:** the improvement order in section 3 stays as pre-registered. Nothing in it is changed because of this run.
+
+## 2026-11-14: rank_v1 rule, pre-registered (section 3 (a))
+
+Committed with `contracts/rank_stopwords_v1.json` and the hand-written `tests/vectors/rank_vectors.json`, **before any rank_v1 code or run**. It makes `post-uat-and_v4-and-date-ranking.md` section 2 steps 1–6 exact; where the wording differs, this text is the rule. Scored on the dev sets only.
+
+1. **Candidates:** every row the matcher (and_v3) and the days window accept. No cut yet.
+2. **Question anchors:** `claims(question)` (`e2escore.claims` / guard-ts `claims`, unchanged).
+   - Date anchors are its (month, day) pairs.
+   - Number anchors are its numbers. A date's year is a number; its day is not.
+   - So "November 16-18" gives the date 11-16 and the number 18.
+3. **Question content words:**
+   - Take the lowercased question with every parsed date span blanked, exactly as `claims()` blanks it.
+   - Split it into maximal runs of and_v3 word characters (`_`, L*, Nd: `is_word_char` / `WORD_RANGES`).
+   - Drop: tokens with a decimal digit; tokens of one code point; the matcher's stopwords (`AND_V2_STOPWORDS`, the stopwords and_v3 uses); and `rank_stopwords_v1`.
+   - Keep the first occurrence of duplicates, in question order.
+4. **Found, per row** (lowercased title, and lowercased whole plain-text body, not the excerpt):
+   - **A content word w** is found by the matcher's own test for a one-word query w: some alternative in [w, *synonyms(w)] is a substring of the title or of the body, or w's plural alternative is a whole word in the title or the body.
+   - **A date anchor** is found if it is in `claims(title + "\n" + body).dates`.
+   - **A number anchor** is found if it is in `merged_claims([title + "\n" + body]).numbers` (the row's numbers, its dates' years and its dates' day numbers).
+5. **Score:**
+   - `points = words_found + 3 × anchors_found` and `possible = n_words + 3 × n_anchors`.
+   - Integers only. The weight 3 is fixed.
+6. **Order:** points descending, then published descending, then id ascending. Then the cut to `limit`.
+   - With `possible = 0`, every row scores 0 and the order is exactly today's.
+7. **Where it applies:**
+   - The search takes the raw question: Python `search_feed(..., question=..., rank="rank_v1")`; TS `searchRows(rows, args, nowMs, { question, rank: "rank_v1" })`, with `AssistantDeps.search(args, { question })`.
+   - The query arguments and the contract are unchanged.
+   - The results' order is now rank_v1, not newest first. This is an internal phone setting (ADR 0006).
+8. **Parity:**
+   - Python and TS each pass `rank_vectors.json`, and Node and the Hermes CLI run it.
+   - guard-ts `claims` is exported and reused, never copied.
+9. **Mutations to check:**
+   - ranking after the cut
+   - the excerpt in place of the full text
+   - weight 1 in place of 3
+   - the tie-break reversed
+   - one-character tokens kept
+10. **Keep or drop:** kept only if the "nothing gets worse" rule (section 3) holds on e2e34, taglish10 and flow13 against the frozen baseline.
+    - The query replies are the baseline's: the prompts are unchanged, and the baseline was deterministic.
+    - The answer calls are re-run cold.

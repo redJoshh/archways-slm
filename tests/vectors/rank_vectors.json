@@ -1,0 +1,501 @@
+{
+ "$comment": "rank_v1 parity vectors, HAND-WRITTEN 2026-11-14 before any rank_v1 code or run (docs/plans/accuracy-phase.md, section 3 (a), rule in the dated section 'rank_v1 rule, pre-registered'). Every expected value was worked out by hand from the rule, not produced by code. Never regenerate from the implementation; if the code disagrees, the code is wrong or the rule gets a new version. All text is synthetic.",
+ "format": "archways rank vectors v1",
+ "rank": "rank_v1",
+ "matcher": "and_v3",
+ "now": "2026-11-10T10:00:00+08:00",
+ "details": [
+  {
+   "id": 1,
+   "title": "Library Hours Update",
+   "body": "The library is open until 9 PM on November 16, 2026.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 2,
+   "title": "Campus Offices Closed for the Outing",
+   "body": "All offices are closed on May 14, 2027 for the annual outing.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-08T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 3,
+   "title": "Classes Suspended",
+   "body": "There are no classes on November 30, 2026 because of Bonifacio Day.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-07T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 4,
+   "title": "Class Schedule Reminder",
+   "body": "Regular class schedules apply this week.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-06T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 5,
+   "title": "Office Hours",
+   "body": "The registrar office is open from 8 to 5.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-05T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 6,
+   "title": "Long Notice About Class Make-up Sessions",
+   "body": "Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Make-up classes are on 2026-12-05.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-04T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 7,
+   "title": "December 5 Class Make-up",
+   "body": "Details to follow.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-03T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 8,
+   "title": "Fee Deadline",
+   "body": "Pay the fee of 500 pesos by 30 Nov.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-02T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 9,
+   "title": "Class Cards",
+   "body": "Class cards are released on November 30, 2025.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 10,
+   "title": "Fee Payment Reminder",
+   "body": "Fees are due soon.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T12:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 11,
+   "title": "Library Renovation",
+   "body": "The library annex closes on November 18.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T15:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 12,
+   "title": "Office Supplies",
+   "body": "Request office supplies online.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T18:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  }
+ ],
+ "cases": [
+  {
+   "name": "A: date and year anchors; a 2025 row still gets the date",
+   "question": "Are there classes on November 30, 2026?",
+   "arguments": {
+    "query": "class",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "classes"
+    ],
+    "dates": [
+     "11-30"
+    ],
+    "numbers": [
+     "2026"
+    ]
+   },
+   "possible": 7,
+   "expected_ids": [
+    "3",
+    "6",
+    "9",
+    "4",
+    "7"
+   ],
+   "expected_points": [
+    7,
+    4,
+    3,
+    0,
+    0
+   ],
+   "unranked_ids": [
+    "3",
+    "4",
+    "6",
+    "7",
+    "9"
+   ],
+   "why": "row 3: classes+11-30+2026; row 6: classes and 2026 past char 500; row 9: 11-30 only (2025); 4 and 7 tie at 0, newest first"
+  },
+  {
+   "name": "B: the oldest match ranks first; the cut comes after ranking",
+   "question": "Are class cards released on November 30?",
+   "arguments": {
+    "query": "class",
+    "days": 30,
+    "limit": 2
+   },
+   "expected_terms": {
+    "words": [
+     "class",
+     "cards",
+     "released"
+    ],
+    "dates": [
+     "11-30"
+    ],
+    "numbers": []
+   },
+   "possible": 6,
+   "expected_ids": [
+    "9",
+    "3"
+   ],
+   "expected_points": [
+    6,
+    4
+   ],
+   "unranked_ids": [
+    "3",
+    "4"
+   ],
+   "why": "row 9 is 5th of 5 by date and has every word and the date"
+  },
+  {
+   "name": "C: a date and a word found only past char 500; a date only in the title",
+   "question": "Make-up classes on December 5?",
+   "arguments": {
+    "query": "make-up",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "make",
+     "up",
+     "classes"
+    ],
+    "dates": [
+     "12-05"
+    ],
+    "numbers": []
+   },
+   "possible": 6,
+   "expected_ids": [
+    "6",
+    "7"
+   ],
+   "expected_points": [
+    6,
+    5
+   ],
+   "unranked_ids": [
+    "6",
+    "7"
+   ],
+   "why": "row 6: classes and 2026-12-05 sit past char 500 (an excerpt-only scorer gives 2 and puts 7 first); row 7: date in the title only"
+  },
+  {
+   "name": "D: a '30 Nov' row date",
+   "question": "Is the fee due on Nov 30?",
+   "arguments": {
+    "query": "fee",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "fee",
+     "due"
+    ],
+    "dates": [
+     "11-30"
+    ],
+    "numbers": []
+   },
+   "possible": 5,
+   "expected_ids": [
+    "8",
+    "10"
+   ],
+   "expected_points": [
+    4,
+    2
+   ],
+   "unranked_ids": [
+    "10",
+    "8"
+   ],
+   "why": "row 8: fee + '30 Nov'; row 10 (newer): fee + due"
+  },
+  {
+   "name": "E: a range anchors its first day as a date and the second as a number",
+   "question": "Is the library open November 16-18?",
+   "arguments": {
+    "query": "library",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "library",
+     "open"
+    ],
+    "dates": [
+     "11-16"
+    ],
+    "numbers": [
+     "18"
+    ]
+   },
+   "possible": 8,
+   "expected_ids": [
+    "1",
+    "11"
+   ],
+   "expected_points": [
+    5,
+    4
+   ],
+   "unranked_ids": [
+    "11",
+    "1"
+   ],
+   "why": "row 1: library+open+11-16; row 11: library + day number 18 of its November 18"
+  },
+  {
+   "name": "F: a number anchor; digit tokens are not words",
+   "question": "Is the fee 500 pesos?",
+   "arguments": {
+    "query": "fee",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "fee",
+     "pesos"
+    ],
+    "dates": [],
+    "numbers": [
+     "500"
+    ]
+   },
+   "possible": 5,
+   "expected_ids": [
+    "8",
+    "10"
+   ],
+   "expected_points": [
+    5,
+    1
+   ],
+   "unranked_ids": [
+    "10",
+    "8"
+   ],
+   "why": "row 8: fee+pesos+500"
+  },
+  {
+   "name": "G: an all-stopword question keeps today's order",
+   "question": "What is the announcement about?",
+   "arguments": {
+    "query": "office",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [],
+    "dates": [],
+    "numbers": []
+   },
+   "possible": 0,
+   "expected_ids": [
+    "12",
+    "2",
+    "5"
+   ],
+   "expected_points": [
+    0,
+    0,
+    0
+   ],
+   "unranked_ids": [
+    "12",
+    "2",
+    "5"
+   ],
+   "why": "possible 0: every row scores 0, newest first"
+  },
+  {
+   "name": "H: Taglish function words dropped",
+   "question": "Kailan po ang outing ng mga offices?",
+   "arguments": {
+    "query": "offices",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "outing",
+     "offices"
+    ],
+    "dates": [],
+    "numbers": []
+   },
+   "possible": 2,
+   "expected_ids": [
+    "2",
+    "12",
+    "5"
+   ],
+   "expected_points": [
+    2,
+    1,
+    1
+   ],
+   "unranked_ids": [
+    "12",
+    "2",
+    "5"
+   ],
+   "why": "rows 12 and 5 find 'offices' through the plural alternative 'office'; their tie goes to the newer row 12"
+  },
+  {
+   "name": "I: a plural found ('offices' -> 'office'); a points tie broken by newest",
+   "question": "Which offices close for the outing?",
+   "arguments": {
+    "query": "office",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "offices",
+     "close",
+     "outing"
+    ],
+    "dates": [],
+    "numbers": []
+   },
+   "possible": 3,
+   "expected_ids": [
+    "2",
+    "12",
+    "5"
+   ],
+   "expected_points": [
+    3,
+    1,
+    1
+   ],
+   "unranked_ids": [
+    "12",
+    "2",
+    "5"
+   ],
+   "why": "row 2 (q01 shape): offices+close (in 'closed')+outing"
+  },
+  {
+   "name": "J: one-character tokens are dropped",
+   "question": "What's the office's schedule?",
+   "arguments": {
+    "query": "office",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "office",
+     "schedule"
+    ],
+    "dates": [],
+    "numbers": []
+   },
+   "possible": 2,
+   "expected_ids": [
+    "12",
+    "2",
+    "5"
+   ],
+   "expected_points": [
+    1,
+    1,
+    1
+   ],
+   "unranked_ids": [
+    "12",
+    "2",
+    "5"
+   ],
+   "why": "the 's' tokens are dropped, so possible is 2, not 3"
+  },
+  {
+   "name": "K: an ISO date in the question gives a date and its year",
+   "question": "Anything on 2026-12-05?",
+   "arguments": {
+    "query": "make-up",
+    "days": 30
+   },
+   "expected_terms": {
+    "words": [
+     "anything"
+    ],
+    "dates": [
+     "12-05"
+    ],
+    "numbers": [
+     "2026"
+    ]
+   },
+   "possible": 7,
+   "expected_ids": [
+    "6",
+    "7"
+   ],
+   "expected_points": [
+    6,
+    3
+   ],
+   "unranked_ids": [
+    "6",
+    "7"
+   ],
+   "why": "row 6: 12-05 and 2026; row 7: 12-05 only"
+  }
+ ]
+}
