@@ -53,6 +53,14 @@ def test_identical_records_verify(tmp_path, capsys):
     assert module.verify_baseline(write(tmp_path, [record()]), [record()])
 
 
+def test_in_memory_tuples_equal_the_saved_lists(tmp_path, capsys):
+    """The first real verify (2026-11-14) failed on this: tuple != list."""
+    module = load()
+    saved = record(score={"wrong": [], "result_ids": ["1", "2"]})
+    fresh = record(score={"wrong": (), "result_ids": ("1", "2")})
+    assert module.verify_baseline(write(tmp_path, [saved]), [fresh])
+
+
 def test_any_difference_fails_and_is_named(tmp_path, capsys):
     module = load()
     base = write(tmp_path, [record()])

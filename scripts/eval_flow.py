@@ -359,7 +359,8 @@ def verify_baseline(base_path: Path, records: list[dict]) -> bool:
         (c["set"], c["id"]): c
         for c in json.loads(base_path.read_text(encoding="utf-8"))["cases"]
     }
-    new = {(r["set"], r["id"]): r for r in records}
+    # Compare as JSON: the in-memory scores hold tuples, the saved run lists.
+    new = {(r["set"], r["id"]): json.loads(json.dumps(r)) for r in records}
     if set(base) != set(new):
         print("VERIFY: the case lists differ")
         return False
