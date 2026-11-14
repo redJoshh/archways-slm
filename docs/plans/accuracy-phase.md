@@ -603,3 +603,37 @@ Committed with the hand-written `tests/vectors/gate_vectors.json`, **before any 
 - **Consequence:** an overlap-based answerability gate (gate_v1) would suppress correct answers for Taglish speakers. That is why (d) was dropped: θ = 1/4 already lost taglish-02.
 - **rank_v1 is unaffected:** it only reorders the rows the matcher already found. With weak overlap everywhere, the rows tie and the order falls back to newest first, as before rank_v1.
 - **For any later aboutness check:** it must not rely on literal word overlap with the question alone. Taglish questions need to be part of its fit set from the start.
+
+## 2026-11-14: excerpt_v2_centred rule, pre-registered (section 3 (e))
+
+Committed with `tests/vectors/window_vectors.json` (13 cases; positions worked out by hand), **before any window code or run**. On top of rank_v1 + and_v4 (kept). It makes section 3 (e) exact. All lengths and positions are in code points of the row's plain-text body (the whole body, as indexed).
+
+1. **Guard:** if lowercasing the body changes its length in code points, the excerpt stays the first 500 (vector E10). Positions found in the lowercased text would not map back.
+2. **Anchor,** searched in the lowercased body, in this priority:
+   - **a. A date anchor:** the date spans `claims()` parses in the body (the same patterns and blanking order) whose (month, day) is one of the question's dates. The earliest span wins.
+   - **b. Otherwise a question content word:** for each of rank_v1's content words, the earliest substring match of the word or any of its synonyms under the matcher in use, or of its plural alternative as a whole word. The earliest match over all words wins (ties: the shorter match first).
+   - **c. Otherwise a query word:** the same, over the matcher's groups for the model's query.
+   - **d.** No anchor at all → the first 500.
+3. **No move:** if the anchor ends at or before 500, the excerpt is the first 500, unchanged (E1, E11).
+4. **Window:**
+   - `start = max(0, min(anchor_start − 250, length − 500))`.
+   - If `start > 0` and the code point before `start` is not a space (U+0020), `start` moves to just after the first space in `[start, start + 30)`, if there is one (E2; E7: none, so no move).
+   - The excerpt is "…" (U+2026) followed by 499 code points from `start` (fewer at the end of the body). The total is at most 500.
+5. **Scope:** the excerpt of every returned result is rebuilt this way, each from its own body. Titles are unchanged. The guard's supported claims follow the new excerpts, because they are read from the results.
+6. **Parity:**
+   - Python: the window function, plus `search_feed(..., excerpt="excerpt_v2_centred")`. `claims_and_rest` also returns the date spans.
+   - TS: guard-ts `claimsAndRest` returns the same spans; `IndexRow` keeps the original-case plain body; `searchRows` / `makeFeedSearch` take the excerpt rule.
+   - Both pass `window_vectors.json` and an integration vector through the search, on Node and the Hermes CLI. The phone default stays the first 500.
+7. **Mutations to check:**
+   - word priority over dates (E5)
+   - no snap
+   - snap backward
+   - UTF-16 units in place of code points (E9)
+   - the 500 boundary as `<` in place of `≤` (a vector with the anchor ending exactly at 500 is added with the code if none covers it)
+8. **Keep or drop:**
+   - The section 3 "nothing gets worse" rule on every dev set **with AI-correct case by case** (the user's (d) condition, applied from (d) onwards), against the rank_v1 + and_v4 run.
+   - The baseline's query replies are reused, and the answer calls re-run cold.
+   - **e2e-003 is reported outside the check** (the exception recorded 2026-11-14).
+9. **Must report:**
+   - q08: whether the banned items reach the excerpt, and the answer.
+   - **The long-body trap explicitly** (the 2026-10-31 risk that a window surfaces its hidden fact): e2e-003's anchor, whether its hidden deadline enters the excerpt, its path and reply. Also any other case whose excerpt now contains a fact past character 500 that it didn't before.
