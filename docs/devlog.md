@@ -19,6 +19,40 @@ Template:
 
 ---
 
+## 2026-11-14: Fix (g) strip_nf_v1 pre-registered; Step 3 (d) gate_v1 pre-registered, built, fitted: DROPPED (θ* = 0)
+
+- **Date:** 2026-11-14 (+08:00)
+- **Pre-registered (`36a4c51`), before any gate code, fit or run:**
+  - **(g) strip_nf_v1:** remove the exact not-found sentence from a reply that also has other text; tested after (f). 9 hand-written vectors in `tests/vectors/strip_nf_vectors.json`. Evidence: flow q13.
+  - **(d) gate_v1:**
+    - The rule; the θ grid {0, 1/4, 1/3, 1/2, 2/3, 3/4}.
+    - The fit: the largest θ losing **no correct AI answer** on e2e34 + taglish10, with no helpful drop and no new unsafe (user's condition).
+    - The keep check adds AI-correct case by case (user).
+    - The `not_about` text, and how scorer_v1 scores it (as the plain list; section 0 names the path).
+    - 11 hand-written vectors in `tests/vectors/gate_vectors.json`.
+- **G6 (`c7d0e24`):** a hand-written vector, added after the mutation "excerpt in place of the body" survived G1–G5, before any fit.
+- **Built (`4047827`):**
+  - `rank.gate_v1` / TS `gateV1`.
+  - `eval_flow.py --gate-fit`, `--gate-apply` (exact replay; the gate only removes the answer call) and `--nothing-worse --correct-case-by-case`.
+  - Tests: the replay judges the first result, uses the run's matcher synonyms, scores `not_about` as the list, and never gates paths without an answer call. Case-by-case AI-correct catches a correct answer turned into a list where helpfulness can't.
+- **Verified:**
+  - Gate vectors 12/12 in Python, Node (283/283 in total) and Hermes.
+  - **Mutations,** all caught and restored:
+    - Python: `≥` → `>` → 4 fail; excerpt → 1 (after G6); second result → 2; v3 synonyms under and_v4 → 1.
+    - TS: `≥` → `>` → 1.
+  - `uv run pytest -q` → `1320 passed, 2 skipped`.
+- **Fit (no model calls) on `and_v4-1.json`:** only θ = 0 passes.
+  - θ = 1/4 already gates taglish-02, a correct answer: its top row scores 1 of 8 (Taglish spellings, plus the "2nd" number anchor).
+  - Higher θ lose up to 8 correct answers. The helpful count stays 27 at every θ, because the list is still shown.
+- **Decision:** θ\* = 0, so **(d) DROPPED.**
+  - The `not_about` path is not built.
+  - **"retry_v1 + gate_v1 combined" is not run. Retry stays off for good**, as registered.
+  - flow13 was not read out.
+- **Commits:** `36a4c51`, `c7d0e24`, `4047827`, this `docs:` commit. Not pushed.
+- **Open questions / next:** (e) excerpt_v2_centred on top of rank_v1 + and_v4, with the e2e-003 exception (pre-registered first).
+
+---
+
 ## 2026-11-14: Pre-registered "retry_v1 + gate_v1 combined"; Step 3 (c) and_v4: pre-registered, built, run: KEPT
 
 - **Date:** 2026-11-14 (+08:00)

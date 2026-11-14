@@ -565,3 +565,32 @@ Committed with the hand-written `tests/vectors/gate_vectors.json`, **before any 
    - A confirming cold run with the integrated flow must then reproduce the replay case by case.
 7. **Mutations to check:** `≥` → `>`; the excerpt in place of the whole body; the second result in place of the first; v3 synonyms under and_v4.
 8. **Then:** if (d) is kept, the registered "retry_v1 + gate_v1 combined" experiment follows, with θ\* unchanged.
+
+## 2026-11-14: gate_v1 result: DROPPED (θ* = 0 by the pre-registered fit)
+
+- **Before the fit:**
+  - The decision function was built in Python and TS (`4047827`). It passes `gate_vectors.json` on Python, Node and Hermes.
+  - G6 was added by hand (`c7d0e24`) after the mutation "excerpt in place of the body" survived G1–G5.
+  - All pre-registered mutations were caught: `≥` → `>`, the excerpt, the second result, and v3 synonyms under and_v4.
+- **Fit:** `eval_flow.py --gate-fit data/local/runs/and_v4-1.json`, an exact replay on e2e34 + taglish10 against θ = 0.
+
+  | θ | Gated | AI-correct lost | Helpful | New unsafe | Passes |
+  |---|---|---|---|---|---|
+  | 0 | — | — | 27 → 27 | — | yes |
+  | 1/4 | taglish-02 | taglish-02 | 27 → 27 | — | no |
+  | 1/3 | e2e-021, taglish-02 | taglish-02 | 27 → 27 | — | no |
+  | 1/2 | 5 cases | e2e-026, taglish-02 | 27 → 27 | — | no |
+  | 2/3 | 7 cases | 4 | 27 → 27 | — | no |
+  | 3/4 | 11 cases | 8 | 27 → 27 | — | no |
+
+- **θ\* = 0: the gate does nothing, so (d) is dropped** (rule 4). flow13 was not read out; the rule needs θ\* > 0 for that.
+- **Why the smallest step fails:**
+  - taglish-02 ("anu oras ung advising sa 2nd yr?") is correct at θ = 0, but its top row scores 1 of 8.
+  - The informal spellings and "yr" are not in the row, and "2nd" is a number anchor (2, weight 3) that the row doesn't contain.
+  - This is the Taglish risk recorded for (d).
+  - The helpful count never fell, because a gated case still shows its list. That is why the fit also required no correct AI answer to be lost (user, 2026-11-14).
+- **Consequences:**
+  - The `not_about` flow path is **not built** (it was conditional on keeping (d)).
+  - The decision function and the replay stay in the repo, unused.
+  - The pre-registered **"retry_v1 + gate_v1 combined" is not run**, because (d) was not kept. **Retry stays off for good**, as registered.
+- **Next:** (e) excerpt_v2_centred, on top of rank_v1 + and_v4, with the e2e-003 exception as recorded.
