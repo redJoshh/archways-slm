@@ -19,6 +19,40 @@ Template:
 
 ---
 
+## 2026-11-14: Harness drift check (VERIFY OK 57/57); Step 3 (b) retry_v1 pre-registered, built, run: DROPPED
+
+- **Date:** 2026-11-14 (+08:00)
+- **Drift check (user request):**
+  - **New `eval_flow.py --verify-baseline BASE` (`fa8e238`):**
+    - It runs the baseline configuration (rank and retry off) with BASE's query replies and re-runs the answer calls cold.
+    - Every case's arguments, search results, case tokens, answer reply, path, final text and score must equal BASE, or it exits 1.
+    - Tests pin the comparison and the query-call path a reuse run skips.
+  - **The first run reported FAILED:** 0/57 identical, on `score` only. Paths, texts, replies and totals all matched.
+    - The cause was a bug in the comparison: in-memory tuples against the saved JSON lists.
+    - Fixed in `9168e58`, with a regression test. The first run's saved records then compared 57/57 identical.
+  - **Clean end-to-end run at `9168e58`:** `VERIFY OK`, 57/57 identical (`data/local/runs/verify-baseline-2.json`).
+  - **Rule added** (plan dated section, ADR 0007): this check must pass at the same commit, with a clean tree, before the final held-out run.
+- **retry_v1:**
+  - **Pre-registered (`60f54c1`), before any code:** the exact rule and 9 hand-written vectors (`tests/vectors/retry_vectors.json`).
+  - **Built (`17937f3`):** Python `feedindex.search_feed_retry`, TS `retry.ts` / `searchWithRetry`, `makeFeedSearch(..., rank, retry, onSearch)` (phone default off), and `eval_flow.py --retry`. `--replay` can run the retry.
+  - **Vectors:** 9/9 in Python, in Node (278/278 in total) and in Hermes (retry 9/9; the others unchanged).
+  - **Mutations,** all caught and restored:
+    - Python: AND in place of OR → 4 fail; retry after rows → 1; days ignored → 1; newest in place of rank → 1; retry with no words → 2.
+    - TS: AND → 1; retry after rows → 1.
+  - **Run:** `retry_v1-1.json`, header `17937f3-dirty`. The comparison fix was committed in the seconds between the queued job's clean `git status` and the header. It is outside the run path.
+  - **Result against rank_v1:**
+    - helpful 38 → 41/42; AI correct 26/28 → 28/34; coverage 41 → 45/45
+    - traps clean 14 → 11/14; traps with an unrelated list 2 → 6/14
+    - Unsafe (scored) 0 → **1/57**: q13, answerable. The retry put row 51 first; the reply said "November 20, 2026" instead of January 15.
+    - Traps answered: e2e-003, e2e-018, q10.
+  - **Decision:** DROPPED by the pre-registered rule (an answerable case broke), not held. The code stays, off.
+  - **Observation:** e2e-018's reply invents "the enrollment fee waiver program is still accepting applications". It has no date, number or office, so scorer_v1 doesn't flag it; a human review would.
+- **How it was verified:** `uv run pytest -q` → `1286 passed, 2 skipped`. ruff clean. Generators `--check` up to date.
+- **Commits:** `fa8e238`, `60f54c1`, `17937f3`, `9168e58`, this `docs:` commit. Not pushed.
+- **Open questions / next:** (c) and_v4 on top of rank_v1 alone (pre-registered first).
+
+---
+
 ## 2026-11-14: Step 3 (a) rank_v1: pre-registered, built (Python, Node, Hermes), run on the dev sets: KEPT
 
 - **Date:** 2026-11-14 (+08:00)

@@ -37,6 +37,7 @@ The three metrics of `accuracy-phase.md` section 0 (Helpfulness, AI answer accur
 - **Private report (amendment, 2026-11-14):** `--private-report PATH` writes a per-case report to a path outside the repository, for the user's manual review. Only the user reads it; it never enters the repo, the devlog or a chat. Without the option nothing is written.
 - **Frozen at `9bf6e72`:** scorer_v1 and the held-out script.
 - **Human review (2026-11-14):** the user reviews the private report of both held-out runs. Each run reports Unsafe as scored and as human-reviewed, side by side. scorer_v1 can't detect a reply that contradicts its source on a yes/no question, or one that mixes up which listed announcement says what.
+- **Drift check (2026-11-14):** before the final run, `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` must print `VERIFY OK` at the same commit, with a clean tree. It proves the baseline configuration still reproduces the frozen dev baseline case by case.
 - **No pass/fail thresholds** are set in this ADR. The held-out run reports the baseline and final counts side by side. With so few cases it is a check that the dev-set gains carry over, not an error rate.
 
 ## Consequences

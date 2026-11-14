@@ -421,3 +421,40 @@ Committed with the hand-written `tests/vectors/retry_vectors.json`, **before any
    - If it breaks the rule **only on traps** (a trap no longer clean, or a new unsafe trap), (b) is **held** and re-tested together with (d), as one step (b+d).
    - If it breaks an answerable case, it is **dropped**.
    - The run reuses the baseline's query replies and re-runs the answer calls cold.
+
+## 2026-11-14 (user): harness drift check before the final held-out run
+
+- **Why:** the held-out script imports `eval_flow.run_case`, whose file changed after the `9bf6e72` freeze (rank, reuse, retry options). The default path must be proven unchanged.
+- **The check:** `uv run python scripts/eval_flow.py --verify-baseline data/local/runs/baseline-1.json --out data/local/runs/<name>.json`.
+  - It runs the baseline configuration (rank off, retry off) on every dev case with the frozen baseline's query replies, and re-runs the answer calls cold.
+  - It requires every case's arguments, search results, case tokens, answer reply, path, final text and full score to equal `baseline-1.json`. Otherwise it exits 1.
+  - Tests (`tests/test_verify_baseline.py`) also pin the part a reuse run skips: with no saved reply, `run_case` makes the query call with `flow()`'s own prompt and searches newest first.
+- **Rule:** this check must print `VERIFY OK` at the commit the final held-out run uses, with a clean tree, before that run.
+- **Result, 2026-11-14:**
+  - The first run (`fa8e238`) reported 0/57 identical on `score` only. The cause was a bug in the comparison: in-memory tuples against saved lists.
+  - Fixed in `9168e58`, with a test. The first run's saved records then compared 57/57 identical.
+  - A clean end-to-end run at `9168e58` (clean tree): **VERIFY OK, 57/57 identical.**
+
+## 2026-11-14: retry_v1 result: DROPPED (by the pre-registered rule)
+
+- **Run:** `--rank rank_v1 --retry retry_v1 --reuse-queries baseline-1.json` (`data/local/runs/retry_v1-1.json`).
+  - The header says `17937f3-dirty`: the comparison fix (`9168e58`) was committed in the seconds between the queued job's clean `git status` and the header.
+  - The only difference is inside `verify_baseline()`, which this run never calls. The run path is `17937f3`'s.
+- **Retrieval replay:**
+  - All four answerable zero-result cases reached their source: e2e-014 4th, e2e-023 1st, taglish-04 1st, q13 3rd.
+  - Most traps got a list.
+- **Against rank_v1:**
+
+  | Set | Helpful | AI correct | Wrong AI answers | New unsafe | Traps clean |
+  |---|---|---|---|---|---|
+  | e2e34 | 22 → 24 | 18 → 20 (of 22) | 0 → 0 | none | 10 → 8 of 10 |
+  | taglish10 | 5 → 6 | 3 → 3 | 0 → 0 | none | 3 → 3 of 3 |
+  | flow13 | 11 → 11 | 5 → 5 (of 9) | 0 → 1 | **q13** | 1 → 0 of 1 |
+
+  - Total: helpful 38 → 41/42, coverage 41 → 45/45, traps clean 14 → 11/14, traps with an unrelated list 2 → 6/14, Unsafe (scored) 0 → 1/57.
+  - **q13 (answerable) became unsafe.** The retry ranked row 51 first and row 14 3rd. The reply took 51's date ("November 20, 2026") instead of January 15.
+  - **Traps no longer clean:** e2e-003, e2e-018, q10 got AI answers.
+- **Decision:** the rule says "if it breaks an answerable case, it is dropped". q13 is answerable and newly unsafe, so retry_v1 is **dropped**, not held for (d).
+  - Its code stays in the repo, off by default (phone default off, harness `--retry` off). Any later retry is a new pre-registered version.
+- **Observation (not a scorer change):** e2e-018's reply states "The enrollment fee waiver program is still accepting applications." It is an invented fact on a trap, with no date, number or office, so scorer_v1 does not flag it. A human review would. This is a third kind of fact scorer_v1 can't see, next to the two recorded limitations.
+- **Next:** (c) and_v4, tested on top of rank_v1 alone.
