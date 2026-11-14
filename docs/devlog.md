@@ -19,6 +19,52 @@ Template:
 
 ---
 
+## 2026-11-14: Step 3 (a) rank_v1: pre-registered, built (Python, Node, Hermes), run on the dev sets: KEPT
+
+- **Date:** 2026-11-14 (+08:00)
+- **Pre-registration (`440b771`), before any code or run:**
+  - The exact rule, a dated section in `accuracy-phase.md`. It makes the post-UAT plan's text exact:
+    - a content word is tested on title and body separately, like the matcher
+    - one-character tokens are dropped
+    - claims run on the lowercased title + "\n" + body
+    - a "16-18" range gives the date 11-16 and the number 18, as `claims()` parses it
+  - The frozen `contracts/rank_stopwords_v1.json`.
+  - 11 hand-written vectors, `tests/vectors/rank_vectors.json`. Every expected value was worked out by hand.
+- **Built (`aff90dc`):**
+  - **Python:**
+    - `e2escore.claims_and_rest()` (`claims()` unchanged; guard vectors pass).
+    - New `rank.py`.
+    - `search_announcements` / `search_feed` take `question=` and `rank=` (and_v3 only).
+  - **TS:**
+    - guard-ts exports `claims` and `claimsAndRest`. Guard results are unchanged: Node 461/461, Hermes 453/453.
+    - New `rank.ts`. Row claims are cached per index row.
+    - `searchRows(..., score?)`.
+    - `makeFeedSearch(index, now, rank = null)`: the phone default stays newest first.
+    - `AssistantDeps.search(args, { question })`.
+    - `export_search_ts.py` adds `RANK`, `ANCHOR_WEIGHT`, `RANK_STOPWORDS` and `DIGIT_RANGES` (Unicode Nd).
+  - **Harness:**
+    - `eval_flow.py --rank`, `--reuse-queries` (`92b300e`): the baseline's query replies. The same prompt, model digest and Ollama version are checked.
+    - `--replay` (retrieval only).
+    - `--nothing-worse` (`c9dc370`): the section 3 keep rule, with tests.
+- **How it was verified:**
+  - The hand-written vectors pass in Python (35 tests), Node (275/275 in total) and Hermes (rank 55/55, assistant 247/247, feed 194/194, runtime scenario as expected).
+  - `uv run pytest -q` → `1266 passed, 2 skipped`, plus 5 nothing-worse tests. ruff clean. Generators `--check` up to date.
+  - **Mutations,** all restored and checked with `cmp`:
+    - Python: weight 1 → 14 fail; one-character tokens kept → 2; excerpt in place of the full text → 3; tie-break reversed → 16; ranking after the cut → 1.
+    - TS: weight 1 → 1 fail; score order reversed → 1; one-character tokens kept → 1.
+    - The first form of the TS one-character mutation didn't compile, so it proved nothing. It was re-run in a form that compiles.
+- **Dev result** (commit `92b300e`, clean tree, baseline query replies, answer calls cold):
+  - helpful 37/42 → 38/42; AI correct 25/28 → 26/28; Unsafe (scored) 1/57 → 0/57; traps clean 14/14 → 14/14; coverage 40/45 → 41/45.
+  - **Nothing got worse on any set.** The only changed answer is q01: it now names the right office from row 18.
+  - q11: row 16 is 1st, but the reply is still not found. That is (f)'s target.
+- **Decision:** kept by the pre-registered rule. Every later step runs with rank_v1 on.
+  - The phone default flips only at the final freeze.
+  - The held-out set was not touched.
+- **Commits:** `440b771`, `aff90dc`, `92b300e`, `c9dc370`, this `docs:` commit. Not pushed.
+- **Open questions / next:** Step 3 (b) retry_v1. It is pre-registered first.
+
+---
+
 ## 2026-11-14: Held-out baseline (run 1 of 2, by the user)
 
 - **Date:** 2026-11-14 (+08:00)

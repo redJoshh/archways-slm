@@ -371,3 +371,24 @@ Committed with `contracts/rank_stopwords_v1.json` and the hand-written `tests/ve
 10. **Keep or drop:** kept only if the "nothing gets worse" rule (section 3) holds on e2e34, taglish10 and flow13 against the frozen baseline.
     - The query replies are the baseline's: the prompts are unchanged, and the baseline was deterministic.
     - The answer calls are re-run cold.
+
+## 2026-11-14: rank_v1 result: KEPT (by the pre-registered rule)
+
+- **Run:** `eval_flow.py --rank rank_v1 --reuse-queries baseline-1.json`, commit `92b300e`, clean tree, the frozen dev baseline's query replies, answer calls cold. Run file `data/local/runs/rank_v1-1.json`.
+- **Retrieval replay (no model):**
+  - q01: row 18 went from cut to 1st. q11: row 16 from 5th to 1st. e2e-032: its source from 2nd to 1st.
+  - Order changed, but no source row lost its place, in e2e-021 (trap), taglish-03 and q11's other rows. Nothing else changed.
+- **"Nothing gets worse": OK on every set.**
+
+  | Set | Helpful | AI correct | Wrong AI answers | New unsafe | Traps clean |
+  |---|---|---|---|---|---|
+  | e2e34 | 22 → 22 | 18 → 18 | 0 → 0 | none | 10/10 → 10/10 |
+  | taglish10 | 5 → 5 | 3 → 3 | 0 → 0 | none | 3/3 → 3/3 |
+  | flow13 | 10 → 11 | 4 → 5 | 1 → 0 | none | 1/1 → 1/1 |
+  | **Total** | **37/42 → 38/42** | **25/28 → 26/28** | — | — | 14/14 → 14/14 |
+
+  - Unsafe (scored) 1/57 → 0/57. Coverage 40/45 → 41/45. Paths unchanged in count.
+  - The only answer reply that changed is q01's. It now names the Office of the Secretary-General, from row 18: helpful, correct, no longer unsafe.
+  - q11 is still `answer_not_found` with row 16 now 1st: the model says not found with the right row first. That is (f)'s target.
+- **Decision:** rank_v1 is kept. Every later step is tested with rank_v1 on.
+- **Not yet changed:** the phone default stays newest first (`makeFeedSearch` rank null) until the final freeze of all kept versions.
