@@ -337,6 +337,35 @@ def nothing_worse(base_path: Path, new_path: Path, exclude: set[str]) -> bool:
     return ok
 
 
+VERIFY_KEYS = ("arguments", "search", "case_tokens", "answer_reply", "path", "text")
+
+
+def verify_baseline(base_path: Path, records: list[dict]) -> bool:
+    """Every case's path, final text, score and replies equal the frozen run's."""
+    base = {
+        (c["set"], c["id"]): c
+        for c in json.loads(base_path.read_text(encoding="utf-8"))["cases"]
+    }
+    new = {(r["set"], r["id"]): r for r in records}
+    if set(base) != set(new):
+        print("VERIFY: the case lists differ")
+        return False
+    differ = []
+    for key, b in base.items():
+        fields = [k for k in VERIFY_KEYS if b[k] != new[key][k]]
+        if b["score"] != new[key]["score"]:
+            fields.append("score")
+        if fields:
+            differ.append(f"{key[1]} ({', '.join(fields)})")
+    print(
+        f"VERIFY against {base_path.name}: cases {len(base)}  "
+        f"identical {len(base) - len(differ)}"
+    )
+    for line in differ:
+        print(f"  differs: {line}")
+    return not differ
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path)
@@ -347,6 +376,12 @@ def main() -> None:
     parser.add_argument("--rank", choices=["rank_v1"], default=None)
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
     parser.add_argument("--replay", type=Path, metavar="RUN")
+    parser.add_argument(
+        "--verify-baseline",
+        type=Path,
+        metavar="BASE",
+        help="baseline configuration with BASE's query replies; must equal BASE",
+    )
     parser.add_argument("--nothing-worse", nargs=2, type=Path, metavar=("BASE", "NEW"))
     parser.add_argument("--exclude", default="", help="ids reported outside the check")
     args = parser.parse_args()
@@ -364,6 +399,12 @@ def main() -> None:
         return
     if args.out is None:
         parser.error("--out is required")
+    if args.verify_baseline is not None:
+        if args.rank is not None or args.reuse_queries is not None:
+            parser.error("--verify-baseline runs the baseline configuration only")
+        if args.sets != ",".join(SETS) or args.ids:
+            parser.error("--verify-baseline runs every case of every dev set")
+        args.reuse_queries = args.verify_baseline
     out = args.out.resolve()
     if not out.is_relative_to(LOCAL.resolve()):
         sys.exit("--out must be inside data/local/ (gitignored)")
@@ -500,6 +541,13 @@ def main() -> None:
         json.dumps(report, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
     )
     print(f"wrote {len(records)} cases to {out.relative_to(ROOT)}")
+    if args.verify_baseline is not None:
+        base_header = json.loads(args.verify_baseline.read_text(encoding="utf-8"))
+        if base_header["header"]["prompts"] != header["prompts"]:
+            sys.exit("VERIFY: the prompts differ from the baseline's")
+        if not verify_baseline(args.verify_baseline, records):
+            sys.exit("VERIFY FAILED: the baseline configuration no longer reproduces")
+        print("VERIFY OK: the baseline configuration reproduces the frozen baseline")
 
 
 if __name__ == "__main__":
