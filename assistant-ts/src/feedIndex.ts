@@ -32,6 +32,7 @@
 
 import type { Announcement } from "./render.ts";
 import { feedRow } from "./feed.ts";
+import { rankScorer, type RankVersion } from "./rank.ts";
 import { searchRows, type IndexRow } from "./search.ts";
 
 export class HttpError extends Error {
@@ -90,7 +91,8 @@ export interface FeedIndex {
   ensure: () => Promise<IndexReport>;
   rebuild: () => Promise<IndexReport>;
   clear: () => void;
-  search: (args: unknown, nowMs?: number) => Announcement[];
+  /** score: searchRows's optional per-row score (rank.ts rankScorer). */
+  search: (args: unknown, nowMs?: number, score?: (row: IndexRow) => number) => Announcement[];
   size: () => number;
 }
 
@@ -259,10 +261,10 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
       refreshedAt = 0;
       inFlight = null;
     },
-    search: (args: unknown, nowMs?: number) => {
+    search: (args: unknown, nowMs?: number, score?: (row: IndexRow) => number) => {
       const rows: IndexRow[] = [];
       if (entries) entries.forEach((entry) => rows.push(entry.row));
-      return searchRows(rows, args, nowMs === undefined ? clock() : nowMs);
+      return searchRows(rows, args, nowMs === undefined ? clock() : nowMs, score);
     },
     size: () => (entries ? entries.size : 0),
   };
@@ -273,10 +275,20 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
  * (ensure(): a refresh or a full build only when due), then searches it.
  * The refresh time counts in the question's elapsed time, so the budget
  * sees it.
+ *
+ * rank: null keeps newest first (the frozen UAT setting until rank_v1 is
+ * kept, accuracy-phase.md); "rank_v1" orders by the raw question, which
+ * askAssistant passes as the second argument.
  */
-export function makeFeedSearch(index: FeedIndex, nowMs: () => number = Date.now) {
-  return async (args: unknown): Promise<unknown> => {
+export function makeFeedSearch(
+  index: FeedIndex,
+  nowMs: () => number = Date.now,
+  rank: RankVersion | null = null,
+) {
+  return async (args: unknown, context?: { question: string }): Promise<unknown> => {
     await index.ensure();
-    return index.search(args, nowMs());
+    if (rank !== null && context === undefined) throw new Error("rank needs the question");
+    const score = rank === null ? undefined : rankScorer(rank, (context as { question: string }).question);
+    return index.search(args, nowMs(), score);
   };
 }

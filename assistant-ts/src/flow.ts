@@ -261,8 +261,11 @@ export interface AssistantDeps {
   nowMs: () => number;
   /** Runs one model call (see session.ts makeComplete). */
   complete: (call: ModelCall) => Promise<Completion>;
-  /** Calls Spring's search_announcements with these arguments; returns the JSON. */
-  search: (args: SearchArguments) => Promise<unknown>;
+  /**
+   * Searches with these arguments; returns the JSON. context.question is the
+   * raw question (rank_v1 ranks by it; feedIndex makeFeedSearch).
+   */
+  search: (args: SearchArguments, context: { question: string }) => Promise<unknown>;
   /** Qwen tokens in text: llama.rn context.tokenize(text).tokens.length. */
   countTokens: (text: string) => Promise<number>;
   /** Monotonic-ish clock for timings; defaults to Date.now. */
@@ -334,7 +337,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
             if (step.kind === "answer" && deps.speed) deps.speed.update(completion.timings);
             if (step.kind === "query" && deps.querySpeed) deps.querySpeed.update(completion.timings);
           }
-        } else if (step.kind === "search") value = await deps.search(step.arguments);
+        } else if (step.kind === "search") value = await deps.search(step.arguments, { question: question });
         else {
           value = await deps.countTokens(step.casePart);
           if (typeof value === "number") caseTokens = value;

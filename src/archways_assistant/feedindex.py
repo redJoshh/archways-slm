@@ -124,6 +124,15 @@ def feed_row(detail) -> tuple[dict, bool] | None:
 
 
 def search_feed(
-    rows: list[dict], arguments: dict, now: datetime, contract: dict
+    rows: list[dict],
+    arguments: dict,
+    now: datetime,
+    contract: dict,
+    *,
+    question: str | None = None,
+    rank: str | None = None,
 ) -> list[dict]:
-    return search_announcements(rows, arguments, now, contract, matcher="and_v3")
+    """and_v3 over feed rows; rank "rank_v1" orders by the question first."""
+    return search_announcements(
+        rows, arguments, now, contract, matcher="and_v3", question=question, rank=rank
+    )

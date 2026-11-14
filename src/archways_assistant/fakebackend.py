@@ -270,12 +270,25 @@ def search_announcements(
     now: datetime,
     contract: dict,
     matcher: str = DEFAULT_MATCHER,
+    *,
+    question: str | None = None,
+    rank: str | None = None,
 ) -> list[dict]:
-    """Run one search over seed rows at now. See the module docstring for the rules."""
+    """Run one search over seed rows at now. See the module docstring for the rules.
+
+    rank "rank_v1" (and_v3 only) orders the matched rows by overlap with the
+    raw question before the cut (rank.py); None keeps newest first.
+    """
     if now.tzinfo is None:
         raise ValueError("now must have a time zone")
     if matcher not in MATCHERS:
         raise ValueError(f"unknown matcher {matcher!r}")
+    if rank is not None:
+        from archways_assistant import rank as ranking  # rank imports this module
+
+        if rank not in ranking.RANKS or matcher != "and_v3" or question is None:
+            raise ValueError("rank_v1 needs matcher and_v3 and the question")
+        terms = ranking.question_terms(question)
     schema = contract["$defs"]["arguments"]
     errors = [
         error.message for error in Draft202012Validator(schema).iter_errors(arguments)
@@ -318,7 +331,8 @@ def search_announcements(
                 or any(whole_word_in(s, title) or whole_word_in(s, body) for s in stems)
                 for subs, stems in words
             ):
-                matches.append((0, row))
+                score = 0 if rank is None else ranking.points(terms, title, body)
+                matches.append((score, row))
         else:
             score = prefix_score(words, row["title"], row["body"])
             if score is not None:

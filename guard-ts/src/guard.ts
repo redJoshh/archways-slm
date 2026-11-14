@@ -166,13 +166,24 @@ function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-interface Claims {
+export interface Claims {
+  /** "MM-DD" keys. */
   dates: { [key: string]: true };
+  /** Canonical decimal strings (no leading zeros). */
   numbers: { [key: string]: true };
 }
 
 /** The (month, day) dates and the other integers in the text. */
-function claims(text: string): Claims {
+export function claims(text: string): Claims {
+  const found = claimsAndRest(text);
+  return { dates: found.dates, numbers: found.numbers };
+}
+
+/**
+ * claims(text), and the text with every parsed date span blanked
+ * (e2escore.claims_and_rest): what rank_v1 reads its content words from.
+ */
+export function claimsAndRest(text: string): Claims & { rest: string } {
   const dates: { [key: string]: true } = {};
   const numbers: { [key: string]: true } = {};
   // Code units; every match is ASCII, so blanking a unit blanks a code point.
@@ -203,7 +214,7 @@ function claims(text: string): Claims {
   while ((token = NUMBER.exec(rest)) !== null) {
     numbers[canonical(token[0])] = true;
   }
-  return { dates, numbers };
+  return { dates, numbers, rest };
 }
 
 /** What a reply may claim: retrieved titles and excerpts, and the question. */

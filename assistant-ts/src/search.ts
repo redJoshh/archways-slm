@@ -10,7 +10,8 @@
  *   AND across groups.
  * - Window: now - days <= published <= now (days default DAYS_DEFAULT).
  * - Order: newest published first, then id ascending; pinned is ignored.
- *   Then limit (default LIMIT_DEFAULT).
+ *   With a score (rank.ts rankScorer, rank_v1), higher score first, then
+ *   that order. Then limit (default LIMIT_DEFAULT): the cut comes after.
  *
  * Word characters are "_", Unicode letters (L*) and decimal digits (Nd),
  * judged per code point by WORD_RANGES, generated from Python's unicodedata,
@@ -125,7 +126,12 @@ function matches(row: IndexRow, groups: [string[], string[]][]): boolean {
  * search_announcements arguments -> contract results, over the index at
  * nowMs. Throws (ContractError) if the arguments break the contract.
  */
-export function searchRows(rows: IndexRow[], args: unknown, nowMs: number): Announcement[] {
+export function searchRows(
+  rows: IndexRow[],
+  args: unknown,
+  nowMs: number,
+  score?: (row: IndexRow) => number,
+): Announcement[] {
   const checked = checkArguments(args);
   const days = checked.days === undefined ? DAYS_DEFAULT : checked.days;
   const limit = checked.limit === undefined ? LIMIT_DEFAULT : checked.limit;
@@ -133,7 +139,14 @@ export function searchRows(rows: IndexRow[], args: unknown, nowMs: number): Anno
   if (groups.length === 0) return [];
   const since = nowMs - days * DAY_MS;
   const found = rows.filter((row) => row.publishedMs <= nowMs && row.publishedMs >= since && matches(row, groups));
+  const scores: Map<IndexRow, number> = new Map();
+  if (score !== undefined) for (const row of found) scores.set(row, score(row));
   found.sort((a, b) => {
+    if (score !== undefined) {
+      const sa = scores.get(a) as number;
+      const sb = scores.get(b) as number;
+      if (sa !== sb) return sb - sa;
+    }
     if (a.publishedMs !== b.publishedMs) return b.publishedMs - a.publishedMs;
     const ia = a.announcement.id;
     const ib = b.announcement.id;

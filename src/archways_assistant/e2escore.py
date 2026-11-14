@@ -203,6 +203,15 @@ def claims(text: str) -> Claims:
 
     A date's year counts as a number; its day does not.
     """
+    return claims_and_rest(text)[0]
+
+
+def claims_and_rest(text: str) -> tuple[Claims, str]:
+    """claims(text), and the text with every parsed date span blanked.
+
+    The rest is what rank_v1 reads its content words from (accuracy-phase.md,
+    rank_v1 rule, step 3): the space-normalised text, dates as spaces.
+    """
     dates = set()
     numbers = set()
     chars = list(text.translate(SPACE_TABLE))
@@ -216,8 +225,9 @@ def claims(text: str) -> Claims:
                 numbers.add(int(match["year"]))
             # Blank the date so its digits aren't read again as numbers.
             chars[match.start() : match.end()] = " " * (match.end() - match.start())
-    numbers.update(int(token) for token in NUMBER.findall("".join(chars)))
-    return Claims(frozenset(dates), frozenset(numbers))
+    rest = "".join(chars)
+    numbers.update(int(token) for token in NUMBER.findall(rest))
+    return Claims(frozenset(dates), frozenset(numbers)), rest
 
 
 def merged_claims(texts: list[str]) -> Claims:
