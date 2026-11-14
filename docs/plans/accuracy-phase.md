@@ -458,3 +458,23 @@ Committed with the hand-written `tests/vectors/retry_vectors.json`, **before any
   - Its code stays in the repo, off by default (phone default off, harness `--retry` off). Any later retry is a new pre-registered version.
 - **Observation (not a scorer change):** e2e-018's reply states "The enrollment fee waiver program is still accepting applications." It is an invented fact on a trap, with no date, number or office, so scorer_v1 does not flag it. A human review would. This is a third kind of fact scorer_v1 can't see, next to the two recorded limitations.
 - **Next:** (c) and_v4, tested on top of rank_v1 alone.
+
+## 2026-11-14 (user): experiment pre-registered for later: "retry_v1 + gate_v1 combined"
+
+- **Registered before any (d) result exists.** gate_v1 is not built, its θ is not fitted, and nothing about (d) has run. Recorded at this commit, before (c) runs.
+- **When:** tested only if (d) gate_v1 is kept. Otherwise it is never run, and retry stays off for good.
+- **What:** retry_v1, unchanged (`60f54c1` rule, `17937f3` code), switched on together with the kept gate_v1, on top of every kept change at that point. No retry or gate parameter is re-tuned for it: θ is the one (d) froze.
+- **Rules:** the same as section 3:
+  - nothing worse on every dev set (e2e34, taglish10, flow13) against the state with the kept changes and the retry off
+  - no new unsafe case
+  - traps reported separately
+  - the baseline's query replies, answer calls cold
+- **If it fails any rule, retry stays off for good.** No retry_v2 is built in this phase.
+
+## 2026-11-14 (user): scorer_v1 blind spot: observations
+
+scorer_v1 sees only dates, numbers, office names and listed phrases. Observed cases of what it can't see (none changes the frozen scorer; the human review covers them):
+
+1. **Held-out baseline (user review):** a reply contradicting its source on a yes/no question ("allowed/encouraged" where the source prohibits).
+2. **Dev, retry_v1 run (e2e-018, a trap):** an invented claim with no date, number or office: "The enrollment fee waiver program is still accepting applications."
+3. **Dev baseline (flow q06):** mixing up which listed announcement says what ("second and third announcements").
