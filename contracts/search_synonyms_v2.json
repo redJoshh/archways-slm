@@ -1,0 +1,34 @@
+{
+  "$comment": "Frozen synonym map for the and_v4 matcher (accuracy-phase.md section 3 (c), pre-registered 2026-11-14 before any run): search_synonyms_v1.json plus one entry, \"pasok\": [\"class\"]. and_v4 = and_v3's matching rules with this map. v1 stays frozen for and_v2/and_v3. Never edit; a change is search_synonyms_v3.json. Known side effect: the substring 'class' also matches 'classroom' and 'classification'. Revisits the 2026-10-31 decision to leave 'pasok' out (taglish-08's trap), with the real-data evidence of flow q13.",
+  "name": "search_synonyms_v2",
+  "matcher": "and_v4",
+  "extra_stopwords": [
+    "kapag"
+  ],
+  "synonyms": {
+    "payment": [
+      "due"
+    ],
+    "enrolment": [
+      "enrollment"
+    ],
+    "second-term": [
+      "second term"
+    ],
+    "registration": [
+      "sign up"
+    ],
+    "examinations": [
+      "examination"
+    ],
+    "bagyo": [
+      "typhoon"
+    ],
+    "klase": [
+      "class"
+    ],
+    "pasok": [
+      "class"
+    ]
+  }
+}

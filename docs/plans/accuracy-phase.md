@@ -478,3 +478,25 @@ scorer_v1 sees only dates, numbers, office names and listed phrases. Observed ca
 1. **Held-out baseline (user review):** a reply contradicting its source on a yes/no question ("allowed/encouraged" where the source prohibits).
 2. **Dev, retry_v1 run (e2e-018, a trap):** an invented claim with no date, number or office: "The enrollment fee waiver program is still accepting applications."
 3. **Dev baseline (flow q06):** mixing up which listed announcement says what ("second and third announcements").
+
+## 2026-11-14: and_v4 rule, pre-registered (section 3 (c))
+
+Committed with `contracts/search_synonyms_v2.json` and the hand-written `tests/vectors/and_v4_vectors.json`, **before any and_v4 code or run**. Tested on top of rank_v1 (kept). retry_v1 stays off (dropped).
+
+1. **and_v4 = and_v3's matching rules with `search_synonyms_v2`:** v1's map plus `"pasok": ["class"]`, and the same extra stopwords. v1 stays frozen for and_v2/and_v3.
+   - A synonym is a plain substring, so `class` also matches "classes", "classroom" and "classification" (by design; vector S1).
+2. **rank_v1 under and_v4** finds a question word through the active synonym version (`word_found` with v2), so the question word "pasok" is found in a row with "class" (vector S4).
+   - rank_v1's content words, anchors, weights and stopwords are unchanged.
+3. **Parity:**
+   - Python `fakebackend` matcher "and_v4"; `rank.word_found` / `points` take the synonym map of the matcher in use; `search_feed(..., matcher=)`.
+   - TS: `SYNONYMS_V2` generated; `searchRows` / `rankScorer` / `makeFeedSearch` take the matcher.
+   - Both pass `and_v4_vectors.json` (expected ids and points under and_v4 **and** and_v3), on Node and the Hermes CLI.
+4. **Mutations to check:**
+   - v1 synonyms under and_v4
+   - v2 synonyms under and_v3
+   - rank_v1 finding words with v1 under and_v4
+5. **Keep or drop:**
+   - The "nothing gets worse" rule on every dev set, against the rank_v1 run (`rank_v1-1.json`). The baseline's query replies are reused, and the answer calls re-run cold.
+   - Reported as the pre-registered plan asks: q13 (row 14's place); taglish-08 (retrieval clean or not; the path; honest or not); and whether any reply presents a non-class row as being about classes.
+   - A hurt answerable case or a new unsafe case → dropped.
+   - The trap rule is the section 3 one: traps reported separately. A trap that stops being clean counts against "nothing gets worse" only through Unsafe; the pre-registered (b) hold option does not apply to (c).

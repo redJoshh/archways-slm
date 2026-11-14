@@ -1,0 +1,325 @@
+{
+ "$comment": "and_v4 parity vectors, HAND-WRITTEN 2026-11-14 before any and_v4 code or run (accuracy-phase.md, 'and_v4 rule, pre-registered'). Expected values worked out by hand; never regenerate from the implementation. Details: rank_vectors.json's rows plus row 13 (classroom). Every case runs with rank_v1 on (kept); each case gives the expected ids and points under and_v4 and under and_v3.",
+ "format": "archways and_v4 vectors v1",
+ "matcher": "and_v4",
+ "synonyms": "search_synonyms_v2",
+ "rank": "rank_v1",
+ "now": "2026-11-10T10:00:00+08:00",
+ "details": [
+  {
+   "id": 1,
+   "title": "Library Hours Update",
+   "body": "The library is open until 9 PM on November 16, 2026.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 2,
+   "title": "Campus Offices Closed for the Outing",
+   "body": "All offices are closed on May 14, 2027 for the annual outing.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-08T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 3,
+   "title": "Classes Suspended",
+   "body": "There are no classes on November 30, 2026 because of Bonifacio Day.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-07T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 4,
+   "title": "Class Schedule Reminder",
+   "body": "Regular class schedules apply this week.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-06T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 5,
+   "title": "Office Hours",
+   "body": "The registrar office is open from 8 to 5.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-05T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 6,
+   "title": "Long Notice About Class Make-up Sessions",
+   "body": "Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Make-up classes are on 2026-12-05.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-04T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 7,
+   "title": "December 5 Class Make-up",
+   "body": "Details to follow.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-03T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 8,
+   "title": "Fee Deadline",
+   "body": "Pay the fee of 500 pesos by 30 Nov.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-02T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 9,
+   "title": "Class Cards",
+   "body": "Class cards are released on November 30, 2025.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 10,
+   "title": "Fee Payment Reminder",
+   "body": "Fees are due soon.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T12:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 11,
+   "title": "Library Renovation",
+   "body": "The library annex closes on November 18.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T15:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 12,
+   "title": "Office Supplies",
+   "body": "Request office supplies online.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-09T18:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 13,
+   "title": "Classroom Assignments",
+   "body": "Rooms for the second term are posted.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-08T12:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  }
+ ],
+ "cases": [
+  {
+   "name": "S1: 'pasok' alone matches class, classes and classroom",
+   "question": "Pasok?",
+   "arguments": {
+    "query": "pasok",
+    "days": 30,
+    "limit": 10
+   },
+   "and_v4": {
+    "expected_ids": [
+     "13",
+     "3",
+     "4",
+     "6",
+     "7",
+     "9"
+    ],
+    "expected_points": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ]
+   },
+   "and_v3": {
+    "expected_ids": [],
+    "expected_points": []
+   },
+   "why": "and_v4: 'class' substring in rows 13 (classroom, by design), 3 (classes only), 4, 6, 7, 9; one word each, newest first. and_v3: no row has 'pasok'"
+  },
+  {
+   "name": "S2: 'pasok' with another word (AND)",
+   "question": "May pasok ba sa November 30?",
+   "arguments": {
+    "query": "pasok november",
+    "days": 30
+   },
+   "and_v4": {
+    "expected_ids": [
+     "3",
+     "9"
+    ],
+    "expected_points": [
+     4,
+     4
+    ]
+   },
+   "and_v3": {
+    "expected_ids": [],
+    "expected_points": []
+   },
+   "why": "class AND november: rows 3 (2026) and 9 (2025); words [pasok] + date 11-30 = 4 each; tie, newest first"
+  },
+  {
+   "name": "S3: v1 synonyms kept ('klase')",
+   "question": "May klase ba?",
+   "arguments": {
+    "query": "klase",
+    "days": 30
+   },
+   "and_v4": {
+    "expected_ids": [
+     "13",
+     "3",
+     "4",
+     "6",
+     "7"
+    ],
+    "expected_points": [
+     1,
+     1,
+     1,
+     1,
+     1
+    ]
+   },
+   "and_v3": {
+    "expected_ids": [
+     "13",
+     "3",
+     "4",
+     "6",
+     "7"
+    ],
+    "expected_points": [
+     1,
+     1,
+     1,
+     1,
+     1
+    ]
+   },
+   "why": "'klase' -> 'class' is in v1 and v2; the same under both"
+  },
+  {
+   "name": "S4: rank_v1 finds the question word 'pasok' through the synonym under and_v4 only",
+   "question": "Kailan ang pasok ng make-up classes?",
+   "arguments": {
+    "query": "make-up",
+    "days": 30
+   },
+   "and_v4": {
+    "expected_ids": [
+     "6",
+     "7"
+    ],
+    "expected_points": [
+     4,
+     3
+    ]
+   },
+   "and_v3": {
+    "expected_ids": [
+     "6",
+     "7"
+    ],
+    "expected_points": [
+     3,
+     2
+    ]
+   },
+   "why": "words [pasok, make, up, classes]; row 6 has class+make+up+classes, row 7 class+make+up; and_v3 never finds 'pasok'"
+  },
+  {
+   "name": "S5: the taglish-08 shape: a date anchor does not pull in a non-matching row",
+   "question": "May pasok ba sa November 16-18?",
+   "arguments": {
+    "query": "pasok",
+    "days": 30
+   },
+   "and_v4": {
+    "expected_ids": [
+     "13",
+     "3",
+     "4",
+     "6",
+     "7"
+    ],
+    "expected_points": [
+     1,
+     1,
+     1,
+     1,
+     1
+    ]
+   },
+   "and_v3": {
+    "expected_ids": [],
+    "expected_points": []
+   },
+   "why": "anchors 11-16 and 18 are in row 1 and row 11 only, which have no 'class'; every matching row scores 1"
+  },
+  {
+   "name": "S6: 'pasok' as a question word but not in the query",
+   "question": "Kailan ang pasok sa library?",
+   "arguments": {
+    "query": "library",
+    "days": 30
+   },
+   "and_v4": {
+    "expected_ids": [
+     "11",
+     "1"
+    ],
+    "expected_points": [
+     1,
+     1
+    ]
+   },
+   "and_v3": {
+    "expected_ids": [
+     "11",
+     "1"
+    ],
+    "expected_points": [
+     1,
+     1
+    ]
+   },
+   "why": "words [pasok, library]: rows 1 and 11 have 'library' but no 'class', so 1 point each under both matchers; the tie goes to the newer row 11 (2026-11-09T15:00) before row 1 (09:00)"
+  }
+ ]
+}
