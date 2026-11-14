@@ -32,7 +32,8 @@
 
 import type { Announcement } from "./render.ts";
 import { feedRow } from "./feed.ts";
-import { rankScorer, type RankVersion } from "./rank.ts";
+import type { RankVersion } from "./rank.ts";
+import { searchWithRetry, type RetryResult, type RetryVersion } from "./retry.ts";
 import { searchRows, type IndexRow } from "./search.ts";
 
 export class HttpError extends Error {
@@ -93,6 +94,14 @@ export interface FeedIndex {
   clear: () => void;
   /** score: searchRows's optional per-row score (rank.ts rankScorer). */
   search: (args: unknown, nowMs?: number, score?: (row: IndexRow) => number) => Announcement[];
+  /** retry.ts searchWithRetry over the index (rank_v1, then retry_v1 on 0 results). */
+  searchRetry: (
+    args: unknown,
+    nowMs: number,
+    question: string,
+    rank: RankVersion,
+    retry: RetryVersion | null,
+  ) => RetryResult;
   size: () => number;
 }
 
@@ -266,6 +275,17 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
       if (entries) entries.forEach((entry) => rows.push(entry.row));
       return searchRows(rows, args, nowMs === undefined ? clock() : nowMs, score);
     },
+    searchRetry: (
+      args: unknown,
+      nowMs: number,
+      question: string,
+      rank: RankVersion,
+      retry: RetryVersion | null,
+    ) => {
+      const rows: IndexRow[] = [];
+      if (entries) entries.forEach((entry) => rows.push(entry.row));
+      return searchWithRetry(rows, args, nowMs, question, rank, retry);
+    },
     size: () => (entries ? entries.size : 0),
   };
 }
@@ -278,17 +298,26 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
  *
  * rank: null keeps newest first (the frozen UAT setting until rank_v1 is
  * kept, accuracy-phase.md); "rank_v1" orders by the raw question, which
- * askAssistant passes as the second argument.
+ * askAssistant passes as the second argument. retry: "retry_v1" (needs
+ * rank_v1) searches again with the question's words after 0 results;
+ * onSearch, if given, gets the retry flag and the result count (numbers
+ * only, for the question log).
  */
 export function makeFeedSearch(
   index: FeedIndex,
   nowMs: () => number = Date.now,
   rank: RankVersion | null = null,
+  retry: RetryVersion | null = null,
+  onSearch?: (info: { retried: boolean; count: number }) => void,
 ) {
+  if (retry !== null && rank === null) throw new Error("retry_v1 needs rank_v1");
   return async (args: unknown, context?: { question: string }): Promise<unknown> => {
     await index.ensure();
     if (rank !== null && context === undefined) throw new Error("rank needs the question");
-    const score = rank === null ? undefined : rankScorer(rank, (context as { question: string }).question);
-    return index.search(args, nowMs(), score);
+    if (rank === null) return index.search(args, nowMs());
+    const question = (context as { question: string }).question;
+    const found = index.searchRetry(args, nowMs(), question, rank, retry);
+    if (onSearch) onSearch({ retried: found.retried, count: found.results.length });
+    return found.results;
   };
 }

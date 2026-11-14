@@ -27,6 +27,7 @@ function plainScript(...parts) {
 
 const feedVectorsPath = join(root, "..", "tests", "vectors", "feed_vectors.json");
 const rankVectorsPath = join(root, "..", "tests", "vectors", "rank_vectors.json");
+const retryVectorsPath = join(root, "..", "tests", "vectors", "retry_vectors.json");
 
 const runner = `
 var log = typeof print === "function" ? print : console.log;
@@ -45,6 +46,11 @@ log("hermes rank vectors: " + rankReport.passed + "/" + rankReport.total + " pas
     rankReport.failed + " failed");
 for (var k = 0; k < rankReport.failures.length; k++) log("FAIL " + rankReport.failures[k]);
 if (rankReport.failed) { throw new Error("rank vectors failed"); }
+var retryReport = runRetryVectors(RETRY_VECTORS);
+log("hermes retry vectors: " + retryReport.passed + "/" + retryReport.total + " passed, " +
+    retryReport.failed + " failed");
+for (var r = 0; r < retryReport.failures.length; r++) log("FAIL " + retryReport.failures[r]);
+if (retryReport.failed) { throw new Error("retry vectors failed"); }
 
 var flowVector = VECTORS.flow[0];
 askAssistant(flowVector.question, {
@@ -151,6 +157,8 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "feedVectors.js"],
   ["assistant-ts", "src", "rank.js"],
   ["assistant-ts", "src", "rankVectors.js"],
+  ["assistant-ts", "src", "retry.js"],
+  ["assistant-ts", "src", "retryVectors.js"],
 ];
 const declared = {};
 for (const parts of BUNDLE_FILES) {
@@ -170,6 +178,7 @@ const bundle = [
   "var VECTORS = " + readFileSync(vectorsPath, "utf8").trim() + ";",
   "var FEED_VECTORS = " + readFileSync(feedVectorsPath, "utf8").trim() + ";",
   "var RANK_VECTORS = " + readFileSync(rankVectorsPath, "utf8").trim() + ";",
+  "var RETRY_VECTORS = " + readFileSync(retryVectorsPath, "utf8").trim() + ";",
   runner,
 ].join("\n");
 mkdirSync(join(root, "dist-hermes"), { recursive: true });

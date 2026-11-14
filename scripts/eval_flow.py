@@ -69,7 +69,7 @@ from archways_assistant.evalflow import (
     totals,
 )
 from archways_assistant.fakebackend import InvalidArguments, is_visible
-from archways_assistant.feedindex import search_feed
+from archways_assistant.feedindex import search_feed, search_feed_retry
 from archways_assistant.render import QWEN3_STOP
 from archways_assistant.snapshot import load_snapshot
 
@@ -150,6 +150,7 @@ def run_case(
     *,
     rank: str | None = None,
     query_reply: str | None = None,
+    retry: str | None = None,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -177,9 +178,20 @@ def run_case(
             arguments = None
         if arguments is not None:
             try:
-                search_reply = search_feed(
-                    rows, arguments, now, contract, question=question, rank=rank
-                )
+                if retry is None:
+                    search_reply = search_feed(
+                        rows, arguments, now, contract, question=question, rank=rank
+                    )
+                else:
+                    search_reply, record["retried"] = search_feed_retry(
+                        rows,
+                        arguments,
+                        now,
+                        contract,
+                        question=question,
+                        rank=rank,
+                        retry=retry,
+                    )
                 record["search"] = [r["id"] for r in search_reply]
             except InvalidArguments:
                 search_reply = assistant.ERROR
@@ -248,7 +260,7 @@ def places(ids: list[str], sources: list[str]) -> str:
     )
 
 
-def replay(run_path: Path, rank: str) -> None:
+def replay(run_path: Path, rank: str, retry: str | None = None) -> None:
     """Retrieval only, no model call: a saved run's arguments, searched again."""
     run = json.loads(run_path.read_text(encoding="utf-8"))
     sources = load_sources()
@@ -261,19 +273,20 @@ def replay(run_path: Path, rank: str) -> None:
         rows = sources[SETS[case["set"]][1]]
         now = datetime.fromisoformat(case["now"])
         before = [r["id"] for r in search_feed(rows, case["arguments"], now, contract)]
-        after = [
-            r["id"]
-            for r in search_feed(
-                rows,
-                case["arguments"],
-                now,
-                contract,
-                question=case["question"],
-                rank=rank,
-            )
-        ]
+        found, retried = search_feed_retry(
+            rows,
+            case["arguments"],
+            now,
+            contract,
+            question=case["question"],
+            rank=rank,
+            retry=retry,
+        )
+        after = [r["id"] for r in found]
         sources_ = list(case["score"]["source_ids"])
-        mark = "" if before == after else "  CHANGED"
+        mark = ("" if before == after else "  CHANGED") + (
+            "  RETRIED" if retried else ""
+        )
         print(
             f"{case['set']} {case['id']}: {before} -> {after}  "
             f"sources {places(before, sources_)} -> {places(after, sources_)}{mark}"
@@ -374,6 +387,7 @@ def main() -> None:
     parser.add_argument("--model", default="qwen3:0.6b")
     parser.add_argument("--compare", nargs=2, type=Path, metavar="RUN")
     parser.add_argument("--rank", choices=["rank_v1"], default=None)
+    parser.add_argument("--retry", choices=["retry_v1"], default=None)
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
     parser.add_argument("--replay", type=Path, metavar="RUN")
     parser.add_argument(
@@ -395,12 +409,18 @@ def main() -> None:
     if args.replay:
         if args.rank is None:
             parser.error("--replay needs --rank")
-        replay(args.replay, args.rank)
+        replay(args.replay, args.rank, args.retry)
         return
     if args.out is None:
         parser.error("--out is required")
+    if args.retry is not None and args.rank is None:
+        parser.error("--retry needs --rank (retry_v1 orders by rank_v1)")
     if args.verify_baseline is not None:
-        if args.rank is not None or args.reuse_queries is not None:
+        if (
+            args.rank is not None
+            or args.retry is not None
+            or args.reuse_queries is not None
+        ):
             parser.error("--verify-baseline runs the baseline configuration only")
         if args.sets != ",".join(SETS) or args.ids:
             parser.error("--verify-baseline runs every case of every dev set")
@@ -468,6 +488,7 @@ def main() -> None:
             "case_files": {n: [SETS[n][0].name, sha256(SETS[n][0])] for n in sets},
             "snapshot_sha256": sha256(SNAPSHOT),
             "rank": args.rank,
+            "retry": args.retry,
             "query_replies_from": None
             if args.reuse_queries is None
             else [args.reuse_queries.name, sha256(args.reuse_queries)],
@@ -500,6 +521,7 @@ def main() -> None:
                     contract,
                     rank=args.rank,
                     query_reply=saved.get((name, case["id"])),
+                    retry=args.retry,
                 )
                 score = score_case(
                     case,

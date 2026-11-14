@@ -48,7 +48,13 @@ from datetime import datetime, timedelta, timezone
 
 from archways_assistant.assistant import is_integral
 from archways_assistant.excerpt import plain_text
-from archways_assistant.fakebackend import PUBLISHED, search_announcements
+from archways_assistant.fakebackend import (
+    PUBLISHED,
+    is_visible,
+    published_at,
+    search_announcements,
+    to_announcement,
+)
 
 MANILA = timezone(timedelta(hours=8))
 TITLE_MAX_CHARS = 255
@@ -136,3 +142,55 @@ def search_feed(
     return search_announcements(
         rows, arguments, now, contract, matcher="and_v3", question=question, rank=rank
     )
+
+
+RETRIES = ("retry_v1",)
+
+
+def search_feed_retry(
+    rows: list[dict],
+    arguments: dict,
+    now: datetime,
+    contract: dict,
+    *,
+    question: str,
+    rank: str = "rank_v1",
+    retry: str | None = "retry_v1",
+) -> tuple[list[dict], bool]:
+    """search_feed, then retry_v1 if it found nothing: (results, retried).
+
+    retry_v1 (accuracy-phase.md, pre-registered 2026-11-14): only after a
+    valid search with 0 results; the question's rank_v1 content words, a row
+    matching if any one is found by the matcher's one-word test; the model's
+    days and limit kept; ordered by rank_v1, then newest, then id; cut after.
+    No content words: no retry. Invalid arguments raise, as search_feed does.
+    """
+    from archways_assistant import rank as ranking
+
+    if retry is not None and retry not in RETRIES:
+        raise ValueError(f"unknown retry {retry!r}")
+    results = search_feed(rows, arguments, now, contract, question=question, rank=rank)
+    if results or retry is None:
+        return results, False
+    terms = ranking.question_terms(question)
+    if not terms.words:
+        return [], False
+    properties = contract["$defs"]["arguments"]["properties"]
+    days = arguments.get("days", properties["days"]["default"])
+    limit = arguments.get("limit", properties["limit"]["default"])
+    since = now - timedelta(days=days)
+    found = []
+    for row in rows:
+        if not is_visible(row, now) or published_at(row) < since:
+            continue
+        title, body = row["title"].lower(), row["body"].lower()
+        if any(ranking.word_found(word, title, body) for word in terms.words):
+            found.append((ranking.points(terms, title, body), row))
+    found.sort(
+        key=lambda match: (
+            -match[0],
+            -published_at(match[1]).timestamp(),
+            match[1]["id"],
+        )
+    )
+    return [to_announcement(row) for _, row in found[:limit]], True
