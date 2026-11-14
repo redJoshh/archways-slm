@@ -500,3 +500,25 @@ Committed with `contracts/search_synonyms_v2.json` and the hand-written `tests/v
    - Reported as the pre-registered plan asks: q13 (row 14's place); taglish-08 (retrieval clean or not; the path; honest or not); and whether any reply presents a non-class row as being about classes.
    - A hurt answerable case or a new unsafe case → dropped.
    - The trap rule is the section 3 one: traps reported separately. A trap that stops being clean counts against "nothing gets worse" only through Unsafe; the pre-registered (b) hold option does not apply to (c).
+
+## 2026-11-14: and_v4 result: KEPT (by the pre-registered rule)
+
+- **Run:** `--rank rank_v1 --matcher and_v4 --reuse-queries baseline-1.json`, commit `000e49f`, clean tree (`data/local/runs/and_v4-1.json`). Compared against the rank_v1 run.
+- **Retrieval replay:** only q13 changed. Row 14 went from not retrieved to 1st.
+- **"Nothing gets worse": OK on every set.**
+
+  | Set | Helpful | AI correct | Wrong AI answers | New unsafe | Traps clean |
+  |---|---|---|---|---|---|
+  | e2e34 | 22 → 22 | 18 → 18 | 0 → 0 | none | 10/10 → 10/10 |
+  | taglish10 | 5 → 5 | 3 → 3 | 0 → 0 | none | 3/3 → 3/3 |
+  | flow13 | 11 → 12 | 5 → 6 | 0 → 0 | none | 1/1 → 1/1 |
+  | **Total** | **38 → 39/42** | **26/28 → 27/29** | — | — | 14/14 → 14/14 |
+
+  - Unsafe (scored) 0/57 → 0/57. Coverage 41 → 42/45.
+- **Pre-registered report items:**
+  - **q13:** row 14 is 1st, and the path went from `not_found` to `answer`, correct.
+    - Note: the reply is "The Second Term of Academic Year 2026-2027 will officially commence on January 15, 2027. No official announcement was found for your question."
+    - It is the right fact followed by the not-found sentence. scorer_v1 counts it correct (`must_include` present, nothing wrong). The trailing sentence contradicts the answer, which is the kind of thing only the human review sees.
+  - **taglish-08:** retrieval stays clean. The model's query was "swimming pool", not "pasok", so the synonym never applied. The path is `not_found`, honest. The trap is not exercised by this dev run.
+  - **No reply presents a non-class row as being about classes.** q13's is the only answer reply that changed.
+- **Decision:** and_v4 is kept. Every later step runs with rank_v1 + and_v4. The phone default changes only at the final freeze.

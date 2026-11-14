@@ -19,6 +19,37 @@ Template:
 
 ---
 
+## 2026-11-14: Pre-registered "retry_v1 + gate_v1 combined"; Step 3 (c) and_v4: pre-registered, built, run: KEPT
+
+- **Date:** 2026-11-14 (+08:00)
+- **Pre-registered (user, `b13cc15`), before any (d) result exists:** "retry_v1 + gate_v1 combined".
+  - It is tested only if (d) is kept, on top of the kept changes, under the section 3 rules.
+  - If it fails, retry stays off for good.
+  - The same commit records scorer_v1's blind-spot observations: the held-out contradiction; e2e-018's invented non-numeric claim on a trap; q06's mixed-up announcements.
+- **and_v4:**
+  - **Pre-registration (`509545c`):** frozen `contracts/search_synonyms_v2.json` (v1 + `"pasok": ["class"]`, the same extra stopwords), the exact rule, and 6 hand-written vectors with expectations under both and_v4 and and_v3.
+    - One vector (S6) was corrected by hand before the commit: the tie goes to the newer row.
+  - **Vector S7 (`500575c`):** hand-written and added after the mutation "rank_v1 with v1 synonyms under and_v4" survived S1–S6, before any and_v4 run. The rule is unchanged.
+  - **Built (`000e49f`):**
+    - Python: matcher "and_v4" (`AND_V3_RULES`); `rank.word_found` / `points` take the matcher's synonyms; `search_feed(..., matcher=)`.
+    - TS: `SYNONYMS_V2` generated; `Matcher` / `synonymsFor`; `searchRows`, `rankScorer` and `makeFeedSearch` take the matcher. retry_v1 refuses and_v4.
+    - `eval_flow.py --matcher`; `--verify-baseline` requires and_v3. The verify test now also asserts that the default path searches with and_v3.
+    - Phone default: and_v3.
+  - **Vectors:** 16 Python tests, Node 282/282, Hermes and_v4 14/14 (the others unchanged).
+  - **Mutations,** caught and restored:
+    - Python: v1 under and_v4 → 4 fail; v2 under and_v3 → 4; rank with v1 under and_v4 → 1 (after S7).
+    - TS: v1 under and_v4 → 1; rank with v1 under and_v4 → 1.
+  - **Dev result** (commit `000e49f`, clean tree), against rank_v1:
+    - helpful 38 → 39/42; AI correct 26/28 → 27/29; Unsafe 0/57 → 0/57; traps clean 14/14; coverage 41 → 42/45. Nothing got worse on any set.
+    - **q13:** not found → a correct answer from row 14. The reply also appends the not-found sentence, which scorer_v1 can't see (recorded).
+    - **taglish-08:** not exercised; the query was "swimming pool".
+  - **Decision:** KEPT. Later steps run with rank_v1 + and_v4.
+- **How it was verified:** `uv run pytest -q` → `1302 passed, 2 skipped`. ruff clean. Generators `--check` up to date.
+- **Commits:** `b13cc15`, `509545c`, `500575c`, `000e49f`, this `docs:` commit. Not pushed.
+- **Open questions / next:** (d) gate_v1. Pre-register the rule, the θ grid and the vectors first; fit θ on e2e34 + taglish10 replays only.
+
+---
+
 ## 2026-11-14: Harness drift check (VERIFY OK 57/57); Step 3 (b) retry_v1 pre-registered, built, run: DROPPED
 
 - **Date:** 2026-11-14 (+08:00)
