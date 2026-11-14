@@ -212,6 +212,20 @@ def claims_and_rest(text: str) -> tuple[Claims, str]:
     The rest is what rank_v1 reads its content words from (accuracy-phase.md,
     rank_v1 rule, step 3): the space-normalised text, dates as spaces.
     """
+    found, rest, _ = date_scan(text)
+    return found, rest
+
+
+def date_scan(
+    text: str,
+) -> tuple[Claims, str, list[tuple[int, int, tuple[int, int]]]]:
+    """claims_and_rest(text), and every parsed date span as (start, end, date).
+
+    Spans are in code points of text (the space table maps one code point to
+    one), in parse order: the excerpt window's date anchors (accuracy-phase.md,
+    excerpt_v2_centred rule, step 2a).
+    """
+    spans = []
     dates = set()
     numbers = set()
     chars = list(text.translate(SPACE_TABLE))
@@ -221,13 +235,14 @@ def claims_and_rest(text: str) -> tuple[Claims, str]:
             if not (1 <= month <= 12 and 1 <= day <= 31):
                 continue
             dates.add((month, day))
+            spans.append((match.start(), match.end(), (month, day)))
             if match["year"]:
                 numbers.add(int(match["year"]))
             # Blank the date so its digits aren't read again as numbers.
             chars[match.start() : match.end()] = " " * (match.end() - match.start())
     rest = "".join(chars)
     numbers.update(int(token) for token in NUMBER.findall(rest))
-    return Claims(frozenset(dates), frozenset(numbers)), rest
+    return Claims(frozenset(dates), frozenset(numbers)), rest, spans
 
 
 def merged_claims(texts: list[str]) -> Claims:

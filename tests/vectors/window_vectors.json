@@ -176,5 +176,46 @@
    "expected": "Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Due on December 14, 2026",
    "why": "date 483..500: the end is at 500, so 'ends at or before 500' keeps the first 500. Added 2026-11-14 with the code (the rule asked for a boundary vector if none covered it); before any run."
   }
- ]
+ ],
+ "search": {
+  "now": "2026-11-10T10:00:00+08:00",
+  "details": [
+   {
+    "id": 1,
+    "title": "Org Papers",
+    "body": "Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Org papers are due on December 4, 2026. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. ",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-09T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   },
+   {
+    "id": 2,
+    "title": "Org Fair",
+    "body": "The org fair is on December 4.",
+    "priority": "NORMAL",
+    "officeName": "Test Office",
+    "publishedAt": "2026-11-08T09:00:00+08:00",
+    "version": 1,
+    "attachments": []
+   }
+  ],
+  "question": "What is due on December 4?",
+  "arguments": {
+   "query": "org",
+   "days": 30
+  },
+  "matcher": "and_v4",
+  "rank": "rank_v1",
+  "expected_ids": [
+   "1",
+   "2"
+  ],
+  "expected_excerpts": [
+   "\u2026Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Org papers are due on December 4, 2026. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum",
+   "The org fair is on December 4."
+  ],
+  "why": "rank_v1: words [due], date 12-04 (possible 4): row 1 = 4, row 2 = 3 (no 'due'). Row 1's window is E2's (date at 638, start 388, snapped to 392; the trimmed trailing space doesn't reach the window); row 2 is short, so whole. Hand-derived 2026-11-14 as the pre-registered rule asks; before any run."
+ }
 }

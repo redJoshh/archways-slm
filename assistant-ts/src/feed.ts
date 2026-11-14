@@ -99,6 +99,7 @@ export function feedRow(detail: unknown): { row: IndexRow; offsetAdded: boolean 
       },
       title: title.toLowerCase(),
       body: body.toLowerCase(),
+      plain: body,
       publishedMs: published.ms,
     },
     offsetAdded: published.offsetAdded,

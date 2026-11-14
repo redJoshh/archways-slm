@@ -183,7 +183,16 @@ export function claims(text: string): Claims {
  * claims(text), and the text with every parsed date span blanked
  * (e2escore.claims_and_rest): what rank_v1 reads its content words from.
  */
-export function claimsAndRest(text: string): Claims & { rest: string } {
+export interface DateSpan {
+  /** UTF-16 code unit offsets in text (every match is ASCII). */
+  start: number;
+  end: number;
+  /** "MM-DD". */
+  date: string;
+}
+
+export function claimsAndRest(text: string): Claims & { rest: string; spans: DateSpan[] } {
+  const spans: DateSpan[] = [];
   const dates: { [key: string]: true } = {};
   const numbers: { [key: string]: true } = {};
   // Code units; every match is ASCII, so blanking a unit blanks a code point.
@@ -200,6 +209,7 @@ export function claimsAndRest(text: string): Claims & { rest: string } {
       const day = parseInt(match[pattern.day], 10);
       if (!(month >= 1 && month <= 12 && day >= 1 && day <= 31)) continue;
       dates[pad2(month) + "-" + pad2(day)] = true;
+      spans.push({ start: match.index, end: match.index + match[0].length, date: pad2(month) + "-" + pad2(day) });
       const year = match[pattern.year];
       if (year) numbers[canonical(year)] = true;
       // Blank the date so its digits aren't read again as numbers.
@@ -214,7 +224,7 @@ export function claimsAndRest(text: string): Claims & { rest: string } {
   while ((token = NUMBER.exec(rest)) !== null) {
     numbers[canonical(token[0])] = true;
   }
-  return { dates, numbers, rest };
+  return { dates, numbers, rest, spans };
 }
 
 /** What a reply may claim: retrieved titles and excerpts, and the question. */

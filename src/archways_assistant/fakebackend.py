@@ -289,6 +289,7 @@ def search_announcements(
     *,
     question: str | None = None,
     rank: str | None = None,
+    excerpt: str | None = None,
 ) -> list[dict]:
     """Run one search over seed rows at now. See the module docstring for the rules.
 
@@ -364,4 +365,17 @@ def search_announcements(
             match[1]["id"],
         )
     )
-    return [to_announcement(row) for _, row in matches[:limit]]
+    results = [to_announcement(row) for _, row in matches[:limit]]
+    if excerpt is not None:
+        # excerpt_v2_centred (accuracy-phase.md (e)); window imports this module.
+        from archways_assistant import window
+
+        if excerpt not in window.EXCERPTS or matcher not in AND_V3_RULES:
+            raise ValueError("excerpt_v2_centred needs and_v3 or and_v4")
+        if question is None:
+            raise ValueError("excerpt_v2_centred needs the question")
+        for result, (_, row) in zip(results, matches[:limit], strict=True):
+            result["excerpt"] = window.centred_excerpt(
+                row["body"], question, arguments["query"], matcher
+            )
+    return results

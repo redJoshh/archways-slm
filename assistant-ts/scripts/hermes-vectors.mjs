@@ -30,6 +30,7 @@ const rankVectorsPath = join(root, "..", "tests", "vectors", "rank_vectors.json"
 const retryVectorsPath = join(root, "..", "tests", "vectors", "retry_vectors.json");
 const andV4VectorsPath = join(root, "..", "tests", "vectors", "and_v4_vectors.json");
 const gateVectorsPath = join(root, "..", "tests", "vectors", "gate_vectors.json");
+const windowVectorsPath = join(root, "..", "tests", "vectors", "window_vectors.json");
 
 const runner = `
 var log = typeof print === "function" ? print : console.log;
@@ -63,6 +64,11 @@ log("hermes gate vectors: " + gateReport.passed + "/" + gateReport.total + " pas
     gateReport.failed + " failed");
 for (var gv = 0; gv < gateReport.failures.length; gv++) log("FAIL " + gateReport.failures[gv]);
 if (gateReport.failed) { throw new Error("gate vectors failed"); }
+var windowReport = runWindowVectors(WINDOW_VECTORS);
+log("hermes window vectors: " + windowReport.passed + "/" + windowReport.total + " passed, " +
+    windowReport.failed + " failed");
+for (var wv = 0; wv < windowReport.failures.length; wv++) log("FAIL " + windowReport.failures[wv]);
+if (windowReport.failed) { throw new Error("window vectors failed"); }
 
 var flowVector = VECTORS.flow[0];
 askAssistant(flowVector.question, {
@@ -173,6 +179,8 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "retryVectors.js"],
   ["assistant-ts", "src", "andV4Vectors.js"],
   ["assistant-ts", "src", "gateVectors.js"],
+  ["assistant-ts", "src", "window.js"],
+  ["assistant-ts", "src", "windowVectors.js"],
 ];
 const declared = {};
 for (const parts of BUNDLE_FILES) {
@@ -195,6 +203,7 @@ const bundle = [
   "var RETRY_VECTORS = " + readFileSync(retryVectorsPath, "utf8").trim() + ";",
   "var AND_V4_VECTORS = " + readFileSync(andV4VectorsPath, "utf8").trim() + ";",
   "var GATE_VECTORS = " + readFileSync(gateVectorsPath, "utf8").trim() + ";",
+  "var WINDOW_VECTORS = " + readFileSync(windowVectorsPath, "utf8").trim() + ";",
   runner,
 ].join("\n");
 mkdirSync(join(root, "dist-hermes"), { recursive: true });

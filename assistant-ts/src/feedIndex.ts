@@ -34,6 +34,7 @@ import type { Announcement } from "./render.ts";
 import { feedRow } from "./feed.ts";
 import { rankScorer, type RankVersion } from "./rank.ts";
 import { searchWithRetry, type RetryResult, type RetryVersion } from "./retry.ts";
+import { excerptFor, type ExcerptRule } from "./window.ts";
 import { searchRows, type IndexRow, type Matcher } from "./search.ts";
 
 export class HttpError extends Error {
@@ -98,6 +99,7 @@ export interface FeedIndex {
     nowMs?: number,
     score?: (row: IndexRow) => number,
     matcher?: Matcher,
+    excerpt?: (row: IndexRow, query: string) => string,
   ) => Announcement[];
   /** retry.ts searchWithRetry over the index (rank_v1, then retry_v1 on 0 results). */
   searchRetry: (
@@ -275,10 +277,16 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
       refreshedAt = 0;
       inFlight = null;
     },
-    search: (args: unknown, nowMs?: number, score?: (row: IndexRow) => number, matcher?: Matcher) => {
+    search: (
+      args: unknown,
+      nowMs?: number,
+      score?: (row: IndexRow) => number,
+      matcher?: Matcher,
+      excerpt?: (row: IndexRow, query: string) => string,
+    ) => {
       const rows: IndexRow[] = [];
       if (entries) entries.forEach((entry) => rows.push(entry.row));
-      return searchRows(rows, args, nowMs === undefined ? clock() : nowMs, score, matcher);
+      return searchRows(rows, args, nowMs === undefined ? clock() : nowMs, score, matcher, excerpt);
     },
     searchRetry: (
       args: unknown,
@@ -307,7 +315,8 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
  * rank_v1) searches again with the question's words after 0 results;
  * onSearch, if given, gets the retry flag and the result count (numbers
  * only, for the question log). matcher: "and_v3" (default) or "and_v4"
- * (retry_v1 runs with and_v3 only).
+ * (retry_v1 runs with and_v3 only). excerpt: null (the first 500, the
+ * default) or "excerpt_v2_centred" (needs the question; not with retry).
  */
 export function makeFeedSearch(
   index: FeedIndex,
@@ -316,16 +325,28 @@ export function makeFeedSearch(
   retry: RetryVersion | null = null,
   onSearch?: (info: { retried: boolean; count: number }) => void,
   matcher: Matcher = "and_v3",
+  excerpt: ExcerptRule | null = null,
 ) {
+  if (excerpt !== null && retry !== null) throw new Error("the excerpt window runs without retry");
   if (retry !== null && rank === null) throw new Error("retry_v1 needs rank_v1");
   if (retry !== null && matcher !== "and_v3") throw new Error("retry_v1 runs with and_v3 only");
   return async (args: unknown, context?: { question: string }): Promise<unknown> => {
     await index.ensure();
     if (rank !== null && context === undefined) throw new Error("rank needs the question");
-    if (rank === null) return index.search(args, nowMs(), undefined, matcher);
+    if (excerpt !== null && context === undefined) throw new Error("the excerpt window needs the question");
+    if (rank === null) {
+      const window = excerpt === null ? undefined : excerptFor(excerpt, (context as { question: string }).question, matcher);
+      return index.search(args, nowMs(), undefined, matcher, window);
+    }
     const question = (context as { question: string }).question;
     if (retry === null) {
-      const results = index.search(args, nowMs(), rankScorer(rank, question, matcher), matcher);
+      const results = index.search(
+        args,
+        nowMs(),
+        rankScorer(rank, question, matcher),
+        matcher,
+        excerptFor(excerpt, question, matcher),
+      );
       if (onSearch) onSearch({ retried: false, count: results.length });
       return results;
     }

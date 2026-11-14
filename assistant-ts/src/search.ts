@@ -39,6 +39,8 @@ export interface IndexRow {
   /** Lowercased title and lowercased whole plain-text body, for matching. */
   title: string;
   body: string;
+  /** The whole plain-text body, original case (excerpt_v2_centred's window). */
+  plain: string;
   publishedMs: number;
 }
 
@@ -144,6 +146,7 @@ export function searchRows(
   nowMs: number,
   score?: (row: IndexRow) => number,
   matcher: Matcher = "and_v3",
+  excerptFor?: (row: IndexRow, query: string) => string,
 ): Announcement[] {
   const checked = checkArguments(args);
   const days = checked.days === undefined ? DAYS_DEFAULT : checked.days;
@@ -165,5 +168,18 @@ export function searchRows(
     const ib = b.announcement.id;
     return ia < ib ? -1 : ia > ib ? 1 : 0;
   });
-  return found.slice(0, limit).map((row) => row.announcement);
+  const cut = found.slice(0, limit);
+  if (excerptFor === undefined) return cut.map((row) => row.announcement);
+  return cut.map((row) => {
+    const a = row.announcement;
+    return {
+      id: a.id,
+      title: a.title,
+      excerpt: excerptFor(row, checked.query),
+      office: a.office,
+      priority: a.priority,
+      year_level: a.year_level,
+      posted_at: a.posted_at,
+    };
+  });
 }

@@ -153,6 +153,7 @@ def run_case(
     query_reply: str | None = None,
     retry: str | None = None,
     matcher: str = MATCHER,
+    excerpt: str | None = None,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -189,6 +190,7 @@ def run_case(
                         question=question,
                         rank=rank,
                         matcher=matcher,
+                        excerpt=excerpt,
                     )
                 else:
                     if matcher != MATCHER:
@@ -330,6 +332,37 @@ def replay(
             f"{case['set']} {case['id']}: {before} -> {after}  "
             f"sources {places(before, sources_)} -> {places(after, sources_)}{mark}"
         )
+
+
+def excerpt_replay(run_path: Path, rank: str, matcher: str, rule: str) -> None:
+    """Retrieval only: which results' excerpts the window changes, and which
+    dates or numbers it newly shows (facts past character 500)."""
+    from archways_assistant.e2escore import claims
+
+    run = json.loads(run_path.read_text(encoding="utf-8"))
+    sources = load_sources()
+    contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    print(f"excerpt replay of {run_path.name}: {rule} with {rank} + {matcher}")
+    for case in run["cases"]:
+        if not isinstance(case["arguments"], dict):
+            continue
+        rows = sources[SETS[case["set"]][1]]
+        now = datetime.fromisoformat(case["now"])
+        common = {"question": case["question"], "rank": rank, "matcher": matcher}
+        before = search_feed(rows, case["arguments"], now, contract, **common)
+        after = search_feed(
+            rows, case["arguments"], now, contract, excerpt=rule, **common
+        )
+        for old, new in zip(before, after, strict=True):
+            if old["excerpt"] == new["excerpt"]:
+                continue
+            was, now_c = claims(old["excerpt"]), claims(new["excerpt"])
+            dates = sorted(f"{m:02d}-{d:02d}" for m, d in now_c.dates - was.dates)
+            numbers = sorted(now_c.numbers - was.numbers)
+            print(
+                f"{case['set']} {case['id']}: result {new['id']} window moved; "
+                f"newly shown dates {dates} numbers {numbers}"
+            )
 
 
 def nothing_worse(
@@ -576,6 +609,8 @@ def main() -> None:
     parser.add_argument("--rank", choices=["rank_v1"], default=None)
     parser.add_argument("--retry", choices=["retry_v1"], default=None)
     parser.add_argument("--matcher", choices=["and_v3", "and_v4"], default=MATCHER)
+    parser.add_argument("--excerpt", choices=["excerpt_v2_centred"], default=None)
+    parser.add_argument("--excerpt-replay", type=Path, metavar="RUN")
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
     parser.add_argument("--replay", type=Path, metavar="RUN")
     parser.add_argument(
@@ -605,6 +640,11 @@ def main() -> None:
     if args.gate_fit:
         gate_fit(args.gate_fit)
         return
+    if args.excerpt_replay:
+        if args.rank is None or args.excerpt is None:
+            parser.error("--excerpt-replay needs --rank and --excerpt")
+        excerpt_replay(args.excerpt_replay, args.rank, args.matcher, args.excerpt)
+        return
     if args.gate_apply:
         if args.theta is None or args.out is None:
             parser.error("--gate-apply needs --theta p/q and --out")
@@ -621,6 +661,8 @@ def main() -> None:
         return
     if args.out is None:
         parser.error("--out is required")
+    if args.excerpt is not None and (args.rank is None or args.retry is not None):
+        parser.error("--excerpt runs with --rank and without --retry")
     if args.retry is not None and args.matcher != MATCHER:
         parser.error("--retry runs with and_v3 only")
     if args.retry is not None and args.rank is None:
@@ -629,6 +671,7 @@ def main() -> None:
         if (
             args.rank is not None
             or args.matcher != MATCHER
+            or args.excerpt is not None
             or args.retry is not None
             or args.reuse_queries is not None
         ):
@@ -700,6 +743,7 @@ def main() -> None:
             "snapshot_sha256": sha256(SNAPSHOT),
             "rank": args.rank,
             "retry": args.retry,
+            "excerpt": args.excerpt,
             "query_replies_from": None
             if args.reuse_queries is None
             else [args.reuse_queries.name, sha256(args.reuse_queries)],
@@ -734,6 +778,7 @@ def main() -> None:
                     query_reply=saved.get((name, case["id"])),
                     retry=args.retry,
                     matcher=args.matcher,
+                    excerpt=args.excerpt,
                 )
                 score = score_case(
                     case,
