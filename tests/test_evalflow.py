@@ -1,5 +1,6 @@
 """scorer_v1 (docs/plans/accuracy-phase.md, section 0) on hand-written replies."""
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -320,3 +321,16 @@ def test_the_dev_case_files_load():
     e2e = load_cases(ROOT / "evals" / "e2e_cases.jsonl", known)
     taglish = load_cases(ROOT / "evals" / "taglish_cases.jsonl", known)
     assert (len(e2e), len(taglish)) == (34, 10)
+
+
+# scorer_v1 is frozen (accuracy-phase.md, 2026-11-14): this file's bytes are
+# pinned, line endings normalised to LF. A change to a rule is scorer_v2 in a
+# new dated plan section, with the dev sets re-scored from saved run files;
+# the held-out baseline can't be re-scored.
+SCORER_V1_SHA256 = "44cd630851a30cf28d76d26e4e416ac92708c21b2ce0e4c6236d4de8b7174691"
+
+
+def test_scorer_v1_is_frozen():
+    data = (ROOT / "src" / "archways_assistant" / "evalflow.py").read_bytes()
+    digest = hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
+    assert digest == SCORER_V1_SHA256, "scorer_v1 is frozen; a change is scorer_v2"

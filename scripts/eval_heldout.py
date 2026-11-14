@@ -11,7 +11,8 @@ docs/plans/accuracy-phase.md, section 2 (frozen 2026-11-14), and ADR 0007:
   not read.
 - Prints only: the settings, the file's SHA-256 and case count, and the
   section 0 totals (counts). Never a per-case line, id, question or reply.
-- Writes nothing to disk and uses no cache.
+- Writes nothing to disk and uses no cache, unless --private-report PATH
+  is given (below).
 - At most two runs ever: --config baseline (now) and --config final
   (added when every change is frozen). Never in between.
 
@@ -33,11 +34,21 @@ File format: JSON Lines, one case per line, every case over the snapshot
 
 A malformed file stops the run with the line number and the field name,
 never a value.
+
+--private-report PATH (the user's manual review; amendment of 2026-11-14):
+writes one block per case (id, question, flags and reason codes, query
+arguments, result ids, the final text the student would see) to PATH,
+after the totals are printed. PATH must be outside the repository (checked
+on the resolved path, ignoring case, before any model call) and must not
+exist yet. The four printed lines are unchanged, and nothing says the
+report was written. Only the user reads it; it never enters the repo, the
+devlog or a chat. Without the option nothing is written.
 """
 
 import argparse
 import hashlib
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -62,6 +73,7 @@ from archways_assistant import assistant
 from archways_assistant.evalflow import (
     SCORER,
     CaseFileError,
+    format_case,
     format_totals,
     load_cases,
     score_case,
@@ -71,13 +83,50 @@ from archways_assistant.evalflow import (
 FIXED_NOW = datetime.fromisoformat("2026-11-14T10:00:00+08:00")
 CONFIGS = ("baseline",)  # "final" is added when every change is frozen
 MODEL = "qwen3:0.6b"
+REPO = Path(__file__).resolve().parents[1]
+
+
+def private_report_path(value: str) -> Path:
+    """The --private-report path, or exit: outside the repo, not existing."""
+    path = Path(value).resolve()
+    inside = os.path.normcase(str(path)), os.path.normcase(str(REPO))
+    if inside[0] == inside[1] or inside[0].startswith(inside[1] + os.sep):
+        sys.exit("--private-report must be outside the repository")
+    if path.exists():
+        sys.exit("--private-report must not exist yet")
+    if not path.parent.is_dir():
+        sys.exit("--private-report: the folder does not exist")
+    return path
+
+
+def write_private_report(path: Path, blocks: list[str]) -> None:
+    """The only write in this script (accuracy-phase.md, 2026-11-14 amendment)."""
+    with path.open("x", encoding="utf-8", newline="\n") as report:
+        report.write("\n\n".join(blocks) + "\n")
+
+
+def report_block(case: dict, record: dict, line: str) -> str:
+    return "\n".join(
+        [
+            f"=== {case['id']} ===",
+            f"question: {case['question']}",
+            f"score: {line}",
+            f"query arguments: {json.dumps(record['arguments'], ensure_ascii=False)}",
+            "final text:",
+            record["text"],
+        ]
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("path", type=Path)
     parser.add_argument("--config", required=True, choices=CONFIGS)
+    parser.add_argument("--private-report", metavar="PATH")
     args = parser.parse_args()
+    report = None
+    if args.private_report is not None:
+        report = private_report_path(args.private_report)
 
     try:
         data = args.path.read_bytes()
@@ -135,25 +184,28 @@ def main() -> None:
         print(
             f"held-out file sha256 {hashlib.sha256(data).hexdigest()}  cases {len(cases)}"
         )
-        scores = []
+        scores, blocks = [], []
         for number, case in enumerate(cases, start=1):
             try:
                 record = run_case(client, MODEL, case, prompts, rows, contract)
-                scores.append(
-                    score_case(
-                        case,
-                        record["path"],
-                        record["text"],
-                        record["results"],
-                        by_id,
-                        offices,
-                    )
+                score = score_case(
+                    case,
+                    record["path"],
+                    record["text"],
+                    record["results"],
+                    by_id,
+                    offices,
                 )
+                scores.append(score)
+                if report is not None:
+                    blocks.append(report_block(case, record, format_case(score)))
             except Exception as error:  # noqa: BLE001 - never print a value
                 sys.exit(
                     f"case number {number} failed ({type(error).__name__}); no totals"
                 )
     print(format_totals("HELD-OUT", totals(scores)))
+    if report is not None:
+        write_private_report(report, blocks)
 
 
 if __name__ == "__main__":

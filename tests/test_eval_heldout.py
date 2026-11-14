@@ -13,7 +13,9 @@ from pathlib import Path
 
 import pytest
 
+from archways_assistant import assistant
 from archways_assistant.e2escore import NOT_FOUND_MESSAGE
+from archways_assistant.fakebackend import to_announcement
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -143,11 +145,184 @@ def test_only_the_baseline_config_exists_until_the_final_freeze():
     assert load_script().CONFIGS == ("baseline",)
 
 
-def test_the_script_has_no_write_or_cache_call():
+WRITES = {"write_text", "write_bytes", "open", "mkdir", "dump", "write"}
+
+
+def write_names(node: ast.AST) -> set[str]:
+    return {
+        n.attr if isinstance(n, ast.Attribute) else n.id
+        for n in ast.walk(node)
+        if isinstance(n, (ast.Attribute, ast.Name))
+    } & WRITES
+
+
+def test_the_only_write_is_the_private_report():
     tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
-    names = {
-        node.attr if isinstance(node, ast.Attribute) else node.id
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.Attribute, ast.Name))
+    writer = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "write_private_report"
+    ]
+    assert len(writer) == 1 and write_names(writer[0]) == {"open", "write"}
+    rest = [node for node in tree.body if node is not writer[0]]
+    assert all(not write_names(node) for node in rest)
+
+
+# --- --private-report (amendment of 2026-11-14) -------------------------------
+
+
+def answering(client, model, case, prompts, rows, contract):
+    found = [to_announcement(ROWS[0])]
+    text = (
+        assistant.ANSWER_LABEL
+        + assistant.ANSWER_LABEL_SEPARATOR
+        + SECRET_REPLY
+        + assistant.ANSWER_LIST_SEPARATOR
+        + assistant.results_list(found)
+    )
+    return {
+        "path": "answer",
+        "text": text,
+        "results": found,
+        "arguments": {"query": "q"},
     }
-    assert not names & {"write_text", "write_bytes", "open", "mkdir", "dump"}
+
+
+def run_main(module, monkeypatch, *argv):
+    monkeypatch.setattr(sys, "argv", ["eval_heldout.py", *argv])
+    module.main()
+
+
+def test_without_the_option_nothing_is_written(tmp_path, monkeypatch, capsys):
+    module = load_script()
+    patch(module, monkeypatch, answering)
+
+    def no_write(path, blocks):
+        raise AssertionError("wrote a report without --private-report")
+
+    monkeypatch.setattr(module, "write_private_report", no_write)
+    path = held_out_file(tmp_path)
+    before = sorted(p.name for p in tmp_path.iterdir())
+    run_main(module, monkeypatch, str(path), "--config", "baseline")
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+    assert len(capsys.readouterr().out.splitlines()) == 4
+
+
+def test_the_report_outside_the_repo_has_question_reply_and_flags(
+    tmp_path, monkeypatch, capsys
+):
+    module = load_script()
+    patch(module, monkeypatch, answering)
+    path = held_out_file(tmp_path)
+    report = tmp_path / "review" / "report.txt"
+    report.parent.mkdir()
+    run_main(
+        module,
+        monkeypatch,
+        str(path),
+        "--config",
+        "baseline",
+        "--private-report",
+        str(report),
+    )
+    out = capsys.readouterr().out
+    # The printed lines are unchanged: four, with no case text and no report line.
+    assert len(out.splitlines()) == 4
+    for secret in (SECRET_ID, SECRET_QUESTION, SECRET_REPLY, str(report)):
+        assert secret not in out
+    text = report.read_text(encoding="utf-8")
+    assert f"=== {SECRET_ID} ===" in text
+    assert f"question: {SECRET_QUESTION}" in text
+    assert SECRET_REPLY in text
+    # Flags and reason codes per case: the answerable case misses "Some",
+    # and the trap got an AI answer.
+    assert "AI_NOT_CORRECT" in text and "missing:Some" in text
+    assert "NOT_CLEAN" in text
+    assert text.count("=== ") == 2
+
+
+@pytest.mark.parametrize(
+    "inside",
+    [
+        lambda: ROOT / "report.txt",
+        lambda: ROOT / "data" / "local" / "report.txt",
+        lambda: Path(str(ROOT).upper()) / "report.txt",
+        lambda: ROOT / "data" / ".." / "report.txt",
+        lambda: Path("report.txt"),  # relative, resolved against the repo cwd
+    ],
+)
+def test_a_report_inside_the_repo_is_refused_before_any_run(
+    tmp_path, monkeypatch, inside
+):
+    module = load_script()
+
+    def never(*args):
+        raise AssertionError("ran a case although the report path was refused")
+
+    patch(module, monkeypatch, never)
+    monkeypatch.chdir(ROOT)
+    target = inside()
+    path = held_out_file(tmp_path)
+    with pytest.raises(SystemExit) as stop:
+        run_main(
+            module,
+            monkeypatch,
+            str(path),
+            "--config",
+            "baseline",
+            "--private-report",
+            str(target),
+        )
+    assert "outside the repository" in str(stop.value.code)
+    assert not (ROOT / "report.txt").exists()
+    assert not (ROOT / "data" / "local" / "report.txt").exists()
+
+
+def test_an_existing_report_file_is_refused(tmp_path, monkeypatch):
+    module = load_script()
+    patch(module, monkeypatch, answering)
+    existing = tmp_path / "old.txt"
+    existing.write_text("keep", encoding="utf-8")
+    path = held_out_file(tmp_path)
+    with pytest.raises(SystemExit) as stop:
+        run_main(
+            module,
+            monkeypatch,
+            str(path),
+            "--config",
+            "baseline",
+            "--private-report",
+            str(existing),
+        )
+    assert "must not exist" in str(stop.value.code)
+    assert existing.read_text(encoding="utf-8") == "keep"
+
+
+def test_a_failed_run_writes_no_report(tmp_path, monkeypatch):
+    module = load_script()
+
+    def failing(*args):
+        raise ValueError(SECRET_QUESTION)
+
+    patch(module, monkeypatch, failing)
+    report = tmp_path / "report.txt"
+    with pytest.raises(SystemExit):
+        run_main(
+            module,
+            monkeypatch,
+            str(held_out_file(tmp_path)),
+            "--config",
+            "baseline",
+            "--private-report",
+            str(report),
+        )
+    assert not report.exists()
+
+
+def test_the_repo_check_ignores_case(monkeypatch):
+    """Windows paths are case-insensitive: a repo path in other case still matches."""
+    module = load_script()
+    monkeypatch.setattr(module, "REPO", Path(str(ROOT).upper()))
+    with pytest.raises(SystemExit) as stop:
+        module.private_report_path(str(ROOT / "report.txt"))
+    assert "outside the repository" in str(stop.value.code)
