@@ -280,6 +280,63 @@ def replay(run_path: Path, rank: str) -> None:
         )
 
 
+def nothing_worse(base_path: Path, new_path: Path, exclude: set[str]) -> bool:
+    """accuracy-phase.md section 3, rule 4, per set. Prints every change."""
+    runs = [json.loads(p.read_text(encoding="utf-8")) for p in (base_path, new_path)]
+    base, new = ({(c["set"], c["id"]): c["score"] for c in r["cases"]} for r in runs)
+    if set(base) != set(new):
+        sys.exit("the two runs have different cases")
+    print(f"nothing-worse check: {base_path.name} -> {new_path.name}")
+    if exclude:
+        print(f"  reported outside the check: {sorted(exclude)}")
+    ok = True
+    for name in dict.fromkeys(s for s, _ in base):
+        keys = [k for k in base if k[0] == name and k[1] not in exclude]
+        helpful = [sum(bool(d[k]["helpful"]) for k in keys) for d in (base, new)]
+        wrong = [
+            sum(bool(d[k]["wrong"]) and d[k]["answered"] for k in keys)
+            for d in (base, new)
+        ]
+        new_unsafe = [k[1] for k in keys if new[k]["wrong"] and not base[k]["wrong"]]
+        lost = [k[1] for k in keys if base[k]["helpful"] and not new[k]["helpful"]]
+        gained = [k[1] for k in keys if new[k]["helpful"] and not base[k]["helpful"]]
+        correct = [sum(bool(d[k]["correct"]) for k in keys) for d in (base, new)]
+        set_ok = helpful[1] >= helpful[0] and not new_unsafe and wrong[1] <= wrong[0]
+        ok = ok and set_ok
+        print(
+            f"{name}: {'OK' if set_ok else 'WORSE'}  helpful {helpful[0]} -> {helpful[1]}  "
+            f"ai_correct {correct[0]} -> {correct[1]}  wrong answers {wrong[0]} -> {wrong[1]}  "
+            f"new unsafe {new_unsafe}"
+        )
+        print(f"  helpful lost {lost}  gained {gained}")
+        for k in keys:
+            b, n = base[k], new[k]
+            if b["trap"] and not b["out_of_scope"]:
+                print(
+                    f"  trap {k[1]}: clean {b['clean']} -> {n['clean']}  "
+                    f"path {b['path']} -> {n['path']}  unrelated list "
+                    f"{b['unrelated_list']} -> {n['unrelated_list']}"
+                )
+            elif (b["path"], b["correct"], b["helpful"]) != (
+                n["path"],
+                n["correct"],
+                n["helpful"],
+            ):
+                print(
+                    f"  changed {k[1]}: path {b['path']} -> {n['path']}  correct "
+                    f"{b['correct']} -> {n['correct']}  helpful {b['helpful']} -> {n['helpful']}"
+                )
+    for k in sorted(exclude):
+        for s, i in base:
+            if i == k:
+                b, n = base[(s, i)], new[(s, i)]
+                print(
+                    f"  outside the check {i}: path {b['path']} -> {n['path']}  wrong {b['wrong']} -> {n['wrong']}"
+                )
+    print("RESULT: " + ("nothing got worse" if ok else "something got worse"))
+    return ok
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path)
@@ -290,7 +347,13 @@ def main() -> None:
     parser.add_argument("--rank", choices=["rank_v1"], default=None)
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
     parser.add_argument("--replay", type=Path, metavar="RUN")
+    parser.add_argument("--nothing-worse", nargs=2, type=Path, metavar=("BASE", "NEW"))
+    parser.add_argument("--exclude", default="", help="ids reported outside the check")
     args = parser.parse_args()
+    if args.nothing_worse:
+        exclude = {i for i in args.exclude.split(",") if i}
+        ok = nothing_worse(*args.nothing_worse, exclude)
+        sys.exit(0 if ok else 1)
     if args.compare:
         compare(*args.compare)
         return
