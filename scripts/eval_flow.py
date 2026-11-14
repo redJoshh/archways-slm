@@ -45,6 +45,7 @@ import json
 import subprocess
 import sys
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -146,17 +147,29 @@ def run_case(
     prompts: dict[str, str],
     rows: list[dict],
     contract: dict,
+    *,
+    rank: str | None = None,
+    query_reply: str | None = None,
 ) -> dict:
-    """One case through the full flow; returns the replies and the outcome."""
+    """One case through the full flow; returns the replies and the outcome.
+
+    rank: None (newest first, the frozen baseline) or "rank_v1". query_reply:
+    a saved query reply to use instead of the query call (--reuse-queries);
+    None makes the call. The defaults are the held-out script's path.
+    """
+    saved_query = query_reply
     question, now = case["question"], case["now"]
     _, calls, _ = assistant.flow(question, now, prompts, assistant.ERROR)
     record = {"query_reply": None, "search": None, "case_tokens": None}
     record["answer_reply"] = None
     query_reply = search_reply = case_tokens = answer_reply = None
     if calls is not None:
-        query_reply = generate(client, model, calls.query_prompt, QUERY_N_PREDICT)[
-            "response"
-        ]
+        if saved_query is not None:
+            query_reply = saved_query
+        else:
+            query_reply = generate(client, model, calls.query_prompt, QUERY_N_PREDICT)[
+                "response"
+            ]
         record["query_reply"] = query_reply
         try:
             arguments = assistant.parse_query_reply(query_reply)
@@ -164,7 +177,9 @@ def run_case(
             arguments = None
         if arguments is not None:
             try:
-                search_reply = search_feed(rows, arguments, now, contract)
+                search_reply = search_feed(
+                    rows, arguments, now, contract, question=question, rank=rank
+                )
                 record["search"] = [r["id"] for r in search_reply]
             except InvalidArguments:
                 search_reply = assistant.ERROR
@@ -220,6 +235,51 @@ def compare(a: Path, b: Path) -> None:
         print(f"  differs: {line}")
 
 
+def load_saved_queries(path: Path) -> tuple[dict, dict]:
+    """(header, {(set, id): query_reply}) of a saved run file."""
+    run = json.loads(path.read_text(encoding="utf-8"))
+    return run["header"], {(c["set"], c["id"]): c["query_reply"] for c in run["cases"]}
+
+
+def places(ids: list[str], sources: list[str]) -> str:
+    return (
+        " ".join(f"{s}@{ids.index(s) + 1}" if s in ids else f"{s}@-" for s in sources)
+        or "trap"
+    )
+
+
+def replay(run_path: Path, rank: str) -> None:
+    """Retrieval only, no model call: a saved run's arguments, searched again."""
+    run = json.loads(run_path.read_text(encoding="utf-8"))
+    sources = load_sources()
+    contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    print(f"replay of {run_path.name} (commit {run['header']['commit']}), rank {rank}")
+    for case in run["cases"]:
+        if not isinstance(case["arguments"], dict):
+            print(f"{case['set']} {case['id']}: no search (path {case['path']})")
+            continue
+        rows = sources[SETS[case["set"]][1]]
+        now = datetime.fromisoformat(case["now"])
+        before = [r["id"] for r in search_feed(rows, case["arguments"], now, contract)]
+        after = [
+            r["id"]
+            for r in search_feed(
+                rows,
+                case["arguments"],
+                now,
+                contract,
+                question=case["question"],
+                rank=rank,
+            )
+        ]
+        sources_ = list(case["score"]["source_ids"])
+        mark = "" if before == after else "  CHANGED"
+        print(
+            f"{case['set']} {case['id']}: {before} -> {after}  "
+            f"sources {places(before, sources_)} -> {places(after, sources_)}{mark}"
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path)
@@ -227,9 +287,17 @@ def main() -> None:
     parser.add_argument("--ids", default="")
     parser.add_argument("--model", default="qwen3:0.6b")
     parser.add_argument("--compare", nargs=2, type=Path, metavar="RUN")
+    parser.add_argument("--rank", choices=["rank_v1"], default=None)
+    parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
+    parser.add_argument("--replay", type=Path, metavar="RUN")
     args = parser.parse_args()
     if args.compare:
         compare(*args.compare)
+        return
+    if args.replay:
+        if args.rank is None:
+            parser.error("--replay needs --rank")
+        replay(args.replay, args.rank)
         return
     if args.out is None:
         parser.error("--out is required")
@@ -262,6 +330,17 @@ def main() -> None:
             sys.exit(f"{name}: {error}")
         sets[name] = [c for c in cases if not wanted or c["id"] in wanted]
 
+    saved_header, saved = (None, {})
+    if args.reuse_queries:
+        saved_header, saved = load_saved_queries(args.reuse_queries)
+        if saved_header["prompts"]["query"][1] != sha256(QUERY_PROMPT):
+            sys.exit("--reuse-queries: that run used another query prompt")
+        missing = [
+            c["id"] for n, cs in sets.items() for c in cs if (n, c["id"]) not in saved
+        ]
+        if missing:
+            sys.exit(f"--reuse-queries: no saved query reply for {missing}")
+
     with httpx.Client(timeout=600, trust_env=False) as client:
         header = {
             "ollama": ollama_version(client),
@@ -284,7 +363,16 @@ def main() -> None:
             },
             "case_files": {n: [SETS[n][0].name, sha256(SETS[n][0])] for n in sets},
             "snapshot_sha256": sha256(SNAPSHOT),
+            "rank": args.rank,
+            "query_replies_from": None
+            if args.reuse_queries is None
+            else [args.reuse_queries.name, sha256(args.reuse_queries)],
         }
+        if saved_header is not None and (
+            saved_header["model_digest"] != header["model_digest"]
+            or saved_header["ollama"] != header["ollama"]
+        ):
+            sys.exit("--reuse-queries: that run used another model or Ollama")
         print(json.dumps(header, ensure_ascii=True))
         for name, cases in sets.items():
             instants = sorted({c["now"].isoformat() for c in cases})
@@ -300,7 +388,14 @@ def main() -> None:
             scores = []
             for case in cases:
                 record = run_case(
-                    client, args.model, case, prompts, data_rows, contract
+                    client,
+                    args.model,
+                    case,
+                    prompts,
+                    data_rows,
+                    contract,
+                    rank=args.rank,
+                    query_reply=saved.get((name, case["id"])),
                 )
                 score = score_case(
                     case,
