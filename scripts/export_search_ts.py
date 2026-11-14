@@ -5,6 +5,8 @@ Usage: uv run python scripts/export_search_ts.py [--check]
 From the Python reference (ADR 0006: the search runs on the phone):
 - STOPWORDS: fakebackend.AND_V2_STOPWORDS (and_v3 uses the same)
 - SYNONYMS: contracts/search_synonyms_v1.json via fakebackend.SYNONYMS
+- SYNONYMS_V2: contracts/search_synonyms_v2.json via fakebackend.SYNONYMS_V2
+  (and_v4, accuracy-phase.md section 3 (c))
 - PY_SPACE: every code point for which Python's str.isspace() is true,
   because the query is split with str.split() (no arguments)
 - INLINE_TAGS, PLAIN_SPACE and ENTITIES: excerpt.py's plain-text rule
@@ -33,6 +35,7 @@ from archways_assistant.fakebackend import (
     AND_V2_STOPWORDS,
     EXCERPT_CHARS,
     SYNONYMS,
+    SYNONYMS_V2,
     is_word_char,
 )
 
@@ -91,6 +94,9 @@ def render() -> str:
         + ";",
         "export const SYNONYMS: { readonly [word: string]: readonly string[] } = "
         + literal(dict(sorted(SYNONYMS.items())))
+        + ";",
+        "export const SYNONYMS_V2: { readonly [word: string]: readonly string[] } = "
+        + literal(dict(sorted(SYNONYMS_V2.items())))
         + ";",
         "// Code points where Python's str.isspace() is true (query splitting).",
         "export const PY_SPACE: readonly number[] = ["

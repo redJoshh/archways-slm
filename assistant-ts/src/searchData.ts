@@ -12,6 +12,7 @@ export const YEAR_MIN = 1000;
 export const YEAR_MAX = 9999;
 export const STOPWORDS: readonly string[] = ["a", "about", "an", "and", "ang", "announcement", "announcements", "ano", "any", "are", "at", "ba", "for", "from", "how", "in", "is", "kailan", "kapag", "mga", "ng", "of", "on", "or", "po", "sa", "the", "there", "to", "what", "when", "where", "which", "who", "with", "yung"];
 export const SYNONYMS: { readonly [word: string]: readonly string[] } = {"bagyo": ["typhoon"], "enrolment": ["enrollment"], "examinations": ["examination"], "klase": ["class"], "payment": ["due"], "registration": ["sign up"], "second-term": ["second term"]};
+export const SYNONYMS_V2: { readonly [word: string]: readonly string[] } = {"bagyo": ["typhoon"], "enrolment": ["enrollment"], "examinations": ["examination"], "klase": ["class"], "pasok": ["class"], "payment": ["due"], "registration": ["sign up"], "second-term": ["second term"]};
 // Code points where Python's str.isspace() is true (query splitting).
 export const PY_SPACE: readonly number[] = [0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x001c, 0x001d, 0x001e, 0x001f, 0x0020, 0x0085, 0x00a0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000];
 export const PLAIN_SPACE: readonly number[] = [0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x0020, 0x00a0];

@@ -32,9 +32,9 @@
 
 import type { Announcement } from "./render.ts";
 import { feedRow } from "./feed.ts";
-import type { RankVersion } from "./rank.ts";
+import { rankScorer, type RankVersion } from "./rank.ts";
 import { searchWithRetry, type RetryResult, type RetryVersion } from "./retry.ts";
-import { searchRows, type IndexRow } from "./search.ts";
+import { searchRows, type IndexRow, type Matcher } from "./search.ts";
 
 export class HttpError extends Error {
   status: number;
@@ -93,7 +93,12 @@ export interface FeedIndex {
   rebuild: () => Promise<IndexReport>;
   clear: () => void;
   /** score: searchRows's optional per-row score (rank.ts rankScorer). */
-  search: (args: unknown, nowMs?: number, score?: (row: IndexRow) => number) => Announcement[];
+  search: (
+    args: unknown,
+    nowMs?: number,
+    score?: (row: IndexRow) => number,
+    matcher?: Matcher,
+  ) => Announcement[];
   /** retry.ts searchWithRetry over the index (rank_v1, then retry_v1 on 0 results). */
   searchRetry: (
     args: unknown,
@@ -270,10 +275,10 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
       refreshedAt = 0;
       inFlight = null;
     },
-    search: (args: unknown, nowMs?: number, score?: (row: IndexRow) => number) => {
+    search: (args: unknown, nowMs?: number, score?: (row: IndexRow) => number, matcher?: Matcher) => {
       const rows: IndexRow[] = [];
       if (entries) entries.forEach((entry) => rows.push(entry.row));
-      return searchRows(rows, args, nowMs === undefined ? clock() : nowMs, score);
+      return searchRows(rows, args, nowMs === undefined ? clock() : nowMs, score, matcher);
     },
     searchRetry: (
       args: unknown,
@@ -301,7 +306,8 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
  * askAssistant passes as the second argument. retry: "retry_v1" (needs
  * rank_v1) searches again with the question's words after 0 results;
  * onSearch, if given, gets the retry flag and the result count (numbers
- * only, for the question log).
+ * only, for the question log). matcher: "and_v3" (default) or "and_v4"
+ * (retry_v1 runs with and_v3 only).
  */
 export function makeFeedSearch(
   index: FeedIndex,
@@ -309,13 +315,20 @@ export function makeFeedSearch(
   rank: RankVersion | null = null,
   retry: RetryVersion | null = null,
   onSearch?: (info: { retried: boolean; count: number }) => void,
+  matcher: Matcher = "and_v3",
 ) {
   if (retry !== null && rank === null) throw new Error("retry_v1 needs rank_v1");
+  if (retry !== null && matcher !== "and_v3") throw new Error("retry_v1 runs with and_v3 only");
   return async (args: unknown, context?: { question: string }): Promise<unknown> => {
     await index.ensure();
     if (rank !== null && context === undefined) throw new Error("rank needs the question");
-    if (rank === null) return index.search(args, nowMs());
+    if (rank === null) return index.search(args, nowMs(), undefined, matcher);
     const question = (context as { question: string }).question;
+    if (retry === null) {
+      const results = index.search(args, nowMs(), rankScorer(rank, question, matcher), matcher);
+      if (onSearch) onSearch({ retried: false, count: results.length });
+      return results;
+    }
     const found = index.searchRetry(args, nowMs(), question, rank, retry);
     if (onSearch) onSearch({ retried: found.retried, count: found.results.length });
     return found.results;

@@ -22,7 +22,9 @@
 
 import { claims, claimsAndRest, type Claims } from "../../guard-ts/src/guard.ts";
 import { ANCHOR_WEIGHT, DIGIT_RANGES, RANK_STOPWORDS, STOPWORDS, SYNONYMS } from "./searchData.ts";
-import { isWordChar, pluralAlternative, wholeWordIn, type IndexRow } from "./search.ts";
+import { isWordChar, pluralAlternative, synonymsFor, wholeWordIn, type IndexRow, type Matcher } from "./search.ts";
+
+type SynonymMap = { readonly [word: string]: readonly string[] };
 
 export type RankVersion = "rank_v1";
 
@@ -113,8 +115,8 @@ export function questionTerms(question: string): RankTerms {
 }
 
 /** The matcher's (and_v3) test for a one-word query, on lowercased text. */
-export function wordFound(word: string, title: string, body: string): boolean {
-  const synonyms = Object.prototype.hasOwnProperty.call(SYNONYMS, word) ? SYNONYMS[word] : [];
+export function wordFound(word: string, title: string, body: string, synonymMap: SynonymMap = SYNONYMS): boolean {
+  const synonyms = Object.prototype.hasOwnProperty.call(synonymMap, word) ? synonymMap[word] : [];
   const alts = [word].concat(synonyms);
   for (const alt of alts) if (title.indexOf(alt) !== -1 || body.indexOf(alt) !== -1) return true;
   const stem = pluralAlternative(word);
@@ -143,9 +145,9 @@ function rowAnchors(row: IndexRow): RowAnchors {
   return anchors;
 }
 
-export function rowPoints(terms: RankTerms, row: IndexRow): number {
+export function rowPoints(terms: RankTerms, row: IndexRow, synonymMap: SynonymMap = SYNONYMS): number {
   let words = 0;
-  for (const word of terms.words) if (wordFound(word, row.title, row.body)) words++;
+  for (const word of terms.words) if (wordFound(word, row.title, row.body, synonymMap)) words++;
   const anchors = rowAnchors(row);
   let found = 0;
   for (const key of terms.dates) if (anchors.dates[key] === true) found++;
@@ -160,9 +162,11 @@ export function rowPoints(terms: RankTerms, row: IndexRow): number {
 export function rankScorer(
   rank: RankVersion | null,
   question: string,
+  matcher: Matcher = "and_v3",
 ): ((row: IndexRow) => number) | undefined {
   if (rank === null) return undefined;
   if (rank !== "rank_v1") throw new Error("unknown rank version");
   const terms = questionTerms(question);
-  return (row: IndexRow) => rowPoints(terms, row);
+  const synonymMap = synonymsFor(matcher);
+  return (row: IndexRow) => rowPoints(terms, row, synonymMap);
 }

@@ -93,8 +93,10 @@ def test_the_default_path_makes_the_query_call_with_flows_prompt(monkeypatch):
 
     searched = []
 
-    def fake_search(rows, arguments, now, contract, *, question=None, rank=None):
-        searched.append(rank)
+    def fake_search(
+        rows, arguments, now, contract, *, question=None, rank=None, matcher="and_v3"
+    ):
+        searched.append((rank, matcher))
         return [
             {
                 "id": "1",
@@ -123,5 +125,6 @@ def test_the_default_path_makes_the_query_call_with_flows_prompt(monkeypatch):
         1,
         assistant.ANSWER_N_PREDICT,
     ]
-    assert searched == [None]  # newest first: the baseline configuration
+    # Newest first with and_v3: the baseline configuration.
+    assert searched == [(None, "and_v3")]
     assert result["path"] == "answer"

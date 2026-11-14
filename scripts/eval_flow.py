@@ -151,6 +151,7 @@ def run_case(
     rank: str | None = None,
     query_reply: str | None = None,
     retry: str | None = None,
+    matcher: str = MATCHER,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -180,9 +181,17 @@ def run_case(
             try:
                 if retry is None:
                     search_reply = search_feed(
-                        rows, arguments, now, contract, question=question, rank=rank
+                        rows,
+                        arguments,
+                        now,
+                        contract,
+                        question=question,
+                        rank=rank,
+                        matcher=matcher,
                     )
                 else:
+                    if matcher != MATCHER:
+                        raise ValueError("retry_v1 runs with and_v3 only")
                     search_reply, record["retried"] = search_feed_retry(
                         rows,
                         arguments,
@@ -260,8 +269,14 @@ def places(ids: list[str], sources: list[str]) -> str:
     )
 
 
-def replay(run_path: Path, rank: str, retry: str | None = None) -> None:
-    """Retrieval only, no model call: a saved run's arguments, searched again."""
+def replay(
+    run_path: Path, rank: str, retry: str | None = None, matcher: str = MATCHER
+) -> None:
+    """Retrieval only, no model call: a saved run's arguments, searched again.
+
+    Before: newest first (and_v3); with matcher and_v4, before is rank with
+    and_v3 and after is rank with and_v4.
+    """
     run = json.loads(run_path.read_text(encoding="utf-8"))
     sources = load_sources()
     contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -272,16 +287,39 @@ def replay(run_path: Path, rank: str, retry: str | None = None) -> None:
             continue
         rows = sources[SETS[case["set"]][1]]
         now = datetime.fromisoformat(case["now"])
-        before = [r["id"] for r in search_feed(rows, case["arguments"], now, contract)]
-        found, retried = search_feed_retry(
-            rows,
-            case["arguments"],
-            now,
-            contract,
-            question=case["question"],
-            rank=rank,
-            retry=retry,
-        )
+        base_rank = rank if matcher != MATCHER else None
+        before = [
+            r["id"]
+            for r in search_feed(
+                rows,
+                case["arguments"],
+                now,
+                contract,
+                question=case["question"],
+                rank=base_rank,
+            )
+        ]
+        if matcher != MATCHER:
+            found = search_feed(
+                rows,
+                case["arguments"],
+                now,
+                contract,
+                question=case["question"],
+                rank=rank,
+                matcher=matcher,
+            )
+            retried = False
+        else:
+            found, retried = search_feed_retry(
+                rows,
+                case["arguments"],
+                now,
+                contract,
+                question=case["question"],
+                rank=rank,
+                retry=retry,
+            )
         after = [r["id"] for r in found]
         sources_ = list(case["score"]["source_ids"])
         mark = ("" if before == after else "  CHANGED") + (
@@ -389,6 +427,7 @@ def main() -> None:
     parser.add_argument("--compare", nargs=2, type=Path, metavar="RUN")
     parser.add_argument("--rank", choices=["rank_v1"], default=None)
     parser.add_argument("--retry", choices=["retry_v1"], default=None)
+    parser.add_argument("--matcher", choices=["and_v3", "and_v4"], default=MATCHER)
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
     parser.add_argument("--replay", type=Path, metavar="RUN")
     parser.add_argument(
@@ -410,15 +449,18 @@ def main() -> None:
     if args.replay:
         if args.rank is None:
             parser.error("--replay needs --rank")
-        replay(args.replay, args.rank, args.retry)
+        replay(args.replay, args.rank, args.retry, args.matcher)
         return
     if args.out is None:
         parser.error("--out is required")
+    if args.retry is not None and args.matcher != MATCHER:
+        parser.error("--retry runs with and_v3 only")
     if args.retry is not None and args.rank is None:
         parser.error("--retry needs --rank (retry_v1 orders by rank_v1)")
     if args.verify_baseline is not None:
         if (
             args.rank is not None
+            or args.matcher != MATCHER
             or args.retry is not None
             or args.reuse_queries is not None
         ):
@@ -474,7 +516,7 @@ def main() -> None:
             "commit": git_commit(),
             "tree_dirty": tree_is_dirty(),
             "scorer": SCORER,
-            "matcher": MATCHER,
+            "matcher": args.matcher,
             "budget": "off",
             "options": BASE_OPTIONS,
             "keep_alive": KEEP_ALIVE,
@@ -523,6 +565,7 @@ def main() -> None:
                     rank=args.rank,
                     query_reply=saved.get((name, case["id"])),
                     retry=args.retry,
+                    matcher=args.matcher,
                 )
                 score = score_case(
                     case,

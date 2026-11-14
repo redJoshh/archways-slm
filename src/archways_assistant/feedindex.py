@@ -137,10 +137,13 @@ def search_feed(
     *,
     question: str | None = None,
     rank: str | None = None,
+    matcher: str = "and_v3",
 ) -> list[dict]:
-    """and_v3 over feed rows; rank "rank_v1" orders by the question first."""
+    """and_v3 (or and_v4) over feed rows; rank "rank_v1" orders by the question."""
+    if matcher not in ("and_v3", "and_v4"):
+        raise ValueError(f"the feed search runs and_v3 or and_v4, not {matcher!r}")
     return search_announcements(
-        rows, arguments, now, contract, matcher="and_v3", question=question, rank=rank
+        rows, arguments, now, contract, matcher=matcher, question=question, rank=rank
     )
 
 

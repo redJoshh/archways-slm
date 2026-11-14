@@ -22,7 +22,16 @@
 import { checkArguments } from "./contract.ts";
 import type { Announcement } from "./render.ts";
 import { countCodePoints } from "./plaintext.ts";
-import { DAYS_DEFAULT, LIMIT_DEFAULT, PY_SPACE, STOPWORDS, SYNONYMS, WORD_RANGES } from "./searchData.ts";
+import { DAYS_DEFAULT, LIMIT_DEFAULT, PY_SPACE, STOPWORDS, SYNONYMS, SYNONYMS_V2, WORD_RANGES } from "./searchData.ts";
+
+/** and_v3, or and_v4 = and_v3's rules with SYNONYMS_V2 (accuracy-phase.md (c)). */
+export type Matcher = "and_v3" | "and_v4";
+
+export function synonymsFor(matcher: Matcher): { readonly [word: string]: readonly string[] } {
+  if (matcher === "and_v3") return SYNONYMS;
+  if (matcher === "and_v4") return SYNONYMS_V2;
+  throw new Error("unknown matcher");
+}
 
 /** One indexed feed item. */
 export interface IndexRow {
@@ -101,11 +110,14 @@ function splitPython(text: string): string[] {
 }
 
 /** and_v3 groups: [word and its synonyms, [plural alternative] or []]. */
-export function queryGroups(query: string): [string[], string[]][] {
+export function queryGroups(
+  query: string,
+  synonymMap: { readonly [word: string]: readonly string[] } = SYNONYMS,
+): [string[], string[]][] {
   const out: [string[], string[]][] = [];
   for (const word of splitPython(query.toLowerCase())) {
     if (STOPWORDS.indexOf(word) !== -1) continue;
-    const synonyms = Object.prototype.hasOwnProperty.call(SYNONYMS, word) ? SYNONYMS[word] : [];
+    const synonyms = Object.prototype.hasOwnProperty.call(synonymMap, word) ? synonymMap[word] : [];
     const stem = pluralAlternative(word);
     out.push([[word].concat(synonyms), stem === null ? [] : [stem]]);
   }
@@ -131,11 +143,12 @@ export function searchRows(
   args: unknown,
   nowMs: number,
   score?: (row: IndexRow) => number,
+  matcher: Matcher = "and_v3",
 ): Announcement[] {
   const checked = checkArguments(args);
   const days = checked.days === undefined ? DAYS_DEFAULT : checked.days;
   const limit = checked.limit === undefined ? LIMIT_DEFAULT : checked.limit;
-  const groups = queryGroups(checked.query);
+  const groups = queryGroups(checked.query, synonymsFor(matcher));
   if (groups.length === 0) return [];
   const since = nowMs - days * DAY_MS;
   const found = rows.filter((row) => row.publishedMs <= nowMs && row.publishedMs >= since && matches(row, groups));

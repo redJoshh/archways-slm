@@ -81,9 +81,11 @@ def question_terms(question: str) -> Terms:
     return Terms(tuple(words), found.dates, found.numbers)
 
 
-def word_found(word: str, title: str, body: str) -> bool:
-    """The matcher's (and_v3) test for a one-word query, on lowercased text."""
-    if any(alt in title or alt in body for alt in [word, *SYNONYMS.get(word, [])]):
+def word_found(
+    word: str, title: str, body: str, synonyms: dict[str, list[str]] = SYNONYMS
+) -> bool:
+    """The matcher's one-word test (and_v3 rules; synonyms of the matcher in use)."""
+    if any(alt in title or alt in body for alt in [word, *synonyms.get(word, [])]):
         return True
     stem = plural_alternative(word)
     return stem is not None and (
@@ -97,8 +99,10 @@ def row_claims(title: str, body: str) -> tuple[Claims, Claims]:
     return claims(text), merged_claims([text])
 
 
-def points(terms: Terms, title: str, body: str) -> int:
+def points(
+    terms: Terms, title: str, body: str, synonyms: dict[str, list[str]] = SYNONYMS
+) -> int:
     own, merged = row_claims(title, body)
-    words = sum(word_found(word, title, body) for word in terms.words)
+    words = sum(word_found(word, title, body, synonyms) for word in terms.words)
     anchors = len(terms.dates & own.dates) + len(terms.numbers & merged.numbers)
     return words + ANCHOR_WEIGHT * anchors

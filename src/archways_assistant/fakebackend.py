@@ -139,7 +139,19 @@ SYNONYMS_PATH = (
 _SYNONYM_MAP = json.loads(SYNONYMS_PATH.read_text(encoding="utf-8"))
 SYNONYMS: dict[str, list[str]] = _SYNONYM_MAP["synonyms"]
 AND_V2_STOPWORDS = STOPWORDS | frozenset(_SYNONYM_MAP["extra_stopwords"])
-MATCHERS = ("and_v1", "prefix_v2", "and_v2", "and_v3")
+# and_v4 (accuracy-phase.md section 3 (c)): and_v3's rules with synonyms v2
+# (v1 plus "pasok" -> "class"); the same extra stopwords.
+_SYNONYM_MAP_V2 = json.loads(
+    (SYNONYMS_PATH.parent / "search_synonyms_v2.json").read_text(encoding="utf-8")
+)
+SYNONYMS_V2: dict[str, list[str]] = _SYNONYM_MAP_V2["synonyms"]
+if frozenset(_SYNONYM_MAP_V2["extra_stopwords"]) != frozenset(
+    _SYNONYM_MAP["extra_stopwords"]
+):
+    raise RuntimeError("synonyms v2 must keep v1's extra stopwords")
+MATCHERS = ("and_v1", "prefix_v2", "and_v2", "and_v3", "and_v4")
+# The matchers that use and_v3's rules, with their synonym maps.
+AND_V3_RULES = {"and_v3": SYNONYMS, "and_v4": SYNONYMS_V2}
 # and_v2 replaced and_v1 on 2026-10-31, and and_v3 replaced and_v2 on
 # 2026-11-07 (devlog); the older matchers stay for comparisons.
 DEFAULT_MATCHER = "and_v3"
@@ -198,18 +210,22 @@ def word_regex(stem: str) -> str:
     return r"\m" + escaped + r"\M"
 
 
-def plural_groups(query: str) -> list[tuple[list[str], list[str]]]:
+def plural_groups(
+    query: str, synonyms: dict[str, list[str]] = SYNONYMS
+) -> list[tuple[list[str], list[str]]]:
     """and_v3 groups: (word and its synonyms, [plural alternative] or [])."""
     return [
         (group, [] if (stem := plural_alternative(group[0])) is None else [stem])
-        for group in synonym_groups(query)
+        for group in synonym_groups(query, synonyms)
     ]
 
 
-def synonym_groups(query: str) -> list[list[str]]:
+def synonym_groups(
+    query: str, synonyms: dict[str, list[str]] = SYNONYMS
+) -> list[list[str]]:
     """and_v2 groups, in query order: each word, then its synonyms."""
     words = [word for word in query.lower().split() if word not in AND_V2_STOPWORDS]
-    return [[word, *SYNONYMS.get(word, [])] for word in words]
+    return [[word, *synonyms.get(word, [])] for word in words]
 
 
 def prefix_stems(query: str) -> list[str]:
@@ -286,8 +302,8 @@ def search_announcements(
     if rank is not None:
         from archways_assistant import rank as ranking  # rank imports this module
 
-        if rank not in ranking.RANKS or matcher != "and_v3" or question is None:
-            raise ValueError("rank_v1 needs matcher and_v3 and the question")
+        if rank not in ranking.RANKS or matcher not in AND_V3_RULES or question is None:
+            raise ValueError("rank_v1 needs matcher and_v3 or and_v4, and the question")
         terms = ranking.question_terms(question)
     schema = contract["$defs"]["arguments"]
     errors = [
@@ -302,8 +318,8 @@ def search_announcements(
         words = query_words(arguments["query"])
     elif matcher == "and_v2":
         words = synonym_groups(arguments["query"])
-    elif matcher == "and_v3":
-        words = plural_groups(arguments["query"])
+    elif matcher in AND_V3_RULES:
+        words = plural_groups(arguments["query"], AND_V3_RULES[matcher])
     else:
         words = prefix_stems(arguments["query"])
     if not words:
@@ -324,14 +340,18 @@ def search_announcements(
                 any(alt in title or alt in body for alt in group) for group in words
             ):
                 matches.append((0, row))
-        elif matcher == "and_v3":
+        elif matcher in AND_V3_RULES:
             title, body = row["title"].lower(), row["body"].lower()
             if all(
                 any(alt in title or alt in body for alt in subs)
                 or any(whole_word_in(s, title) or whole_word_in(s, body) for s in stems)
                 for subs, stems in words
             ):
-                score = 0 if rank is None else ranking.points(terms, title, body)
+                score = (
+                    0
+                    if rank is None
+                    else ranking.points(terms, title, body, AND_V3_RULES[matcher])
+                )
                 matches.append((score, row))
         else:
             score = prefix_score(words, row["title"], row["body"])
