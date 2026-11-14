@@ -28,12 +28,14 @@ The three metrics of `accuracy-phase.md` section 0 (Helpfulness, AI answer accur
 
 - **The script:** `scripts/eval_heldout.py PATH`. It runs the full flow and the frozen scorer_v1, with a fixed `now` of 2026-11-14T10:00:00+08:00 for every case.
   - It prints only the file's SHA-256, the case count, the configuration and the totals.
-  - It prints no per-case line, id, question or reply, and writes nothing to disk.
+  - It prints no per-case line, id, question or reply, and writes nothing to disk (except the private report, below, when asked for).
 - **At most two runs:**
   1. the baseline, after the harness, scorer_v1 and the dev baseline are frozen
   2. the final run, after every change is frozen
 - **Never in between,** and never to choose between changes.
 - **The user runs it.** Claude Code never runs the script, opens or reads the held-out file, or asks for its contents. The user pastes the totals; the devlog records them with the file's SHA-256, which must match between the two runs.
+- **Private report (amendment, 2026-11-14):** `--private-report PATH` writes a per-case report to a path outside the repository, for the user's manual review. Only the user reads it; it never enters the repo, the devlog or a chat. Without the option nothing is written.
+- **Frozen at `9bf6e72`:** scorer_v1 and the held-out script.
 - **No pass/fail thresholds** are set in this ADR. The held-out run reports the baseline and final counts side by side. With so few cases it is a check that the dev-set gains carry over, not an error rate.
 
 ## Consequences

@@ -19,6 +19,42 @@ Template:
 
 ---
 
+## 2026-11-14: Scorer audit accepted; scorer_v1 and Step 2 frozen at `9bf6e72`; private report for the held-out run
+
+- **Date:** 2026-11-14 (+08:00)
+- **Decisions (user):**
+  - scorer_v1 is frozen as is.
+  - Known limitation, recorded: it can't catch an answer that mixes up which listed announcement says what (flow q06: "second and third announcements"). It checks only dates, numbers, office names and listed phrases.
+  - Add `--private-report` to the held-out script before Step 2 is frozen.
+- **What changed (`9bf6e72`):**
+  - **`eval_heldout.py --private-report PATH`:**
+    - Writes a per-case report (id, question, flags and codes, query arguments, final text) after the totals.
+    - PATH must be outside the repo (resolved, ignoring case, checked before any model call) and must not exist.
+    - The four printed lines are unchanged. Without the option nothing is written; a failed run writes no report.
+    - Only the user reads the report. It never enters the repo, the devlog or a chat.
+  - **`tests/test_evalflow.py::test_scorer_v1_is_frozen`** pins `evalflow.py` (SHA-256 with LF line endings `44cd6308…4691`).
+  - **Records:** a dated section in `accuracy-phase.md` (sections 0 and 2 themselves are not edited), and ADR 0007 (still PROPOSED).
+  - **Hashes at the freeze, with LF line endings:** `eval_heldout.py` `54b5fdb0…73dd8`, `eval_flow.py` `84bfc287…2e8c`.
+  - scorer_v1 is byte-identical to the scorer that ran the dev baseline: `git diff 43196e1 9bf6e72 -- src scripts/eval_flow.py prompts contracts` is empty.
+- **How it was verified:**
+  - `uv run pytest -q` → `1230 passed, 2 skipped` before the pin; `tests/test_evalflow.py` → `29 passed` with it. ruff clean.
+  - **Tests:**
+    - Without the option, nothing is written.
+    - With it, the report has the question, the reply and the flags, and stdout stays 4 lines with none of them.
+    - Paths inside the repo are refused before any run: the repo root, `data/local`, upper case, `..`, a relative path.
+    - An existing file is refused. A failed run writes no report. The case-insensitive check is tested.
+    - The only write call is in `write_private_report`.
+  - **Mutations** (restored, `cmp` clean):
+    - Repo check removed → 5 tests failed.
+    - Case-sensitive check → at first not caught, because `resolve()` already fixes case for existing folders. A test with the repo path in other case was added; it is caught now.
+- **Not run:** the held-out file. It was not read either.
+- **Commits:** `9bf6e72`, this `docs:` commit. Not pushed.
+- **Open questions / next:**
+  - The user runs the held-out baseline (once) and pastes the totals.
+  - Then Step 3 (a) rank_v1.
+
+---
+
 ## 2026-11-14: Dev baseline run twice (identical); scorer audit pending; eval_heldout.py built
 
 - **Date:** 2026-11-14 (+08:00)

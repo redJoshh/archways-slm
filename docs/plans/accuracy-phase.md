@@ -310,3 +310,16 @@ The run header records: git commit, Ollama version, model digest, prompt SHA-256
 
 - **The model's query usually asks for the last 30 days** (`days` 30), so evergreen announcements (dress code, uniform rules, Arch guidelines, the Good Moral process) become unsearchable a month after they are published.
 - Not fixed now: it needs a change to the query rule or the window, which is outside this phase's order. The fixed `now` values keep it out of the scores; it does not stop it in real use.
+
+## 2026-11-14 (user): audit accepted; scorer_v1 and Step 2 frozen; private report added
+
+- **scorer_v1 frozen as is,** at commit `9bf6e72` (`src/archways_assistant/evalflow.py`, SHA-256 with LF line endings `44cd6308…4691`; pinned by `tests/test_evalflow.py::test_scorer_v1_is_frozen`).
+  - **Known limitation:** scorer_v1 catches only wrong dates, numbers, office names and listed phrases. It cannot catch an answer that mixes up which listed announcement says what. Example: flow q06 baseline says the dress code is "in the second and third announcements"; only the third is.
+- **Dev baseline frozen:** `data/local/runs/baseline-1.json` (identical to `baseline-2.json`), totals in the devlog of 2026-11-14.
+- **Amendment to section 2, added before its freeze took effect (user):** `eval_heldout.py --private-report PATH`.
+  - Writes one block per case (id, question, flags and reason codes, query arguments, the final text the student would see) to PATH, for the user's manual review of answers the scorer passes.
+  - PATH must be outside the repository (checked on the resolved path, ignoring case, before any model call) and must not exist yet.
+  - The four printed lines are unchanged. Without the option nothing is written; a run that fails writes no report.
+  - **Only the user reads the report.** It never enters the repo, the devlog or a chat, and Claude Code never opens it.
+- **Step 2 frozen** at commit `9bf6e72` (`scripts/eval_heldout.py`). The next change to it is adding `--config final` when every change in section 3 is frozen.
+- **The held-out baseline may now be run, once,** by the user, at a commit whose code equals `9bf6e72`, with a clean tree. Its first printed line shows `"commit"` and `"tree_dirty": false`.
