@@ -288,6 +288,20 @@
    "possible": 7,
    "passes": false,
    "why": "0 < 7"
+  },
+  {
+   "name": "G6: the whole body counts, not the excerpt",
+   "question": "Make-up classes on December 5?",
+   "top_id": "6",
+   "matcher": "and_v3",
+   "theta": [
+    3,
+    4
+   ],
+   "points": 6,
+   "possible": 6,
+   "passes": true,
+   "why": "row 6: make, up, classes and 2026-12-05 (the last two past char 500): 24 >= 18. On the excerpt only it would be 2 (make, up): 8 < 18. ADDED 2026-11-14 by hand after the mutation 'excerpt in place of the body' survived G1-G5; before any fit or run."
   }
  ]
 }
