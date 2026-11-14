@@ -106,3 +106,29 @@ def points(
     words = sum(word_found(word, title, body, synonyms) for word in terms.words)
     anchors = len(terms.dates & own.dates) + len(terms.numbers & merged.numbers)
     return words + ANCHOR_WEIGHT * anchors
+
+
+GATES = ("gate_v1",)
+GATE_THETAS = ((0, 1), (1, 4), (1, 3), (1, 2), (2, 3), (3, 4))  # fixed grid
+
+
+def gate_v1(
+    question: str,
+    title: str,
+    body: str,
+    synonyms: dict[str, list[str]],
+    p: int,
+    q: int,
+) -> bool:
+    """gate_v1 (accuracy-phase.md (d)): is the top result about the question?
+
+    title and body are the top result's lowercased title and whole body;
+    synonyms are the matcher's. Passes if points x q >= p x possible for
+    theta = p/q (integers only); possible 0 always passes.
+    """
+    if q <= 0 or p < 0:
+        raise ValueError("theta must be p/q with p >= 0 and q > 0")
+    terms = question_terms(question)
+    if terms.possible == 0:
+        return True
+    return points(terms, title, body, synonyms) * q >= p * terms.possible

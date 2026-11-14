@@ -68,8 +68,9 @@ from archways_assistant.evalflow import (
     score_case,
     totals,
 )
-from archways_assistant.fakebackend import InvalidArguments, is_visible
+from archways_assistant.fakebackend import AND_V3_RULES, InvalidArguments, is_visible
 from archways_assistant.feedindex import search_feed, search_feed_retry
+from archways_assistant.rank import GATE_THETAS, gate_v1
 from archways_assistant.render import QWEN3_STOP
 from archways_assistant.snapshot import load_snapshot
 
@@ -331,7 +332,9 @@ def replay(
         )
 
 
-def nothing_worse(base_path: Path, new_path: Path, exclude: set[str]) -> bool:
+def nothing_worse(
+    base_path: Path, new_path: Path, exclude: set[str], correct_cases: bool = False
+) -> bool:
     """accuracy-phase.md section 3, rule 4, per set. Prints every change."""
     runs = [json.loads(p.read_text(encoding="utf-8")) for p in (base_path, new_path)]
     base, new = ({(c["set"], c["id"]): c["score"] for c in r["cases"]} for r in runs)
@@ -352,7 +355,12 @@ def nothing_worse(base_path: Path, new_path: Path, exclude: set[str]) -> bool:
         lost = [k[1] for k in keys if base[k]["helpful"] and not new[k]["helpful"]]
         gained = [k[1] for k in keys if new[k]["helpful"] and not base[k]["helpful"]]
         correct = [sum(bool(d[k]["correct"]) for k in keys) for d in (base, new)]
+        lost_correct = [
+            k[1] for k in keys if base[k]["correct"] and not new[k]["correct"]
+        ]
         set_ok = helpful[1] >= helpful[0] and not new_unsafe and wrong[1] <= wrong[0]
+        if correct_cases:
+            set_ok = set_ok and not lost_correct
         ok = ok and set_ok
         print(
             f"{name}: {'OK' if set_ok else 'WORSE'}  helpful {helpful[0]} -> {helpful[1]}  "
@@ -360,6 +368,8 @@ def nothing_worse(base_path: Path, new_path: Path, exclude: set[str]) -> bool:
             f"new unsafe {new_unsafe}"
         )
         print(f"  helpful lost {lost}  gained {gained}")
+        if correct_cases:
+            print(f"  AI-correct lost (case by case) {lost_correct}")
         for k in keys:
             b, n = base[k], new[k]
             if b["trap"] and not b["out_of_scope"]:
@@ -418,6 +428,144 @@ def verify_baseline(base_path: Path, records: list[dict]) -> bool:
     return not differ
 
 
+NOT_ABOUT_HEADER = (
+    "I couldn't find an announcement that answers this exactly. These may be related:"
+)
+# Paths with results where the gate (if it fails) replaces what was shown.
+GATED_PATHS = ("answer", "answer_not_found", "guard_fired", "answer_error")
+
+
+def not_about_text(results: list[dict]) -> str:
+    """The not_about final text: the results list under the gate's header."""
+    listed = assistant.results_list(results)
+    return NOT_ABOUT_HEADER + listed[len(assistant.RESULTS_HEADER) :]
+
+
+def load_all_cases() -> dict:
+    """{(set, id): case} for every dev set (the cases, not the runs)."""
+    sources = load_sources()
+    known_ids = {name: {row["id"] for row in rows} for name, rows in sources.items()}
+    out = {}
+    for name, (path, data) in SETS.items():
+        for case in load_cases(path, known_ids, default_data=data):
+            out[(name, case["id"])] = case
+    return out
+
+
+def gate_record(
+    case: dict,
+    record: dict,
+    rows_by_id: dict,
+    offices: set,
+    matcher: str,
+    p: int,
+    q: int,
+) -> dict:
+    """gate_v1 replayed on one saved record (accuracy-phase.md (d)).
+
+    Exact: the gate only removes the answer call. If the top result (the
+    first) fails, the path becomes not_about with the list under the gate's
+    header; scorer_v1 scores it as the plain results list (section 0).
+    """
+    results = record["results"]
+    if not results or record["path"] not in GATED_PATHS:
+        return record
+    top = rows_by_id[results[0]["id"]]
+    if gate_v1(
+        case["question"],
+        top["title"].lower(),
+        top["body"].lower(),
+        AND_V3_RULES[matcher],
+        p,
+        q,
+    ):
+        return record
+    listed = assistant.results_list(results)
+    score = score_case(case, "not_about", listed, results, rows_by_id, offices)
+    return {
+        **record,
+        "path": "not_about",
+        "text": not_about_text(results),
+        "answer_reply": None,
+        "case_tokens": None,
+        "guard_codes": [],
+        "gated": True,
+        "score": json.loads(json.dumps(asdict(score))),
+    }
+
+
+def gate_run(run: dict, p: int, q: int) -> list[dict]:
+    """Every record of a saved run with gate_v1 at theta p/q."""
+    sources = load_sources()
+    by_id = {name: {row["id"]: row for row in rows} for name, rows in sources.items()}
+    offices = {name: {row["office"] for row in rows} for name, rows in sources.items()}
+    cases = load_all_cases()
+    matcher = run["header"]["matcher"]
+    out = []
+    for record in run["cases"]:
+        case = cases[(record["set"], record["id"])]
+        data = case["data"]
+        out.append(gate_record(case, record, by_id[data], offices[data], matcher, p, q))
+    return out
+
+
+def gate_fit(run_path: Path) -> None:
+    """The pre-registered fit: the largest theta on the grid that, on e2e34
+    and taglish10 against theta 0, loses no AI-correct case, keeps the
+    helpful count and makes no case unsafe."""
+    run = json.loads(run_path.read_text(encoding="utf-8"))
+    fit_sets = ("e2e34", "taglish10")
+    base = {
+        (r["set"], r["id"]): r["score"] for r in run["cases"] if r["set"] in fit_sets
+    }
+    chosen = (0, 1)
+    print(
+        f"gate fit on {run_path.name} (matcher {run['header']['matcher']}), sets {fit_sets}"
+    )
+    for p, q in GATE_THETAS:
+        new = {
+            (r["set"], r["id"]): r["score"]
+            for r in gate_run(run, p, q)
+            if r["set"] in fit_sets
+        }
+        gated = [k[1] for k in base if new[k]["path"] == "not_about"]
+        lost = [k[1] for k in base if base[k]["correct"] and not new[k]["correct"]]
+        helpful = [sum(bool(d[k]["helpful"]) for k in base) for d in (base, new)]
+        unsafe = [k[1] for k in base if new[k]["wrong"] and not base[k]["wrong"]]
+        ok = not lost and helpful[1] >= helpful[0] and not unsafe
+        if ok:
+            chosen = (p, q)
+        print(
+            f"  theta {p}/{q}: {'OK ' if ok else 'NO '} gated {gated}  correct lost {lost}  "
+            f"helpful {helpful[0]} -> {helpful[1]}  new unsafe {unsafe}"
+        )
+    print(
+        f"theta* = {chosen[0]}/{chosen[1]}"
+        + ("  (gate does nothing: (d) dropped)" if chosen == (0, 1) else "")
+    )
+
+
+def gate_apply(run_path: Path, p: int, q: int, out: Path) -> None:
+    run = json.loads(run_path.read_text(encoding="utf-8"))
+    records = gate_run(run, p, q)
+    header = {
+        **run["header"],
+        "gate": "gate_v1",
+        "theta": [p, q],
+        "gate_replay_of": [run_path.name, sha256(run_path)],
+        "replay_commit": git_commit(),
+        "replay_tree_dirty": tree_is_dirty(),
+    }
+    out.write_text(
+        json.dumps({"header": header, "cases": records}, ensure_ascii=False, indent=1)
+        + "\n",
+        encoding="utf-8",
+    )
+    gated = [r["id"] for r in records if r.get("gated")]
+    print(f"gate_v1 theta {p}/{q} on {run_path.name}: gated {gated}")
+    print(f"wrote {out.relative_to(ROOT)}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path)
@@ -438,13 +586,33 @@ def main() -> None:
     )
     parser.add_argument("--nothing-worse", nargs=2, type=Path, metavar=("BASE", "NEW"))
     parser.add_argument("--exclude", default="", help="ids reported outside the check")
+    parser.add_argument(
+        "--correct-case-by-case",
+        action="store_true",
+        help="also fail if any case goes from AI-correct to not (d onwards)",
+    )
+    parser.add_argument("--gate-fit", type=Path, metavar="RUN")
+    parser.add_argument("--gate-apply", type=Path, metavar="RUN")
+    parser.add_argument("--theta", default=None, help="p/q for --gate-apply")
     args = parser.parse_args()
     if args.nothing_worse:
         exclude = {i for i in args.exclude.split(",") if i}
-        ok = nothing_worse(*args.nothing_worse, exclude)
+        ok = nothing_worse(*args.nothing_worse, exclude, args.correct_case_by_case)
         sys.exit(0 if ok else 1)
     if args.compare:
         compare(*args.compare)
+        return
+    if args.gate_fit:
+        gate_fit(args.gate_fit)
+        return
+    if args.gate_apply:
+        if args.theta is None or args.out is None:
+            parser.error("--gate-apply needs --theta p/q and --out")
+        p_text, q_text = args.theta.split("/")
+        out = args.out.resolve()
+        if not out.is_relative_to(LOCAL.resolve()):
+            sys.exit("--out must be inside data/local/ (gitignored)")
+        gate_apply(args.gate_apply, int(p_text), int(q_text), out)
         return
     if args.replay:
         if args.rank is None:

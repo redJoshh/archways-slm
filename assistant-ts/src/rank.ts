@@ -170,3 +170,17 @@ export function rankScorer(
   const synonymMap = synonymsFor(matcher);
   return (row: IndexRow) => rowPoints(terms, row, synonymMap);
 }
+
+export type GateVersion = "gate_v1";
+
+/**
+ * gate_v1 (accuracy-phase.md (d)): is the top result about the question?
+ * row is the top result's index row (lowercased title and whole body);
+ * passes if points x q >= p x possible for theta = p/q; possible 0 passes.
+ */
+export function gateV1(question: string, row: IndexRow, matcher: Matcher, p: number, q: number): boolean {
+  if (!(q > 0) || !(p >= 0)) throw new Error("theta must be p/q with p >= 0 and q > 0");
+  const terms = questionTerms(question);
+  if (terms.possible === 0) return true;
+  return rowPoints(terms, row, synonymsFor(matcher)) * q >= p * terms.possible;
+}
