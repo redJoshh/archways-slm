@@ -320,6 +320,43 @@
     ]
    },
    "why": "words [pasok, library]: rows 1 and 11 have 'library' but no 'class', so 1 point each under both matchers; the tie goes to the newer row 11 (2026-11-09T15:00) before row 1 (09:00)"
+  },
+  {
+   "name": "S7: the search's own ranking uses the v2 synonyms under and_v4",
+   "question": "Pasok ba sa november?",
+   "arguments": {
+    "query": "november",
+    "days": 30
+   },
+   "and_v4": {
+    "expected_ids": [
+     "3",
+     "9",
+     "11",
+     "1"
+    ],
+    "expected_points": [
+     2,
+     2,
+     1,
+     1
+    ]
+   },
+   "and_v3": {
+    "expected_ids": [
+     "11",
+     "1",
+     "3",
+     "9"
+    ],
+    "expected_points": [
+     1,
+     1,
+     1,
+     1
+    ]
+   },
+   "why": "words [pasok, november] (no day, so no date). and_v4: rows 3 and 9 find pasok via class and november = 2; rows 11 and 1 november only = 1; newest breaks ties. and_v3 (or rank with v1 synonyms): every row 1, newest first. ADDED 2026-11-14 by hand, after the mutation 'rank_v1 with v1 synonyms under and_v4' survived the first six vectors; before any and_v4 run."
   }
  ]
 }
