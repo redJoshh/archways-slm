@@ -670,3 +670,38 @@ Committed with `tests/vectors/window_vectors.json` (13 cases; positions worked o
 - **Why it had no effect (a design reason, recorded):** the rule anchors on the **earliest** question word (step 2b). Question words usually appear early in the body, often inside the first 500 (q08: "Verde" at 168), so rule step 3 leaves the window at the start. A fact the question names only later in the body is never reached.
 - **Any revisit must be a new pre-registered version** (for example `excerpt_v3_…`), with its own rule, vectors and run. excerpt_v2_centred itself is not changed.
 - **Next:** (f) answer prompt v4, then (g) strip_nf_v1, as registered.
+
+## 2026-11-16: answer prompt v4 result: DROPPED (7 correct AI answers lost; 0 of 10 targets fixed)
+
+- **Precondition** (section 3 (f)): met. The and_v4 run has 10 answerable cases on `answer_not_found` with a source row shown: e2e-001, e2e-005, e2e-012, e2e-029, taglish-01, taglish-03, q05, q07, q09, q11.
+- **Built (`5975ead`), before any run:**
+  - `prompts/e2e_answer_v4.txt` = v1 plus the registered sentence, appended to the not-found rule's line (one space before it).
+  - `tests/test_answer_v4.py`: v4 is v1 plus exactly that sentence; the sentence is verbatim in this plan; v4 is frozen by SHA-256 (`84eb2bd0…1bdf`); `eval_flow.py --answer-prompt v4`, and `--verify-baseline` refuses it.
+  - The leak test (`tests/test_prompts.py`) covers v4 (it reads every prompt file) and passes.
+  - **SYSTEM_TOKENS_MAX:** the v4 system turn is 229 tokens (Ollama `prompt_eval_count`, raw system turn; v1: 197), under 300.
+  - Mutations caught: one word of v4 changed (3 fail); the verify-baseline refusal removed (1 fail).
+  - `generated.ts` was **not** regenerated: the phone default stays v1, as with every other change until the freeze. Switching would be the generator's prompt path plus a regeneration.
+- **Retrieval:** the prompt changes no retrieval. Re-searching every case of `and_v4-1.json` reproduces its results, excerpts included, 57/57.
+- **Cold run** (`answer_v4-1.json`, `5975ead`, clean tree, query replies from `baseline-1.json`): `--nothing-worse and_v4-1 answer_v4-1 --correct-case-by-case` → **something got worse** on all three sets.
+  - Totals: helpful 39 → 39/42; AI correct 27/29 → 20/22; Unsafe 0 → 0/57; traps clean 14 → 14/14. Paths: `answer_not_found` 12 → 18.
+  - **AI-correct lost (case by case):** e2e-009, e2e-025, taglish-02, taglish-06 and q13 (answer → `answer_not_found`); e2e-015 (still an answer, now missing "three"); e2e-030 (`guard_fired`, `unsupported_date:10-21`). q06 also went answer → `answer_not_found` (it was not AI-correct before).
+  - **Targets:** 0 of 10 changed. All are still `answer_not_found`.
+  - No helpful case was lost and no case became unsafe. The traps are unchanged, including the two with an unrelated list (e2e-021, taglish-09).
+- **Decision:** **DROPPED** (rule 4). The extra sentence made the 0.6B model write the not-found sentence more often, not less. Later steps run with answer v1. The v4 file and `--answer-prompt v4` stay in the repo, unused.
+- **Next:** (g) strip_nf_v1, on top of rank_v1 + and_v4 with answer v1.
+
+## 2026-11-16: strip_nf_v1 result: KEPT (q13 fixed; nothing else changed)
+
+- **Built (`2116739`), before any run:**
+  - Python `assistant.answer_reply_text()` and `flow(..., strip_nf=)`; TS `answerReplyText()`, `startQuestion(..., { stripNf })` and `AssistantDeps.stripNf`. Default off (null) in both.
+  - `strip_nf_vectors.json` (the 9 hand-written vectors) passes in Python, Node and Hermes (9/9). Five new generated flow vectors (`strip-nf-*`, one with the rule off) pass on the Node stepper and driver and on Hermes (assistant vectors 252/252). The existing vectors are byte-identical.
+  - **Mutations,** all caught and restored. Python: first occurrence only (2 fail), no re-strip (6), applies when off (8), collapses inner spacing (1), case-insensitive removal (1; N8). TS: first occurrence only (4), no re-trim (8), applies when off (8), the driver drops the option (3). A case-insensitive *test* with case-sensitive removal is an equivalent mutant (same output on every input).
+  - `eval_flow.py --strip-nf strip_nf_v1`, plus `--strip-nf-replay` (no model call). `--verify-baseline` refuses it.
+- **Replay** (no model call) on `and_v4-1.json`: only q13 changes (path `answer` stays, text changes).
+- **Cold run** (`strip_nf-1.json`, `2116739`, clean tree, query replies from `baseline-1.json`, answer v1): `--nothing-worse and_v4-1 strip_nf-1 --correct-case-by-case` → **nothing got worse** on every set.
+  - `--compare`: 56/57 identical; q13 differs in text only. All 57 answer replies are identical to the and_v4 run.
+  - Totals unchanged: helpful 39/42, AI correct 27/29, Unsafe 0/57, traps clean 14/14.
+  - **q13:** the shown answer no longer ends with the not-found sentence. That was the contradiction scorer_v1 can't see (recorded 2026-11-14).
+- **Decision:** **KEPT.** It changes one case for the better and nothing for the worse, so it also meets the "no change without evidence" principle from (c). It turns on at the final freeze, with rank_v1 + and_v4.
+- **Kept set for the freeze:** rank_v1, and_v4, strip_nf_v1, answer v1. Off: retry_v1, gate_v1, excerpt_v2_centred, answer v4.
+- **Next:** the "Then" list in section 3 (freeze every kept version, re-export the phone flow test, one phone smoke run of flow13, the user's held-out final).

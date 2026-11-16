@@ -19,6 +19,33 @@ Template:
 
 ---
 
+## 2026-11-16: (e) off at the freeze; Step 3 (f) answer prompt v4: DROPPED; fix (g) strip_nf_v1: KEPT
+
+- **Date:** 2026-11-16 (+08:00)
+- **(e) decision (user):** excerpt_v2_centred stays off at the freeze. There was no dev evidence of benefit.
+  - Design reason, recorded in the plan: it anchors on the *earliest* question word, which usually falls inside the first 500.
+  - Any revisit must be a new pre-registered version.
+- **(f) answer prompt v4** (`5975ead`):
+  - What: v1 plus the registered sentence. Tests show v4 = v1 + exactly that sentence and freeze it by hash. The leak test passes. The system turn is 229 tokens (cap 300).
+  - Retrieval reproduces the and_v4 run 57/57.
+  - **Cold run** (`answer_v4-1.json`): AI correct 27/29 → 20/22; `answer_not_found` 12 → 18. Helpful 39/42, Unsafe 0/57 and traps 14/14 unchanged.
+  - Lost AI-correct, case by case: e2e-009, e2e-015, e2e-025, e2e-030, taglish-02, taglish-06, q13.
+  - **Targets: 0 of 10 changed.**
+  - **DROPPED.** The phone stays on v1; `generated.ts` is untouched.
+- **(g) strip_nf_v1** (`2116739`):
+  - Built in Python and TS, off by default. The 9 hand-written vectors pass in Python, Node and Hermes. 5 new generated flow vectors pass. All 10 meaningful mutations caught.
+  - **Replay** predicted only q13.
+  - **Cold run** (`strip_nf-1.json`): nothing got worse on any set; 56/57 identical. q13's text no longer ends with the not-found sentence. The answer replies are identical in all 57 cases.
+  - **KEPT.**
+- **How it was verified:**
+  - `uv run pytest -q` → `1368 passed, 2 skipped`. ruff clean.
+  - `npm test` → 298/298. `npm run test:hermes` → all pass.
+  - Generators `--check` up to date.
+  - Ollama 0.40.15 with `OLLAMA_NUM_PARALLEL:1` (server log, started 09:20 today). Both runs on a clean tree.
+- **Kept for the freeze:** rank_v1, and_v4, strip_nf_v1, answer v1.
+- **Commits:** `9a748bd`, `5975ead`, `2116739`, this `docs:` commit. Not pushed.
+- **Open questions / next:** the section 3 "Then" list: freeze, re-export the phone flow test, phone smoke run of flow13, held-out final (user).
+
 ## 2026-11-14: Step 3 (e) excerpt_v2_centred: pre-registered, built, run: no effect on any dev case
 
 - **Date:** 2026-11-14 (+08:00)
