@@ -33,6 +33,6 @@ test("makeFeedSearch with rank needs the question; without rank it ignores it", 
   const ranked = makeFeedSearch(index, () => 0, "rank_v1");
   await assert.rejects(ranked({ query: "x" }));
   assert.deepEqual(await ranked({ query: "x" }, { question: "x?" }), []);
-  const plain = makeFeedSearch(index, () => 0);
+  const plain = makeFeedSearch(index, () => 0, null);
   assert.deepEqual(await plain({ query: "x" }), []);
 });

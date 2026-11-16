@@ -2,6 +2,7 @@
 
 Usage (the user runs this; Claude Code never does):
     uv run python scripts/eval_heldout.py PATH --config baseline
+    uv run python scripts/eval_heldout.py PATH --config final
 
 docs/plans/accuracy-phase.md, section 2 (frozen 2026-11-14), and ADR 0007:
 
@@ -13,8 +14,13 @@ docs/plans/accuracy-phase.md, section 2 (frozen 2026-11-14), and ADR 0007:
   section 0 totals (counts). Never a per-case line, id, question or reply.
 - Writes nothing to disk and uses no cache, unless --private-report PATH
   is given (below).
-- At most two runs ever: --config baseline (now) and --config final
-  (added when every change is frozen). Never in between.
+- At most two runs ever: --config baseline (done 2026-11-14) and
+  --config final. Never in between, and never again: a later change is a
+  v2 evaluated on a NEW held-out set (user, 2026-11-16).
+- --config baseline is eval_flow.py's default path (newest first, and_v3,
+  answer v1, no strip). --config final is archways_assistant.frozen.FINAL
+  (the phone defaults): rank_v1, and_v4, strip_nf_v1, answer v1; retry and
+  the excerpt window off. Its settings line adds those keys.
 
 File format: JSON Lines, one case per line, every case over the snapshot
 ("data" may be omitted or "snapshot"):
@@ -79,11 +85,25 @@ from archways_assistant.evalflow import (
     score_case,
     totals,
 )
+from archways_assistant.frozen import FINAL
 
 FIXED_NOW = datetime.fromisoformat("2026-11-14T10:00:00+08:00")
-CONFIGS = ("baseline",)  # "final" is added when every change is frozen
+CONFIGS = ("baseline", "final")
 MODEL = "qwen3:0.6b"
 REPO = Path(__file__).resolve().parents[1]
+
+
+def config_run(name: str) -> tuple[Path, dict]:
+    """(answer prompt, run_case keyword arguments) of a config."""
+    if name == "baseline":
+        return ANSWER_PROMPT, {}
+    return REPO / FINAL.answer_prompt, {
+        "rank": FINAL.rank,
+        "matcher": FINAL.matcher,
+        "retry": FINAL.retry,
+        "excerpt": FINAL.excerpt,
+        "strip_nf": FINAL.strip_nf,
+    }
 
 
 def private_report_path(value: str) -> Path:
@@ -145,9 +165,10 @@ def main() -> None:
     except CaseFileError as error:
         sys.exit(f"held-out file: {error}")
     contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    answer_prompt, run_options = config_run(args.config)
     prompts = {
         "query": QUERY_PROMPT.read_text(encoding="utf-8"),
-        "answer": ANSWER_PROMPT.read_text(encoding="utf-8"),
+        "answer": answer_prompt.read_text(encoding="utf-8"),
     }
 
     with httpx.Client(timeout=600, trust_env=False) as client:
@@ -174,12 +195,14 @@ def main() -> None:
                     hashlib.sha256(QUERY_PROMPT.read_bytes()).hexdigest(),
                 ],
                 "answer": [
-                    ANSWER_PROMPT.name,
-                    hashlib.sha256(ANSWER_PROMPT.read_bytes()).hexdigest(),
+                    answer_prompt.name,
+                    hashlib.sha256(answer_prompt.read_bytes()).hexdigest(),
                 ],
             },
             "snapshot_sha256": hashlib.sha256(SNAPSHOT.read_bytes()).hexdigest(),
         }
+        if run_options:
+            settings.update(run_options)
         print(f"settings: {json.dumps(settings, ensure_ascii=True)}")
         print(
             f"held-out file sha256 {hashlib.sha256(data).hexdigest()}  cases {len(cases)}"
@@ -187,7 +210,9 @@ def main() -> None:
         scores, blocks = [], []
         for number, case in enumerate(cases, start=1):
             try:
-                record = run_case(client, MODEL, case, prompts, rows, contract)
+                record = run_case(
+                    client, MODEL, case, prompts, rows, contract, **run_options
+                )
                 score = score_case(
                     case,
                     record["path"],

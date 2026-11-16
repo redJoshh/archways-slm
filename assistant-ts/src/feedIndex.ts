@@ -32,6 +32,7 @@
 
 import type { Announcement } from "./render.ts";
 import { feedRow } from "./feed.ts";
+import { PHONE_EXCERPT, PHONE_MATCHER, PHONE_RANK, PHONE_RETRY } from "./generated.ts";
 import { rankScorer, type RankVersion } from "./rank.ts";
 import { searchWithRetry, type RetryResult, type RetryVersion } from "./retry.ts";
 import { excerptFor, type ExcerptRule } from "./window.ts";
@@ -309,23 +310,24 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
  * The refresh time counts in the question's elapsed time, so the budget
  * sees it.
  *
- * rank: null keeps newest first (the frozen UAT setting until rank_v1 is
- * kept, accuracy-phase.md); "rank_v1" orders by the raw question, which
- * askAssistant passes as the second argument. retry: "retry_v1" (needs
- * rank_v1) searches again with the question's words after 0 results;
- * onSearch, if given, gets the retry flag and the result count (numbers
- * only, for the question log). matcher: "and_v3" (default) or "and_v4"
- * (retry_v1 runs with and_v3 only). excerpt: null (the first 500, the
- * default) or "excerpt_v2_centred" (needs the question; not with retry).
+ * The defaults are the frozen FINAL configuration (generated PHONE_*, from
+ * archways_assistant/frozen.py): rank_v1, and_v4, no retry, the first-500
+ * excerpt. rank: null keeps newest first (the UAT baseline); "rank_v1"
+ * orders by the raw question, which askAssistant passes as the second
+ * argument. retry: "retry_v1" (needs rank_v1) searches again with the
+ * question's words after 0 results; onSearch, if given, gets the retry flag
+ * and the result count (numbers only, for the question log). matcher:
+ * "and_v3" or "and_v4" (retry_v1 runs with and_v3 only). excerpt: null (the
+ * first 500) or "excerpt_v2_centred" (needs the question; not with retry).
  */
 export function makeFeedSearch(
   index: FeedIndex,
   nowMs: () => number = Date.now,
-  rank: RankVersion | null = null,
-  retry: RetryVersion | null = null,
+  rank: RankVersion | null = PHONE_RANK,
+  retry: RetryVersion | null = PHONE_RETRY,
   onSearch?: (info: { retried: boolean; count: number }) => void,
-  matcher: Matcher = "and_v3",
-  excerpt: ExcerptRule | null = null,
+  matcher: Matcher = PHONE_MATCHER,
+  excerpt: ExcerptRule | null = PHONE_EXCERPT,
 ) {
   if (excerpt !== null && retry !== null) throw new Error("the excerpt window runs without retry");
   if (retry !== null && rank === null) throw new Error("retry_v1 needs rank_v1");

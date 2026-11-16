@@ -141,8 +141,76 @@ def test_a_failing_case_prints_no_value_and_no_totals(tmp_path, monkeypatch, cap
     assert "case number 1 failed (ValueError)" in str(stop.value.code)
 
 
-def test_only_the_baseline_config_exists_until_the_final_freeze():
-    assert load_script().CONFIGS == ("baseline",)
+def test_the_two_configs_are_baseline_and_final():
+    assert load_script().CONFIGS == ("baseline", "final")
+
+
+def run_config(tmp_path, monkeypatch, capsys, config, *extra):
+    module = load_script()
+    seen = []
+
+    def fake_run_case(client, model, case, prompts, rows, contract, **options):
+        seen.append((case["now"], prompts["answer"], options))
+        return {
+            "path": "not_found",
+            "text": NOT_FOUND_MESSAGE,
+            "results": [],
+            "answer_reply": SECRET_REPLY,
+            "query_reply": SECRET_REPLY,
+            "arguments": None,
+        }
+
+    patch(module, monkeypatch, fake_run_case)
+    path = held_out_file(tmp_path)
+    argv = ["eval_heldout.py", str(path), "--config", config, *extra]
+    monkeypatch.setattr(sys, "argv", argv)
+    module.main()
+    out, err = capsys.readouterr()
+    return module, seen, out, err
+
+
+def test_final_runs_the_frozen_set_with_the_same_four_lines(
+    tmp_path, monkeypatch, capsys
+):
+    module, seen, out, err = run_config(tmp_path, monkeypatch, capsys, "final")
+    v1 = (ROOT / "prompts" / "e2e_answer_v1.txt").read_text(encoding="utf-8")
+    final = {
+        "rank": "rank_v1",
+        "matcher": "and_v4",
+        "retry": None,
+        "excerpt": None,
+        "strip_nf": "strip_nf_v1",
+    }
+    assert seen == [(module.FIXED_NOW, v1, final)] * 2
+    for secret in (SECRET_ID, SECRET_QUESTION, SECRET_REPLY):
+        assert secret not in out + err
+    lines = out.splitlines()
+    assert len(lines) == 4
+    settings = json.loads(lines[0].removeprefix("settings: "))
+    assert settings["config"] == "final"
+    assert settings["fixed_now"] == "2026-11-14T10:00:00+08:00"
+    assert {k: settings[k] for k in final} == final
+    assert settings["prompts"]["answer"][0] == "e2e_answer_v1.txt"
+    assert lines[1].startswith("held-out file sha256 ")
+    assert lines[2].startswith("HELD-OUT: cases 2")
+    assert lines[3].startswith("  paths: ")
+
+
+def test_baseline_is_unchanged_by_the_final_config(tmp_path, monkeypatch, capsys):
+    _, seen, out, _ = run_config(tmp_path, monkeypatch, capsys, "baseline")
+    assert [options for _, _, options in seen] == [{}, {}]
+    settings = json.loads(out.splitlines()[0].removeprefix("settings: "))
+    assert settings["matcher"] == "and_v3"
+    assert not {"rank", "retry", "excerpt", "strip_nf"} & set(settings)
+
+
+def test_final_writes_the_private_report_too(tmp_path, monkeypatch, capsys):
+    outside = tmp_path / "report.txt"
+    _, _, out, _ = run_config(
+        tmp_path, monkeypatch, capsys, "final", "--private-report", str(outside)
+    )
+    assert len(out.splitlines()) == 4
+    assert SECRET_QUESTION in outside.read_text(encoding="utf-8")
 
 
 WRITES = {"write_text", "write_bytes", "open", "mkdir", "dump", "write"}

@@ -44,6 +44,7 @@ import {
   FALLBACK_HEADER,
   LAST_RESORT_MESSAGE,
   NOT_FOUND_MESSAGE,
+  PHONE_STRIP_NF,
   RESULTS_HEADER,
 } from "./generated.ts";
 import {
@@ -327,7 +328,10 @@ export interface AssistantDeps {
    * ignored. Omitted: no wait.
    */
   whenReady?: () => Promise<void>;
-  /** Fix (g) strip_nf_v1; omitted or null: the UAT flow (the default). */
+  /**
+   * Fix (g) strip_nf_v1. Omitted: the frozen FINAL default (PHONE_STRIP_NF);
+   * null: off (the UAT baseline flow).
+   */
   stripNf?: StripNf;
 }
 
@@ -361,7 +365,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
   let result: AssistantResult;
   try {
     let step = startQuestion(question, deps.nowMs(), deps.speed ? deps.speed.get() : null, {
-      stripNf: deps.stripNf || null,
+      stripNf: deps.stripNf === undefined ? PHONE_STRIP_NF : deps.stripNf,
     });
     while (step.kind !== "done") {
       const started = clock();
