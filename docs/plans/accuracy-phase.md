@@ -661,3 +661,12 @@ Committed with `tests/vectors/window_vectors.json` (13 cases; positions worked o
   - No dev case shows any newly visible date or number.
 - **Decision:** by the letter of rule 4 it passes, because nothing got worse. But it changed nothing on any dev case, including its one target, so there is no dev evidence of benefit. On the phone it would only change behaviour on unseen data. **Whether it is enabled at the final freeze is left to the user.** The code stays, off by default, until then.
 - **Next:** (f) answer prompt v4 (one sentence, false "not found"), on top of rank_v1 + and_v4.
+
+## 2026-11-16 (user): excerpt_v2_centred stays OFF at the freeze
+
+- **Decision:** excerpt_v2_centred is **not enabled** at the final freeze. The phone keeps the first 500 code points.
+  - It passed rule 4 only because nothing changed: no dev evidence of benefit (its one target, q08, was not reached), and enabling it would change behaviour only on unseen data. This applies the "no change without evidence" principle from (c).
+  - The code stays in the repo, off by default, unused.
+- **Why it had no effect (a design reason, recorded):** the rule anchors on the **earliest** question word (step 2b). Question words usually appear early in the body, often inside the first 500 (q08: "Verde" at 168), so rule step 3 leaves the window at the start. A fact the question names only later in the body is never reached.
+- **Any revisit must be a new pre-registered version** (for example `excerpt_v3_…`), with its own rule, vectors and run. excerpt_v2_centred itself is not changed.
+- **Next:** (f) answer prompt v4, then (g) strip_nf_v1, as registered.
