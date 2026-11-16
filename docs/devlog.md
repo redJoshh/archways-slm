@@ -19,6 +19,12 @@ Template:
 
 ---
 
+## 2026-11-16: Correction: test app path in the freeze entry
+
+- **Date:** 2026-11-16 (+08:00)
+- **Correction:** in the entry "Freeze of the FINAL configuration", the test app path was written with a tab in place of `\t`. The path is `C:\throw-away-app\gate1-llm`, as in earlier entries.
+- **Commits:** this `docs:` commit. Not pushed.
+
 ## 2026-11-16: Freeze of the FINAL configuration; VERIFY OK; phase finding; held-out closed after two runs; window_v1 planned
 
 - **Date:** 2026-11-16 (+08:00)
