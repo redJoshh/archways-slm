@@ -705,3 +705,18 @@ Committed with `tests/vectors/window_vectors.json` (13 cases; positions worked o
 - **Decision:** **KEPT.** It changes one case for the better and nothing for the worse, so it also meets the "no change without evidence" principle from (c). It turns on at the final freeze, with rank_v1 + and_v4.
 - **Kept set for the freeze:** rank_v1, and_v4, strip_nf_v1, answer v1. Off: retry_v1, gate_v1, excerpt_v2_centred, answer v4.
 - **Next:** the "Then" list in section 3 (freeze every kept version, re-export the phone flow test, one phone smoke run of flow13, the user's held-out final).
+
+## 2026-11-16: the freeze ("Then", steps 1–2) and the phase finding
+
+- **Frozen (`3a7d0af`):** `src/archways_assistant/frozen.py` `FINAL` = rank_v1, and_v4, strip_nf_v1, answer v1. retry, the gate, the excerpt window and answer v4 are off.
+  - `export_assistant_ts.py` writes it into `generated.ts` as `PHONE_*`, the defaults of `makeFeedSearch()` and `askAssistant()`.
+  - `eval_heldout.py --config final` runs it: same fixed now, the same four printed lines (the settings line adds `rank`/`retry`/`excerpt`/`strip_nf`, and `matcher` reads and_v4), and `--private-report`.
+  - The Python `flow()` / `search_feed()` defaults stay the baseline.
+- **Drift check at `3a7d0af`, clean tree:** `--verify-baseline baseline-1.json` → `VERIFY OK`, 57/57 identical.
+- **Phone:** the test app was re-vendored from `3a7d0af` (test app `22607af`). Its `questionRun.ts` now passes the question context to search, which rank_v1 needs. The flow test was re-exported with the frozen search: 13 cases, results identical to the frozen dev run's flow13.
+- **Phase finding (user, 2026-11-16):** false "not found" (the right row shown, the model says not found) is the largest failure pool: 10 answerable dev cases.
+  - It was **not fixable by prompt design.** Answer v4's one targeted sentence made it worse: 7 correct answers lost, 0 of 10 targets fixed.
+  - The results list mitigates it: in all 10 cases the source row is shown, so the case is still helpful.
+  - This is a model-capacity limitation of the 0.6B model. It supports the future-work recommendation (a larger or fine-tuned model, outside this no-training phase).
+- **Held-out (user, 2026-11-16):** used at most twice. After the final run, any further improvement is a v2 on a new held-out set (ADR 0007).
+- **Next:** the user's held-out final (step 4), then the phone smoke run of flow13 (step 3), then window_v1 (`docs/plans/window-fallback.md`) if approved.

@@ -19,6 +19,35 @@ Template:
 
 ---
 
+## 2026-11-16: Freeze of the FINAL configuration; VERIFY OK; phase finding; held-out closed after two runs; window_v1 planned
+
+- **Date:** 2026-11-16 (+08:00)
+- **Freeze (`3a7d0af`):**
+  - `frozen.FINAL` = rank_v1, and_v4, strip_nf_v1, answer v1. It is the one source for the phone defaults (generated `PHONE_*` → `makeFeedSearch` / `askAssistant`) and for `eval_heldout.py --config final`.
+  - The Python defaults stay the baseline (pinned by `tests/test_frozen.py`).
+  - Default-flip mutations, all caught: matcher, rank, excerpt and strip_nf (TS 1/1/3/1 failing tests; strip always on: 4).
+- **Verified:**
+  - `uv run pytest -q` → `1374 passed, 2 skipped`. `npm test` → 301/301. Hermes all pass. ruff clean. Generators `--check` up to date.
+  - `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` at `3a7d0af`, clean tree → `VERIFY OK` (57/57).
+- **Test app** (`C:	hrow-away-app\gate1-llm`, `22607af`, not pushed):
+  - Re-vendored from `3a7d0af`.
+  - `questionRun.ts` passes the question context to search; rank_v1 needs it, otherwise live mode would hit `search_error`.
+  - `tsc --noEmit` clean.
+  - `flow_test.json` re-exported with the frozen search (Ollama 0.40.15): all 13 results equal the frozen dev run.
+- **Phase finding:** false "not found" is the largest failure pool (10 answerable dev cases).
+  - It was **not** fixable by prompt design: answer v4 lost 7 correct answers and fixed 0 of 10.
+  - The results list mitigates it: the source row is shown in all 10.
+  - This is a model-capacity limitation, and it supports the future-work recommendation (larger or fine-tuned model).
+- **Held-out:** at most two runs (baseline done, final next). After that, any improvement is a v2 on a new held-out set (ADR 0007 amendment).
+- **window_v1 planned, not built** (`docs/plans/window-fallback.md`), for the defense in the 2nd week of December:
+  - The snapshot (posted Nov 6–7) leaves the 30-day window around Dec 6–7.
+  - Prototype, run outside the repo: older rows as a fill tier changes dev trap taglish-09 (it gains ann-018, a stale first-term midterm schedule).
+  - A zero-result-only fallback changes 0 of 57 dev cases and 0 of 1496 snapshot sweep searches at 11-10 and 11-14.
+  - Awaiting approval.
+- **Housekeeping:** a stray shell command of mine hung on stdin for over an hour and left an empty `window_proto.py` outside the repo. The user stopped it; the file was deleted.
+- **Commits:** `3a7d0af`, this `docs:` commit; test app `22607af`. Not pushed.
+- **Open questions / next:** the user's held-out final at this commit; phone smoke run of flow13; approval of window_v1.
+
 ## 2026-11-16: (e) off at the freeze; Step 3 (f) answer prompt v4: DROPPED; fix (g) strip_nf_v1: KEPT
 
 - **Date:** 2026-11-16 (+08:00)

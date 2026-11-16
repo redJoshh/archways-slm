@@ -38,6 +38,7 @@ The three metrics of `accuracy-phase.md` section 0 (Helpfulness, AI answer accur
 - **Frozen at `9bf6e72`:** scorer_v1 and the held-out script.
 - **Human review (2026-11-14):** the user reviews the private report of both held-out runs. Each run reports Unsafe as scored and as human-reviewed, side by side. scorer_v1 can't detect a reply that contradicts its source on a yes/no question, or one that mixes up which listed announcement says what.
 - **Drift check (2026-11-14):** before the final run, `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` must print `VERIFY OK` at the same commit, with a clean tree. It proves the baseline configuration still reproduces the frozen dev baseline case by case.
+- **Two runs, then closed (user, 2026-11-16):** this held-out set is used at most twice, `--config baseline` (done 2026-11-14) and `--config final`. After the final run it is closed: any further improvement is a v2, evaluated on a NEW held-out set written for it. The same rules apply to the new set (written before the v2 changes are measured, never read by Claude Code, at most two runs).
 - **No pass/fail thresholds** are set in this ADR. The held-out run reports the baseline and final counts side by side. With so few cases it is a check that the dev-set gains carry over, not an error rate.
 
 ## Consequences
