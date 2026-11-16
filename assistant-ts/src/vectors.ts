@@ -63,6 +63,8 @@ export interface VectorFile {
     answer_reply: unknown;
     elapsed_ms: number;
     speed: SpeedJson | null;
+    /** Fix (g); only the strip_nf vectors carry it. */
+    strip_nf?: "strip_nf_v1" | null;
     expected: FlowExpected;
   }[];
   speed: { id: string; speed: SpeedJson | null; timings: unknown; expected: SpeedJson }[];
@@ -150,7 +152,7 @@ export function runVectors(file: VectorFile, maxFailures = 20): VectorReport {
     record("results " + JSON.stringify(v.value).slice(0, 80), got.ok === v.ok && same(got.value, v.rows));
   }
   for (const v of file.flow) {
-    let step: Step = startQuestion(v.question, v.now_ms, toSpeed(v.speed));
+    let step: Step = startQuestion(v.question, v.now_ms, toSpeed(v.speed), { stripNf: v.strip_nf || null });
     while (step.kind !== "done") {
       if (step.kind === "query") step = step.next(input(v.query_reply));
       else if (step.kind === "search") step = step.next(input(v.search_reply));

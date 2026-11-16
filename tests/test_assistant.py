@@ -182,6 +182,7 @@ def test_flow_vectors_reproduce():
             decode(vector["answer_reply"]),
             vector["elapsed_ms"],
             speed_of(vector["speed"]),
+            strip_nf=vector.get("strip_nf"),
         )
         expected = vector["expected"]
         budget = outcome.budget
@@ -226,8 +227,11 @@ def test_flow_budget_off_skips_only_the_speed_and_tokens_rules():
             vector["elapsed_ms"],
             speed_of(vector["speed"]),
         )
-        on, on_calls, on_arguments = assistant.flow(*args)
-        off, off_calls, off_arguments = assistant.flow(*args, budget="off")
+        rule = vector.get("strip_nf")
+        on, on_calls, on_arguments = assistant.flow(*args, strip_nf=rule)
+        off, off_calls, off_arguments = assistant.flow(
+            *args, budget="off", strip_nf=rule
+        )
         assert (off_calls, off_arguments) == (on_calls, on_arguments), vector["id"]
         if on.budget is None or on.budget.rule == "n_ctx":
             assert off == on, vector["id"]
@@ -253,11 +257,13 @@ def test_flow_shows_model_text_only_on_the_answer_path():
         expected = vector["expected"]
         reply = vector["answer_reply"]
         if isinstance(reply, str) and reply.strip(assistant.ASCII_WHITESPACE):
+            # The reply as the guard gets it (fix (g) strip_nf_v1 vectors).
+            shown = assistant.answer_reply_text(reply, vector.get("strip_nf"))
             if expected["path"] == "answer":
                 assert expected["text"].startswith(
                     assistant.ANSWER_LABEL
                     + assistant.ANSWER_LABEL_SEPARATOR
-                    + reply.strip(assistant.ASCII_WHITESPACE)
+                    + shown
                     + assistant.ANSWER_LIST_SEPARATOR
                     + assistant.RESULTS_HEADER
                     + "\n- "

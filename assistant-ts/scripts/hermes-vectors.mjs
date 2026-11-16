@@ -31,6 +31,7 @@ const retryVectorsPath = join(root, "..", "tests", "vectors", "retry_vectors.jso
 const andV4VectorsPath = join(root, "..", "tests", "vectors", "and_v4_vectors.json");
 const gateVectorsPath = join(root, "..", "tests", "vectors", "gate_vectors.json");
 const windowVectorsPath = join(root, "..", "tests", "vectors", "window_vectors.json");
+const stripNfVectorsPath = join(root, "..", "tests", "vectors", "strip_nf_vectors.json");
 
 const runner = `
 var log = typeof print === "function" ? print : console.log;
@@ -69,6 +70,11 @@ log("hermes window vectors: " + windowReport.passed + "/" + windowReport.total +
     windowReport.failed + " failed");
 for (var wv = 0; wv < windowReport.failures.length; wv++) log("FAIL " + windowReport.failures[wv]);
 if (windowReport.failed) { throw new Error("window vectors failed"); }
+var stripNfReport = runStripNfVectors(STRIP_NF_VECTORS);
+log("hermes strip_nf vectors: " + stripNfReport.passed + "/" + stripNfReport.total + " passed, " +
+    stripNfReport.failed + " failed");
+for (var sn = 0; sn < stripNfReport.failures.length; sn++) log("FAIL " + stripNfReport.failures[sn]);
+if (stripNfReport.failed) { throw new Error("strip_nf vectors failed"); }
 
 var flowVector = VECTORS.flow[0];
 askAssistant(flowVector.question, {
@@ -181,6 +187,7 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "gateVectors.js"],
   ["assistant-ts", "src", "window.js"],
   ["assistant-ts", "src", "windowVectors.js"],
+  ["assistant-ts", "src", "stripNfVectors.js"],
 ];
 const declared = {};
 for (const parts of BUNDLE_FILES) {
@@ -204,6 +211,7 @@ const bundle = [
   "var AND_V4_VECTORS = " + readFileSync(andV4VectorsPath, "utf8").trim() + ";",
   "var GATE_VECTORS = " + readFileSync(gateVectorsPath, "utf8").trim() + ";",
   "var WINDOW_VECTORS = " + readFileSync(windowVectorsPath, "utf8").trim() + ";",
+  "var STRIP_NF_VECTORS = " + readFileSync(stripNfVectorsPath, "utf8").trim() + ";",
   runner,
 ].join("\n");
 mkdirSync(join(root, "dist-hermes"), { recursive: true });

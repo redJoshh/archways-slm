@@ -471,19 +471,64 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
             (id_, q009, query_009, e2e_009, tokens, reply_009, elapsed, redmi_answer)
         )
     scripts = [(*script, 0, None) for script in scripts] + timed
+    scripts = [(*script, None) for script in scripts]
+    # Fix (g) strip_nf_v1 (off until kept): only these vectors carry the
+    # "strip_nf" key. The last one is the same reply with the rule off.
+    strip = assistant.STRIP_NF_V1
+    scripts += [
+        (*s, 0, None, rule)
+        for s, rule in (
+            (
+                ("strip-nf-answer-then-sentence", q004, query_004, e2e_004, 177),
+                strip,
+            ),
+            (
+                ("strip-nf-sentence-then-answer", q004, query_004, e2e_004, 177),
+                strip,
+            ),
+            (("strip-nf-sentence-twice", q004, query_004, e2e_004, 177), strip),
+            (("strip-nf-guard-fires-on-rest", q009, query_009, e2e_009, 150), strip),
+            (
+                ("strip-nf-off-answer-then-sentence", q004, query_004, e2e_004, 177),
+                None,
+            ),
+        )
+    ]
+    strip_replies = {
+        "strip-nf-answer-then-sentence": reply_004 + " " + not_found,
+        "strip-nf-sentence-then-answer": not_found + "\n" + reply_004,
+        "strip-nf-sentence-twice": not_found + " " + not_found,
+        "strip-nf-guard-fires-on-rest": not_found + " " + invented,
+        "strip-nf-off-answer-then-sentence": reply_004 + " " + not_found,
+    }
+    scripts = [
+        (s[0], *s[1:5], strip_replies[s[0]], *s[5:]) if s[0] in strip_replies else s
+        for s in scripts
+    ]
 
     def encode(value):
         return THROWS if value is ERROR else value
 
     out = []
-    for id_, question, query, search, tokens, answer, elapsed, speed in scripts:
+    for id_, question, query, search, tokens, answer, elapsed, speed, rule in scripts:
         outcome, calls, arguments = flow(
-            question, now, PROMPTS, query, search, tokens, answer, elapsed, speed
+            question,
+            now,
+            PROMPTS,
+            query,
+            search,
+            tokens,
+            answer,
+            elapsed,
+            speed,
+            strip_nf=rule,
         )
         budget = outcome.budget
+        extra = {} if id_ not in strip_replies else {"strip_nf": rule}
         out.append(
             {
                 "id": id_,
+                **extra,
                 "now_ms": to_ms(now),
                 "question": question,
                 "query_reply": encode(query),

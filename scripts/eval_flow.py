@@ -160,6 +160,7 @@ def run_case(
     retry: str | None = None,
     matcher: str = MATCHER,
     excerpt: str | None = None,
+    strip_nf: str | None = None,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -236,6 +237,7 @@ def run_case(
         case_tokens,
         answer_reply,
         budget="off",
+        strip_nf=strip_nf,
     )
     results = search_reply if isinstance(search_reply, list) else []
     record.update(
@@ -584,6 +586,39 @@ def gate_fit(run_path: Path) -> None:
     )
 
 
+def strip_nf_replay(run_path: Path, strip_nf: str) -> None:
+    """No model call: a saved run's replies through flow() with strip_nf.
+
+    Prints the ids whose path or final text would change (no text).
+    """
+    run = json.loads(run_path.read_text(encoding="utf-8"))
+    print(f"strip_nf replay of {run_path.name} (commit {run['header']['commit']})")
+    # The prompts shape only the calls, never the outcome of scripted replies.
+    prompts = {
+        "query": QUERY_PROMPT.read_text(encoding="utf-8"),
+        "answer": ANSWER_PROMPT.read_text(encoding="utf-8"),
+    }
+    changed = 0
+    for case in run["cases"]:
+        if case["answer_reply"] is None:
+            continue
+        outcome, _, _ = assistant.flow(
+            case["question"],
+            datetime.fromisoformat(case["now"]),
+            prompts,
+            case["query_reply"],
+            case["results"],
+            case["case_tokens"],
+            case["answer_reply"],
+            budget="off",
+            strip_nf=strip_nf,
+        )
+        if outcome.path != case["path"] or outcome.text != case["text"]:
+            changed += 1
+            print(f"{case['set']} {case['id']}: {case['path']} -> {outcome.path}")
+    print(f"changed {changed}")
+
+
 def gate_apply(run_path: Path, p: int, q: int, out: Path) -> None:
     run = json.loads(run_path.read_text(encoding="utf-8"))
     records = gate_run(run, p, q)
@@ -617,6 +652,8 @@ def main() -> None:
     parser.add_argument("--matcher", choices=["and_v3", "and_v4"], default=MATCHER)
     parser.add_argument("--excerpt", choices=["excerpt_v2_centred"], default=None)
     parser.add_argument("--answer-prompt", choices=sorted(ANSWER_PROMPTS), default="v1")
+    parser.add_argument("--strip-nf", choices=[assistant.STRIP_NF_V1], default=None)
+    parser.add_argument("--strip-nf-replay", type=Path, metavar="RUN")
     parser.add_argument("--excerpt-replay", type=Path, metavar="RUN")
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
     parser.add_argument("--replay", type=Path, metavar="RUN")
@@ -652,6 +689,11 @@ def main() -> None:
             parser.error("--excerpt-replay needs --rank and --excerpt")
         excerpt_replay(args.excerpt_replay, args.rank, args.matcher, args.excerpt)
         return
+    if args.strip_nf_replay:
+        if args.strip_nf is None:
+            parser.error("--strip-nf-replay needs --strip-nf")
+        strip_nf_replay(args.strip_nf_replay, args.strip_nf)
+        return
     if args.gate_apply:
         if args.theta is None or args.out is None:
             parser.error("--gate-apply needs --theta p/q and --out")
@@ -680,6 +722,7 @@ def main() -> None:
             or args.matcher != MATCHER
             or args.excerpt is not None
             or args.answer_prompt != "v1"
+            or args.strip_nf is not None
             or args.retry is not None
             or args.reuse_queries is not None
         ):
@@ -753,6 +796,8 @@ def main() -> None:
             "rank": args.rank,
             "retry": args.retry,
             "excerpt": args.excerpt,
+            "answer_prompt": args.answer_prompt,
+            "strip_nf": args.strip_nf,
             "query_replies_from": None
             if args.reuse_queries is None
             else [args.reuse_queries.name, sha256(args.reuse_queries)],
@@ -788,6 +833,7 @@ def main() -> None:
                     retry=args.retry,
                     matcher=args.matcher,
                     excerpt=args.excerpt,
+                    strip_nf=args.strip_nf,
                 )
                 score = score_case(
                     case,

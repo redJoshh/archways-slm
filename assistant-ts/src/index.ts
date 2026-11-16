@@ -1,15 +1,17 @@
 // The assistant-ts public API. See README.md.
-export { askAssistant, resultsList, startQuestion } from "./flow.ts";
+export { answerReplyText, askAssistant, resultsList, startQuestion } from "./flow.ts";
 export type {
   AssistantDeps,
   AssistantResult,
   Completion,
+  FlowOptions,
   ModelCall,
   Outcome,
   Path,
   QuestionLog,
   Step,
   StepInput,
+  StripNf,
   Trace,
 } from "./flow.ts";
 export {

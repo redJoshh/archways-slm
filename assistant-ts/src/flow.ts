@@ -23,6 +23,8 @@
  * - guard fired                                          -> resultsList(results)
  * - the reply is exactly NOT_FOUND_MESSAGE (after the ASCII trim), although
  *   results exist ("answer_not_found")                   -> resultsList(results)
+ *   With the "strip_nf_v1" option (fix (g), off until kept): the sentence is
+ *   removed from a reply that also has other text (answerReplyText()).
  * - the guard passed the reply ("answer")
  *              -> ANSWER_LABEL + ANSWER_LABEL_SEPARATOR + reply
  *                 + ANSWER_LIST_SEPARATOR + resultsList(results)
@@ -58,7 +60,7 @@ import {
   systemTurn,
   type Announcement,
 } from "./render.ts";
-import { trimAscii } from "./text.ts";
+import { replaceAll, trimAscii } from "./text.ts";
 
 export type Path =
   | "answer"
@@ -134,8 +136,42 @@ function isCount(value: unknown): value is number {
   return typeof value === "number" && isFinite(value) && Math.floor(value) === value && value >= 0;
 }
 
+/** Fix (g), accuracy-phase.md. null (the default) is the UAT flow. */
+export type StripNf = "strip_nf_v1" | null;
+
+export interface FlowOptions {
+  stripNf?: StripNf;
+}
+
+/**
+ * The answer reply as the guard gets it, or null for answer_not_found (a
+ * port of answer_reply_text()): the ASCII trim, and the exact
+ * NOT_FOUND_MESSAGE alone is null. With "strip_nf_v1": every occurrence of
+ * the exact sentence is removed from a reply that also has other text, both
+ * ends are trimmed again (inner spacing kept), and nothing left is null.
+ */
+export function answerReplyText(answerReply: string, stripNf?: StripNf): string | null {
+  if (stripNf !== undefined && stripNf !== null && stripNf !== "strip_nf_v1") {
+    throw new Error("unknown strip_nf rule " + String(stripNf));
+  }
+  let reply = trimAscii(answerReply);
+  if (reply === NOT_FOUND_MESSAGE) return null;
+  if (stripNf === "strip_nf_v1" && reply.indexOf(NOT_FOUND_MESSAGE) !== -1) {
+    reply = trimAscii(replaceAll(reply, NOT_FOUND_MESSAGE, ""));
+    if (reply === "") return null;
+  }
+  return reply;
+}
+
 /** speed: this phone's measured rates (null or omitted: unknown). */
-export function startQuestion(question: string, nowMs: number, speed?: Speed | null): Step {
+export function startQuestion(
+  question: string,
+  nowMs: number,
+  speed?: Speed | null,
+  options?: FlowOptions,
+): Step {
+  const stripNf: StripNf = options && options.stripNf ? options.stripNf : null;
+  if (stripNf !== null && stripNf !== "strip_nf_v1") throw new Error("unknown strip_nf rule " + String(stripNf));
   const trace: Trace = {
     arguments: null,
     queryPrompt: null,
@@ -164,9 +200,10 @@ export function startQuestion(question: string, nowMs: number, speed?: Speed | n
     if (!input.ok || typeof input.value !== "string") {
       return done("answer_error", listOrLastResort(results));
     }
-    const reply = trimAscii(input.value);
+    const reply = answerReplyText(input.value, stripNf);
     // The not-found sentence although results exist: show the list instead.
-    if (reply === NOT_FOUND_MESSAGE) return done("answer_not_found", listOrLastResort(results));
+    // With strip_nf_v1, also a reply that is only that sentence, repeated.
+    if (reply === null) return done("answer_not_found", listOrLastResort(results));
     let guarded: { fired: boolean; text: string; codes: string[] };
     try {
       guarded = guard(reply, results, question, []);
@@ -290,6 +327,8 @@ export interface AssistantDeps {
    * ignored. Omitted: no wait.
    */
   whenReady?: () => Promise<void>;
+  /** Fix (g) strip_nf_v1; omitted or null: the UAT flow (the default). */
+  stripNf?: StripNf;
 }
 
 export interface AssistantResult extends Outcome {
@@ -321,7 +360,9 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
   let caseTokens: number | null = null;
   let result: AssistantResult;
   try {
-    let step = startQuestion(question, deps.nowMs(), deps.speed ? deps.speed.get() : null);
+    let step = startQuestion(question, deps.nowMs(), deps.speed ? deps.speed.get() : null, {
+      stripNf: deps.stripNf || null,
+    });
     while (step.kind !== "done") {
       const started = clock();
       let input: StepInput;

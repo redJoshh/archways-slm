@@ -568,6 +568,31 @@ def list_or_last_resort(results: list[dict]) -> str:
     return LAST_RESORT_MESSAGE if listed is None else listed
 
 
+# Fix (g), accuracy-phase.md: off until kept. The only other value is None.
+STRIP_NF_V1 = "strip_nf_v1"
+
+
+def answer_reply_text(answer_reply: str, strip_nf: str | None = None) -> str | None:
+    """The answer reply as the guard gets it, or None for answer_not_found.
+
+    The ASCII-whitespace strip, then the exact not-found sentence alone means
+    answer_not_found. With strip_nf_v1 (tests/vectors/strip_nf_vectors.json):
+    every occurrence of the exact sentence (case-sensitive) is removed from a
+    reply that also has other text, then both ends are stripped of ASCII
+    whitespace again (inner spacing is kept); nothing left is answer_not_found.
+    """
+    if strip_nf not in (None, STRIP_NF_V1):
+        raise ValueError(f"unknown strip_nf rule {strip_nf!r}")
+    reply = answer_reply.strip(ASCII_WHITESPACE)
+    if reply == NOT_FOUND_MESSAGE:
+        return None
+    if strip_nf == STRIP_NF_V1 and NOT_FOUND_MESSAGE in reply:
+        reply = reply.replace(NOT_FOUND_MESSAGE, "").strip(ASCII_WHITESPACE)
+        if not reply:
+            return None
+    return reply
+
+
 def flow(
     question: str,
     now: datetime,
@@ -580,6 +605,7 @@ def flow(
     speed: Speed | None = None,
     *,
     budget: str = "on",
+    strip_nf: str | None = None,
 ) -> tuple[Outcome, Calls | None, dict | None]:
     """One question through the UAT flow, with every step's result scripted.
 
@@ -592,11 +618,15 @@ def flow(
     1): the speed and tokens rules are skipped, so every case that fits
     n_ctx gets its answer call; the n_ctx rule (capacity, not speed) stays.
     The phone always runs "on"; assistant-ts has no such switch.
+    strip_nf: None (the UAT flow) or STRIP_NF_V1 (fix (g), see
+    answer_reply_text()).
     Returns the outcome, the prompts sent (None if no call was made) and the
     search arguments (None if no search was made).
     """
     if budget not in ("on", "off"):
         raise ValueError(f"budget must be 'on' or 'off', not {budget!r}")
+    if strip_nf not in (None, STRIP_NF_V1):
+        raise ValueError(f"unknown strip_nf rule {strip_nf!r}")
     try:
         check_question(question)
     except ContractError:
@@ -661,9 +691,10 @@ def flow(
             "answer_error", list_or_last_resort(results), (), budget, count
         )
         return outcome, calls, arguments
-    reply = answer_reply.strip(ASCII_WHITESPACE)
+    reply = answer_reply_text(answer_reply, strip_nf)
     # The not-found sentence although results exist: show the list instead.
-    if reply == NOT_FOUND_MESSAGE:
+    # With strip_nf_v1, also a reply that is only that sentence, repeated.
+    if reply is None:
         outcome = Outcome(
             "answer_not_found", list_or_last_resort(results), (), budget, count
         )
