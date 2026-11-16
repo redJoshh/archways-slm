@@ -14,7 +14,8 @@ docs/plans/accuracy-phase.md, section 1. Per case:
    feedindex.search_feed (and_v3) over the case's data source: the seed
    file for e2e34 and taglish10, the snapshot for flow13. Arguments the
    contract rejects are a search error, as on the phone.
-3. The answer call: flow()'s own answer prompt (answer v1), raw,
+3. The answer call: flow()'s own answer prompt (answer v1, or v4 with
+   --answer-prompt v4), raw,
    num_predict 200 (ANSWER_N_PREDICT), only if the case part fits n_ctx.
    Case tokens are Ollama's prompt_eval_count of flow()'s case part.
 4. assistant.flow(..., budget="off") with those replies: the guard, the
@@ -80,6 +81,11 @@ SEED_DATA = ROOT / "data" / "seed" / "announcements.json"
 SNAPSHOT = LOCAL / "announcements_snapshot.json"
 QUERY_PROMPT = ROOT / "prompts" / "e2e_query_v1.txt"
 ANSWER_PROMPT = ROOT / "prompts" / "e2e_answer_v1.txt"
+# --answer-prompt: v1 is the UAT prompt (the default); v4 is section 3 (f).
+ANSWER_PROMPTS = {
+    "v1": ANSWER_PROMPT,
+    "v4": ROOT / "prompts" / "e2e_answer_v4.txt",
+}
 SETS = {
     "e2e34": (ROOT / "evals" / "e2e_cases.jsonl", "seed"),
     "taglish10": (ROOT / "evals" / "taglish_cases.jsonl", "seed"),
@@ -610,6 +616,7 @@ def main() -> None:
     parser.add_argument("--retry", choices=["retry_v1"], default=None)
     parser.add_argument("--matcher", choices=["and_v3", "and_v4"], default=MATCHER)
     parser.add_argument("--excerpt", choices=["excerpt_v2_centred"], default=None)
+    parser.add_argument("--answer-prompt", choices=sorted(ANSWER_PROMPTS), default="v1")
     parser.add_argument("--excerpt-replay", type=Path, metavar="RUN")
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
     parser.add_argument("--replay", type=Path, metavar="RUN")
@@ -672,6 +679,7 @@ def main() -> None:
             args.rank is not None
             or args.matcher != MATCHER
             or args.excerpt is not None
+            or args.answer_prompt != "v1"
             or args.retry is not None
             or args.reuse_queries is not None
         ):
@@ -693,9 +701,10 @@ def main() -> None:
     by_id = {name: {row["id"]: row for row in rows} for name, rows in sources.items()}
     offices = {name: {row["office"] for row in rows} for name, rows in sources.items()}
     contract = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    answer_prompt = ANSWER_PROMPTS[args.answer_prompt]
     prompts = {
         "query": QUERY_PROMPT.read_text(encoding="utf-8"),
-        "answer": ANSWER_PROMPT.read_text(encoding="utf-8"),
+        "answer": answer_prompt.read_text(encoding="utf-8"),
     }
     sets = {}
     for name in names:
@@ -737,7 +746,7 @@ def main() -> None:
             },
             "prompts": {
                 "query": [QUERY_PROMPT.name, sha256(QUERY_PROMPT)],
-                "answer": [ANSWER_PROMPT.name, sha256(ANSWER_PROMPT)],
+                "answer": [answer_prompt.name, sha256(answer_prompt)],
             },
             "case_files": {n: [SETS[n][0].name, sha256(SETS[n][0])] for n in sets},
             "snapshot_sha256": sha256(SNAPSHOT),
