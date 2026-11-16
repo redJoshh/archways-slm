@@ -25,6 +25,8 @@ Template:
 - **Correction:** in the entry "Freeze of the FINAL configuration", the test app path was written with a tab in place of `\t`. The path is `C:\throw-away-app\gate1-llm`, as in earlier entries.
 - **Commits:** this `docs:` commit. Not pushed.
 
+---
+
 ## 2026-11-16: Freeze of the FINAL configuration; VERIFY OK; phase finding; held-out closed after two runs; window_v1 planned
 
 - **Date:** 2026-11-16 (+08:00)
@@ -54,6 +56,8 @@ Template:
 - **Commits:** `3a7d0af`, this `docs:` commit; test app `22607af`. Not pushed.
 - **Open questions / next:** the user's held-out final at this commit; phone smoke run of flow13; approval of window_v1.
 
+---
+
 ## 2026-11-16: (e) off at the freeze; Step 3 (f) answer prompt v4: DROPPED; fix (g) strip_nf_v1: KEPT
 
 - **Date:** 2026-11-16 (+08:00)
@@ -80,6 +84,8 @@ Template:
 - **Kept for the freeze:** rank_v1, and_v4, strip_nf_v1, answer v1.
 - **Commits:** `9a748bd`, `5975ead`, `2116739`, this `docs:` commit. Not pushed.
 - **Open questions / next:** the section 3 "Then" list: freeze, re-export the phone flow test, phone smoke run of flow13, held-out final (user).
+
+---
 
 ## 2026-11-14: Step 3 (e) excerpt_v2_centred: pre-registered, built, run: no effect on any dev case
 
