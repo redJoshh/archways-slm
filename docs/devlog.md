@@ -19,6 +19,31 @@ Template:
 
 ---
 
+## 2026-11-17: Phone readiness check: window_v1 works on the device at a simulated 2026-12-10 (by the user)
+
+- **Date:** 2026-11-17 (+08:00)
+- **Readiness check, not scored.** Not compared with the dev or held-out results, and not used to change anything.
+- **Setup:** Nothing Phone 3a Pro, test app live mode (`857138c`), local dev-profile Spring, the real local feed (53 rows). Phone defaults: frozen FINAL + window_v1 (`PHONE_FALLBACK`).
+- **Run 1, real date (2026-11-17):** 13 flow questions.
+  - q01 is now correct (Office of the Secretary-General; row 18 first).
+  - q13 is correct (January 15, 2027).
+  - q11: row 16 is first in the list.
+  - The per-question paths were not reported. Every snapshot row is inside the 30-day window at this date, so window_v1 can't add a row here.
+- **Run 2, simulated now 2026-12-10T10:00:00+08:00 (DEV ONLY field):**
+  - **Result ids are identical to run 1 for all 13 questions**, and non-empty although no row is within 30 days. So window_v1 works on the device.
+  - Paths: answer 9, answer_not_found 3, not_found 1 (the trap, clean).
+  - q12 states a past date in the present tense: the known past-date framing limitation (ADR 0007 Consequences). window_v1 doesn't cause it.
+  - q05 gave a vague AI answer instead of `answer_not_found`. The list shows both sources. The user attributes it to the prompt date shift.
+- **Whole-question times:** 1.1–13.2 s.
+- **Compared with the Ollama readiness run at the same date** (entry below, `readiness-1210-window.json`):
+  - Same paths except q05, which was `answer_not_found` there and `answer` on the phone (Ollama answer 8 / answer_not_found 4; phone 9 / 3).
+  - Both runs use the same Dec 10 prompt date. So the difference is likely the phone's runtime (llama.rn vs Ollama), not only the date. Cause unverified.
+- **How it was verified:** docs only. The values are copied from the user's paste; no announcement text is recorded.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** none from this check. The q05 phone/Ollama difference is noted, not acted on (the phase is closed).
+
+---
+
 ## 2026-11-17: Test app: DEV-ONLY simulated date in live mode; node_modules restored from the lockfile
 
 - **Date:** 2026-11-17 (+08:00)
