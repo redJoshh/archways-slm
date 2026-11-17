@@ -19,6 +19,33 @@ Template:
 
 ---
 
+## 2026-11-17: v2 improvements planned (PROPOSED, no code)
+
+- **Date:** 2026-11-17 (+08:00)
+- **What changed:** `docs/plans/v2-improvements.md`, status PROPOSED, for the user's approval. No code.
+- **What it covers:**
+  - **The v2 held-out protocol:**
+    - a new file, never read by Claude Code
+    - fixed now 2026-11-17T10:00+08:00
+    - configurations `shipped` (FINAL + window_v1; the baseline) and `v2final`
+    - two runs with human review
+    - VERIFY OK before the baseline
+    - proposed addition: the file's SHA-256 recorded before any fix
+  - **Fixes (a)–(f)**, each with its rule, targets, what could get worse, and how it is measured.
+  - **A 12-01 schedule,** with the drop order (f), (e), (d).
+- **Facts found while planning** (numbers and ids only):
+  - At 2026-11-17, 8 of 22 visible seed rows are older than 30 days (ann-002, 004, 011, 014, 016, 017, 018, 025). v2 held-out cases on those rows depend on window_v1.
+  - **Saved dev replies** (all runs in `data/local/runs`):
+    - No permission contradiction; the only "Yes" (e2e-015) is correct. So (a) needs the new `rules10` cases, with a pre-registered stop if their baseline shows none.
+    - Plain word overlap would flag correct restate-then-answer replies (q01, q03, e2e-026), so echo_v1 requires "no new date or number, and at most 2 new content words".
+    - q08 is a real dev echo.
+  - **Answer v2's compact format** raises unless results are newest first, and drops the `posted_at` name. Under rank_v1, v5 needs a `posted_at` label in rank order.
+- **How it was verified:** docs only. The seed-age count and the reply scan were one-off scripts over local files; no model calls.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** the user's approval and the open decisions in section 6 of the plan.
+
+---
+
 ## 2026-11-17: Integration guide amended: MD5 on the SDK 57 File API is supported (not deprecated)
 
 - **Date:** 2026-11-17 (+08:00)
