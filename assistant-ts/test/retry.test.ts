@@ -25,8 +25,8 @@ test("runRetryVectors reports every retry vector passing", () => {
 test("makeFeedSearch: retry needs rank, and reports the flag and count", async () => {
   const index = createFeedIndex(async () => ({ content: [], last: true }));
   assert.throws(() => makeFeedSearch(index, () => 0, null, "retry_v1"));
-  const seen: { retried: boolean; count: number }[] = [];
+  const seen: { retried: boolean; fellBack: boolean; count: number }[] = [];
   const search = makeFeedSearch(index, () => 0, "rank_v1", "retry_v1", (info) => seen.push(info), "and_v3");
   assert.deepEqual(await search({ query: "x" }, { question: "Where is the library?" }), []);
-  assert.deepEqual(seen, [{ retried: true, count: 0 }]);
+  assert.deepEqual(seen, [{ retried: true, fellBack: false, count: 0 }]);
 });

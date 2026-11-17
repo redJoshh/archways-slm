@@ -41,6 +41,9 @@ search_feed(rows, arguments, now): fakebackend.search_announcements with
 matcher and_v3 over feed rows: contract validation and defaults (days 7,
 limit 5), the days window on published_at, newest first then id; pinned is
 ignored.
+
+search_feed_window: window_v1 (docs/plans/window-fallback.md), the 30-day
+window as a fallback, checked by tests/vectors/window_fallback_vectors.json.
 """
 
 import re
@@ -153,6 +156,53 @@ def search_feed(
         rank=rank,
         excerpt=excerpt,
     )
+
+
+WINDOWS = ("window_v1",)
+FALLBACK_DAYS = 365
+
+
+def search_feed_window(
+    rows: list[dict],
+    arguments: dict,
+    now: datetime,
+    contract: dict,
+    *,
+    question: str | None = None,
+    rank: str | None = None,
+    matcher: str = "and_v3",
+    excerpt: str | None = None,
+    window: str | None = "window_v1",
+) -> tuple[list[dict], bool]:
+    """search_feed, then window_v1 if it found nothing: (results, fell_back).
+
+    window_v1 (window-fallback.md section 3, approved 2026-11-17): only after
+    a valid search with 0 results, and only if days is the contract maximum
+    (30; the default 7 or any shorter period named by the student is a hard
+    filter), the same search again over now - 365 days <= published <= now:
+    same query, matcher, rank, limit and excerpt rule, same visibility.
+    fell_back is True whenever the second search ran, whatever it found.
+    Invalid arguments raise, as search_feed does, with no fallback.
+    """
+    if window is not None and window not in WINDOWS:
+        raise ValueError(f"unknown window {window!r}")
+    common = {"question": question, "rank": rank, "excerpt": excerpt}
+    results = search_feed(rows, arguments, now, contract, matcher=matcher, **common)
+    if results or window is None:
+        return results, False
+    days_schema = contract["$defs"]["arguments"]["properties"]["days"]
+    if arguments.get("days", days_schema["default"]) != days_schema["maximum"]:
+        return results, False
+    fallback = search_announcements(
+        rows,
+        arguments,
+        now,
+        contract,
+        matcher=matcher,
+        window_days=FALLBACK_DAYS,
+        **common,
+    )
+    return fallback, True
 
 
 RETRIES = ("retry_v1",)

@@ -36,6 +36,7 @@ import { PHONE_EXCERPT, PHONE_MATCHER, PHONE_RANK, PHONE_RETRY } from "./generat
 import { rankScorer, type RankVersion } from "./rank.ts";
 import { searchWithRetry, type RetryResult, type RetryVersion } from "./retry.ts";
 import { excerptFor, type ExcerptRule } from "./window.ts";
+import { searchWithFallback, type FallbackVersion } from "./fallback.ts";
 import { searchRows, type IndexRow, type Matcher } from "./search.ts";
 
 export class HttpError extends Error {
@@ -101,6 +102,7 @@ export interface FeedIndex {
     score?: (row: IndexRow) => number,
     matcher?: Matcher,
     excerpt?: (row: IndexRow, query: string) => string,
+    windowDays?: number,
   ) => Announcement[];
   /** retry.ts searchWithRetry over the index (rank_v1, then retry_v1 on 0 results). */
   searchRetry: (
@@ -284,10 +286,11 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
       score?: (row: IndexRow) => number,
       matcher?: Matcher,
       excerpt?: (row: IndexRow, query: string) => string,
+      windowDays?: number,
     ) => {
       const rows: IndexRow[] = [];
       if (entries) entries.forEach((entry) => rows.push(entry.row));
-      return searchRows(rows, args, nowMs === undefined ? clock() : nowMs, score, matcher, excerpt);
+      return searchRows(rows, args, nowMs === undefined ? clock() : nowMs, score, matcher, excerpt, windowDays);
     },
     searchRetry: (
       args: unknown,
@@ -319,16 +322,22 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
  * and the result count (numbers only, for the question log). matcher:
  * "and_v3" or "and_v4" (retry_v1 runs with and_v3 only). excerpt: null (the
  * first 500) or "excerpt_v2_centred" (needs the question; not with retry).
+ * fallback: null (off, the default for now) or "window_v1" (fallback.ts:
+ * after 0 results at days 30, the same search over 365 days; needs rank_v1,
+ * not with retry). onSearch's fellBack is true when that second search ran.
  */
 export function makeFeedSearch(
   index: FeedIndex,
   nowMs: () => number = Date.now,
   rank: RankVersion | null = PHONE_RANK,
   retry: RetryVersion | null = PHONE_RETRY,
-  onSearch?: (info: { retried: boolean; count: number }) => void,
+  onSearch?: (info: { retried: boolean; fellBack: boolean; count: number }) => void,
   matcher: Matcher = PHONE_MATCHER,
   excerpt: ExcerptRule | null = PHONE_EXCERPT,
+  fallback: FallbackVersion | null = null,
 ) {
+  if (fallback !== null && retry !== null) throw new Error("window_v1 runs without retry");
+  if (fallback !== null && rank === null) throw new Error("window_v1 needs rank_v1");
   if (excerpt !== null && retry !== null) throw new Error("the excerpt window runs without retry");
   if (retry !== null && rank === null) throw new Error("retry_v1 needs rank_v1");
   if (retry !== null && matcher !== "and_v3") throw new Error("retry_v1 runs with and_v3 only");
@@ -342,18 +351,19 @@ export function makeFeedSearch(
     }
     const question = (context as { question: string }).question;
     if (retry === null) {
-      const results = index.search(
+      const at = nowMs();
+      const score = rankScorer(rank, question, matcher);
+      const window = excerptFor(excerpt, question, matcher);
+      const found = searchWithFallback(
+        (windowDays) => index.search(args, at, score, matcher, window, windowDays),
         args,
-        nowMs(),
-        rankScorer(rank, question, matcher),
-        matcher,
-        excerptFor(excerpt, question, matcher),
+        fallback,
       );
-      if (onSearch) onSearch({ retried: false, count: results.length });
-      return results;
+      if (onSearch) onSearch({ retried: false, fellBack: found.fellBack, count: found.results.length });
+      return found.results;
     }
     const found = index.searchRetry(args, nowMs(), question, rank, retry);
-    if (onSearch) onSearch({ retried: found.retried, count: found.results.length });
+    if (onSearch) onSearch({ retried: found.retried, fellBack: false, count: found.results.length });
     return found.results;
   };
 }

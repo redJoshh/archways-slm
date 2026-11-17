@@ -139,6 +139,8 @@ function matches(row: IndexRow, groups: [string[], string[]][]): boolean {
 /**
  * search_announcements arguments -> contract results, over the index at
  * nowMs. Throws (ContractError) if the arguments break the contract.
+ * windowDays replaces the checked days for the window only (window_v1's
+ * fallback, fallback.ts); it never comes from the model.
  */
 export function searchRows(
   rows: IndexRow[],
@@ -147,13 +149,14 @@ export function searchRows(
   score?: (row: IndexRow) => number,
   matcher: Matcher = "and_v3",
   excerptFor?: (row: IndexRow, query: string) => string,
+  windowDays?: number,
 ): Announcement[] {
   const checked = checkArguments(args);
   const days = checked.days === undefined ? DAYS_DEFAULT : checked.days;
   const limit = checked.limit === undefined ? LIMIT_DEFAULT : checked.limit;
   const groups = queryGroups(checked.query, synonymsFor(matcher));
   if (groups.length === 0) return [];
-  const since = nowMs - days * DAY_MS;
+  const since = nowMs - (windowDays === undefined ? days : windowDays) * DAY_MS;
   const found = rows.filter((row) => row.publishedMs <= nowMs && row.publishedMs >= since && matches(row, groups));
   const scores: Map<IndexRow, number> = new Map();
   if (score !== undefined) for (const row of found) scores.set(row, score(row));

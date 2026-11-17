@@ -290,11 +290,14 @@ def search_announcements(
     question: str | None = None,
     rank: str | None = None,
     excerpt: str | None = None,
+    window_days: int | None = None,
 ) -> list[dict]:
     """Run one search over seed rows at now. See the module docstring for the rules.
 
     rank "rank_v1" (and_v3 only) orders the matched rows by overlap with the
     raw question before the cut (rank.py); None keeps newest first.
+    window_days replaces the validated days for the window only (window_v1's
+    fallback, feedindex.search_feed_window); it never comes from the model.
     """
     if now.tzinfo is None:
         raise ValueError("now must have a time zone")
@@ -326,7 +329,7 @@ def search_announcements(
     if not words:
         return []
 
-    since = now - timedelta(days=days)
+    since = now - timedelta(days=days if window_days is None else window_days)
     matches = []  # (score, row)
     for row in rows:
         if not is_visible(row, now) or published_at(row) < since:
