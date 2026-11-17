@@ -58,6 +58,12 @@ A new search endpoint would have to repeat every visibility rule of the feed, pe
   - `year_level`: null.
   - `posted_at`: `publishedAt`, which must carry an offset. An item without a usable `publishedAt` is left out of the index and counted in the log.
 
+- **Amendment (user, 2026-11-17): window_v1 on the phone.** The shipped app searches with the evaluated FINAL configuration (`frozen.FINAL`: rank_v1, and_v4) **plus window_v1**, a phone-only setting kept outside FINAL (`archways_assistant/phone.py`, generated `PHONE_FALLBACK`).
+  - After 0 results at `days` 30 (the student named no shorter period), the same search runs again over the last 365 days. The feed's visibility is unchanged.
+  - Rule and proof: `docs/plans/window-fallback.md`, `tests/vectors/window_fallback_vectors.json`, `tests/test_window_fallback.py`.
+  - It provably can't change any dev or held-out result at the evaluation dates (2026-11-02 to 2026-11-14). It changes behaviour from about 2026-12-07, when the snapshot rows (posted Nov 6–7) leave the 30-day window. That is its purpose.
+  - Risk: an old row can reach the model when nothing current matches. The results list shows each row's posted date.
+
 ## Consequences
 
 - **Spring needs no search change.** The v2/v3 search vectors become assistant-ts parity vectors (Python reference against TS, on Node and Hermes).

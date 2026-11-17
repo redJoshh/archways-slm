@@ -1,6 +1,6 @@
 # Plan: window_v1, the 30-day window as a fallback (product correctness, NOT a scored fix)
 
-- **Status:** APPROVED as planned (user, 2026-11-17): rule 3 unchanged (`zero`, 365 days, only at `days` 30). Held-out final done first (2026-11-17, at `428b1ca`). Vectors `tests/vectors/window_fallback_vectors.json` written by hand before any code.
+- **Status:** APPROVED as planned (user, 2026-11-17): rule 3 unchanged (`zero`, 365 days, only at `days` 30). Held-out final done first (2026-11-17, at `428b1ca`). Vectors `tests/vectors/window_fallback_vectors.json` written by hand before any code. Built `73e1b2d`; on as a phone default `3c3c75a` (`phone.py`, outside `frozen.FINAL`; user, 2026-11-17).
 - **Scope:** a product correctness change for UAT and the defense (2nd week of December). It is not an accuracy-phase change: it is not scored, not compared on the dev sets, and not part of the held-out final. It must be shown not to change any dev or held-out result at the fixed evaluation dates.
 
 ## 1. The problem
