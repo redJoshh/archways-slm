@@ -19,6 +19,29 @@ Template:
 
 ---
 
+## 2026-11-17: Test app: DEV-ONLY simulated date in live mode; node_modules restored from the lockfile
+
+- **Date:** 2026-11-17 (+08:00)
+- **What changed** (test app `C:\throw-away-app\gate1-llm`, `857138c`, not pushed; nothing in this repo or assistant-ts):
+  - `LiveTest.tsx` has a DEV-ONLY "simulate date" field: a fixed ISO 8601 instant with an offset, for example `2026-12-10T10:00:00+08:00`. Empty means the real clock.
+  - It feeds both the question's "today" (`runQuestion(..., nowMs)` → `askAssistant` deps `nowMs`) and the search's now (`makeFeedSearch(index, nowMs)`). So the 30-day window and window_v1 run as on that date.
+  - **`__DEV__` builds only:** a release build doesn't render the field and ignores it.
+  - **Labelled:** a red banner "DEV ONLY: SIMULATED DATE …", a `SIMULATED now` line per question, and `simulatedNow` on the UAT log entry.
+  - **Stays real:** elapsed times (askAssistant's own clock), the index refresh clock and the re-measure day.
+  - The first question at a new date primes its sessions again, because the prompt prefix carries the date.
+  - Documented in the test app's `NOTES.md`.
+- **Why:** to run window_v1 on the phone before Dec 7 (it can't trigger at the real date until the snapshot rows are 30 days old).
+- **node_modules cleanup:**
+  - `npm ci` from the committed lockfile removed `eslint` and `eslint-config-expo`, which my earlier `npx expo lint` had installed.
+  - The first `npm ci` (Git Bash) failed in llama.rn's postinstall: GNU tar read `C:\…` as a remote host ("Cannot connect to C: resolve failed"). That left `node_modules` incomplete.
+  - Re-run from PowerShell (Windows `tar.exe`) it succeeded: the ESLint packages are gone and llama.rn's jniLibs (`arm64-v8a`, `x86_64`) are present.
+  - **Note for later:** run `npm ci` / `npm install` for this app from PowerShell, not Git Bash.
+- **How it was verified:** `npx tsc --noEmit` clean before and after `npm ci`; `git status` clean after the commit. Not run on the phone yet.
+- **Commits:** test app `857138c`; this `docs:` commit. Not pushed.
+- **Open questions / next:** the user's live session at 2026-12-10 on the phone.
+
+---
+
 ## 2026-11-17: window_v1 on as a phone default (outside FINAL); test app re-vendored; flow13 readiness check at 2026-12-10
 
 - **Date:** 2026-11-17 (+08:00)
