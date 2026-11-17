@@ -19,6 +19,33 @@ Template:
 
 ---
 
+## 2026-11-17: Integration guide amended: MD5 on the SDK 57 File API is supported (not deprecated)
+
+- **Date:** 2026-11-17 (+08:00)
+- **Question (user):** is MD5 on the non-legacy `File` API supported or deprecated in Expo SDK 57? If it is deprecated, what is the M2 fallback?
+- **Finding:** supported, not deprecated.
+  - **Read verbatim:** the live SDK 57 docs page, plus `expo/expo` branch `sdk-57`: `packages/expo-file-system/src/internal/NativeFileSystem.types.ts`, `src/File.types.ts` and `CHANGELOG.md`.
+  - **Declarations:**
+    - `md5: string | null` on `NativeFileSystemFile`, with no `@deprecated` tag.
+    - `info(options?: InfoOptions): FileInfo`, also not deprecated, with `InfoOptions.md5` default false and `FileInfo.md5`.
+  - **The misplaced note:** the docs' "Deprecated: In favor of `lastModified`", rendered right after `md5`, is the `@deprecated` tag of `modificationTime`. The earlier entry flagged it as "odd"; now settled.
+  - **CHANGELOG:**
+    - 18.0.0 adds md5 to the new module.
+    - 56.0.0 fixes out-of-memory when calculating md5.
+    - 56.0.0 deprecates `modificationTime`.
+    - There is no md5 deprecation.
+  - **`getInfoAsync`** on the main module is marked deprecated ("will throw in runtime"); in `expo-file-system/legacy` it is not deprecated. The guide now says to use the new API.
+- **What changed in the guide** (section 4 and M2):
+  - Use `new File(...).md5` or `.info({ md5: true }).md5`.
+  - Both are **synchronous**, so show "Verifying download…" before the call.
+  - It runs once per download, then a marker is trusted.
+  - **No fallback is needed:** neither a chunked JS SHA-256 nor a native module.
+  - **Redmi time:** not measured. Estimated at a few seconds (2–6 s, unverified; bounded by flash reads and one A53 core), to be measured in M2.
+- **How it was verified:** documentation and source read through a fetch agent (URLs above, all HTTP 200, quoted verbatim). No code run.
+- **Commits:** this `docs:` commit. Not pushed.
+
+---
+
 ## 2026-11-17: Integration guide frozen; feed index handles forwarded details (backend a823988)
 
 - **Date:** 2026-11-17 (+08:00)

@@ -1,6 +1,7 @@
 # Integration guide: the Archways assistant in `archways-mobile`
 
 - **Status:** FROZEN 2026-11-17. It replaces the 2026-11-10 draft, which lived in a chat reply, not a file. Its 7 milestones are kept and updated below.
+  - **Amended 2026-11-17 (user's request):** MD5 on the SDK 57 `File` API is confirmed supported, not deprecated (section 4, M2).
 - **Vendor source:** archways-assistant `830dcfd` (`830dcfd` and later docs-only commits have the same `assistant-ts/` and `guard-ts/`). Record the full hash in `vendor/archways/VENDORED.md`.
 - **Backend checked against:** `archways-backend` `origin/main` `a823988` (read-only, 2026-11-17).
 - **Mobile app checked against:** `archways-mobile` `origin/main` `b43ffdc` (expo `~57.0.30`, react-native `0.86.3`, expo-router, axios).
@@ -105,10 +106,17 @@ question → [wait while "getting ready"] → query call → feed search (index,
   - The release notes publish both MD5 and SHA-256. HTTPS from GitHub covers tampering. Together these satisfy "verified by checksum".
   - The app compares the downloaded file's MD5 with a constant in the app.
   - The SHA-256 stays a constant too: session file names include it (`session.ts` `modelSha256`).
-  - **SDK 57 API** (docs read 2026-11-17):
-    - **New API** (`expo-file-system`): `File#md5` (`string | null`, read synchronously). The page shows an odd deprecation note on it, so confirm on the live page before relying on it.
-    - **Legacy** (`expo-file-system/legacy`): `getInfoAsync(uri, { md5: true })` → `FileInfo.md5`.
+  - **SDK 57 API: supported, not deprecated** (live docs and the `sdk-57` source, checked 2026-11-17):
+    - **New API** (`expo-file-system`):
+      - `file.md5`: `string | null`; null if the file doesn't exist or can't be read.
+      - `file.info({ md5: true }).md5`: `InfoOptions.md5`, default false.
+      - Both are synchronous: they return values, not Promises.
+    - **The source:** `md5` is declared on `NativeFileSystemFile` (`src/internal/NativeFileSystem.types.ts`) with **no `@deprecated` tag**.
+    - **The misplaced note:** the "Deprecated: In favor of `lastModified`" note shown right after `md5` on the docs page belongs to `modificationTime`; the `@deprecated` tag is on `modificationTime` in the source.
+    - **Changelog:** it has no md5 deprecation. 56.0.0 (2026-05-05) has "Fix out-of-memory errors when calculating file `md5` hash", so use expo-file-system ≥ 56 (SDK 57 is).
+    - **Don't use `getInfoAsync`:** it is deprecated on the main module ("This method will throw in runtime"). It is still undeprecated, md5 option included, only in `expo-file-system/legacy`. Use the new API.
     - expo-file-system has no SHA-256. This replaces the README's "verify the SHA-256" line.
+    - **No fallback is needed:** no JS chunked SHA-256 and no native module.
 - **Platform:** UAT is **Android only** (an explicit scope decision). iOS is untested.
 - **Sign-in:** UAT uses **real student Google sign-in**. `test.*` accounts are only for the demo login (`EXPO_PUBLIC_DEMO_LOGIN_ENABLED`).
 - **Entry point and flag:**
@@ -145,7 +153,11 @@ question → [wait while "getting ready"] → query call → feed search (index,
   - a Wi-Fi notice before 523 MB
 - **Resume:** `File.createDownloadTask(...)` → `DownloadTask` (`pauseAsync`/`resumeAsync`/`savable`), or legacy `createDownloadResumable`. Check against the SDK 57 page.
 - **Verify:**
-  - MD5 once after the download, then write a "verified" marker
+  - MD5 once after the download, with the new API's `new File(Paths.document, name).md5` (or `.info({ md5: true }).md5`), compared with the constant; then write a "verified" marker
+  - **The call is synchronous**, so it blocks the JS thread while it hashes 523 MB. Show a "Verifying download…" state first and start the call on the next frame.
+  - **Expected time on the Redmi 10C: unmeasured.** A native MD5 over 523 MB is bounded by flash reads and one Cortex-A53 core. The estimate is a few seconds (roughly 2–6 s), unverified. Measure it in M2.
+  - It runs once per download, never at app start: the marker is trusted afterwards.
+  - **If the blocking turns out unacceptable,** move the call off the critical path (for example during the Wi-Fi notice's "Done" screen). Don't switch to a JS SHA-256: pure-JS hashing in Hermes would be far slower than native (an order of magnitude or more, unmeasured).
   - on a mismatch, delete and download again
   - delete the old versioned file after a new one is verified
 - **Settings:** "Delete assistant model".
