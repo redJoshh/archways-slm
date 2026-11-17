@@ -804,6 +804,78 @@
    "expected": null
   },
   {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": [],
+    "bookmarked": true
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "title": "Title",
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": [],
+    "bookmarked": false,
+    "someFutureField": {
+     "nested": [
+      1
+     ]
+    }
+   },
+   "expected": {
+    "announcement": {
+     "id": "1",
+     "title": "Title",
+     "excerpt": "Body & more",
+     "office": "Office",
+     "priority": "HIGH",
+     "year_level": null,
+     "posted_at": "2026-11-07T15:33:53+08:00"
+    },
+    "match_title": "Title",
+    "match_body": "Body & more",
+    "offset_added": false
+   }
+  },
+  {
+   "detail": {
+    "id": 1,
+    "body": "<p>Body &amp; more</p>",
+    "priority": "HIGH",
+    "officeName": "Office",
+    "publishedAt": "2026-11-07T15:33:53+08:00",
+    "version": 1,
+    "attachments": [],
+    "bookmarked": true
+   },
+   "expected": null
+  },
+  {
    "detail": "not an object",
    "expected": null
   },

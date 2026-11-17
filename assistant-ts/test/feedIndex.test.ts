@@ -18,7 +18,19 @@ function item(id: number, title: string, body = "<p>Body " + id + "</p>", publis
   return { id: id, title: title, body: body, publishedAt: publishedAt };
 }
 
-function fakeApi(items: Item[], options: { failPage?: number; failDetail?: number; status?: number; gone?: number[] } = {}) {
+function fakeApi(
+  items: Item[],
+  options: {
+    failPage?: number;
+    failDetail?: number;
+    status?: number;
+    gone?: number[];
+    // requested id -> the id the detail answers with (backend a823988 forwarding)
+    forward?: { [id: number]: number };
+    // add the backend's trailing "bookmarked" and an unknown field to every DTO
+    extra?: boolean;
+  } = {},
+) {
   const requests: string[] = [];
   let active = 0;
   let maxActive = 0;
@@ -36,24 +48,34 @@ function fakeApi(items: Item[], options: { failPage?: number; failDetail?: numbe
       const content = items.slice(p * size, (p + 1) * size).map((i) => ({
         id: i.id, title: i.title, excerpt: i.body.slice(0, 160), priority: "NORMAL",
         officeName: "Office", publishedAt: i.publishedAt, pinned: false, read: false,
+        ...(options.extra ? { bookmarked: true, someFutureField: { nested: [1] } } : {}),
       }));
       return { content: content, page: p, size: size, hasNext: (p + 1) * size < items.length };
     }
     const detail = /^\/announcements\/(\d+)$/.exec(path);
     if (detail) {
-      const id = Number(detail[1]);
-      const found = items.find((i) => i.id === id);
+      const requested = Number(detail[1]);
+      const id = options.forward && options.forward[requested] !== undefined ? options.forward[requested] : requested;
+      const found = items.find((i) => i.id === id) || (options.forward && options.forward[requested] !== undefined ? forwardedItems[id] : undefined);
       if (options.failDetail === id) throw new HttpError(options.status || 500);
       if (!found || (options.gone || []).indexOf(id) !== -1) throw new HttpError(404);
       return {
         id: found.id, title: found.title, body: found.body, priority: "NORMAL", officeName: "Office",
         publishedAt: found.publishedAt, version: 1, attachments: [],
+        ...(options.extra ? { bookmarked: false, someFutureField: null } : {}),
       };
     }
     throw new Error("unexpected path " + path);
   };
   return { fetchJson, requests, maxActive: () => maxActive };
 }
+
+// Revisions the detail endpoint can forward to although the feed page
+// doesn't list them (an edit approved between the list and the detail).
+const forwardedItems: { [id: number]: Item } = {
+  90: item(90, "Edited notice (revision 2)", "<p>Revised body</p>", "2026-11-07T09:00:00+08:00"),
+  91: item(91, "Edited notice (revision 3)", "<p>Third body</p>", "2026-11-07T10:00:00+08:00"),
+};
 
 function many(n: number): Item[] {
   const out: Item[] = [];
@@ -184,4 +206,72 @@ test("askAssistant searches the feed index (and_v3, plain text, newest first)", 
   assert.equal(result.trace.results![0].posted_at, "2026-11-06T10:00:00+08:00");
   assert.equal(result.trace.results![1].excerpt, "Submit the drop form by Friday.");
   assert.equal(result.trace.results![0].year_level, null);
+});
+
+test("a forwarded detail is stored under the RESPONSE id, the requested id dropped, and counted", async () => {
+  // Item 2 was edited after the list: GET /announcements/2 answers revision 90.
+  const items = [item(1, "Kept"), item(2, "Old revision"), item(3, "Also kept")];
+  const logs: IndexReport[] = [];
+  const index = createFeedIndex(fakeApi(items, { forward: { 2: 90 } }).fetchJson, {
+    clockMs: () => NOW,
+    log: (r) => logs.push(r),
+  });
+  const report = await index.ensure();
+  assert.equal(report.forwarded, 1);
+  assert.equal(report.skipped, 0);
+  assert.equal(report.detailsFetched, 3);
+  assert.equal(report.rows, 3);
+  assert.equal(logs[0].forwarded, 1);
+  const ids = index
+    .search({ query: "notice kept", days: 30 }, NOW)
+    .concat(index.search({ query: "edited", days: 30 }, NOW), index.search({ query: "kept", days: 30 }, NOW))
+    .map((a) => a.id);
+  assert.ok(ids.indexOf("90") !== -1, "the revision is searchable under its own id");
+  assert.equal(index.search({ query: "old", days: 30 }, NOW).length, 0, "the requested id is gone");
+});
+
+test("forwarded details are deduped: one row per response id", async () => {
+  // 2 and 4 both forward to 91, and 91 is listed itself.
+  const items = [item(1, "Kept"), item(2, "Old A"), item(4, "Old B"), item(91, "Edited notice (revision 3)")];
+  const index = createFeedIndex(fakeApi(items, { forward: { 2: 91, 4: 91 } }).fetchJson, { clockMs: () => NOW });
+  const report = await index.ensure();
+  assert.equal(report.forwarded, 2);
+  assert.equal(report.rows, 2);
+  assert.equal(index.size(), 2);
+  assert.deepEqual(
+    index.search({ query: "edited", days: 30 }, NOW).map((a) => a.id),
+    ["91"],
+  );
+});
+
+test("a forwarded revision not listed in the feed is fetched again on the next refresh", async () => {
+  let now = NOW;
+  const items = [item(1, "Kept"), item(2, "Old revision")];
+  const api = fakeApi(items, { forward: { 2: 90 } });
+  const index = createFeedIndex(api.fetchJson, { clockMs: () => now });
+  await index.ensure();
+  // The feed now lists the revision instead of the archived id.
+  items.splice(1, 1, forwardedItems[90]);
+  now += 10 * 60000;
+  const before = api.requests.length;
+  const refresh = await index.ensure();
+  assert.equal(refresh.kind, "refresh");
+  assert.deepEqual(api.requests.slice(before).filter((p) => p.indexOf("?") === -1), ["/announcements/90"]);
+  assert.equal(refresh.forwarded, 0);
+  assert.equal(index.size(), 2);
+});
+
+test("unknown extra fields (bookmarked, future fields) are ignored in pages and details", async () => {
+  const items = many(3);
+  const plain = createFeedIndex(fakeApi(items).fetchJson, { clockMs: () => NOW });
+  const extra = createFeedIndex(fakeApi(items, { extra: true }).fetchJson, { clockMs: () => NOW });
+  const a = await plain.ensure();
+  const b = await extra.ensure();
+  assert.equal(b.rows, 3);
+  assert.equal(b.skipped, 0);
+  assert.deepEqual({ ...a, fetchMs: 0, indexMs: 0 }, { ...b, fetchMs: 0, indexMs: 0 });
+  assert.deepEqual(
+    extra.search({ query: "notice", days: 30 }, NOW),
+    plain.search({ query: "notice", days: 30 }, NOW),
+  );
 });

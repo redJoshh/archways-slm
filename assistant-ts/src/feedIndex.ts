@@ -23,7 +23,18 @@
  * - clear(): on sign-out and on a 401. A build still running when clear()
  *   is called is discarded when it finishes.
  * - A detail that answers 404 (removed between the list and the detail) is
- *   skipped and counted; any other error (a 401 included) rejects, and the
+ *   skipped and counted;
+ * - Forwarded details (backend a823988): GET /announcements/{id} for an id
+ *   that is no longer visible (an approved edit archived it) answers 200
+ *   with the newest visible revision, under THAT revision's id. The detail
+ *   is stored under the RESPONSE id; the requested id is dropped. If the
+ *   response id is already in the index (listed too, or forwarded twice),
+ *   the entry already there is kept, so each id is one row. Each such detail
+ *   is counted in "forwarded". The stored entry keeps the response id's
+ *   summary key if the feed listed it, otherwise an empty key, so the next
+ *   refresh fetches it again.
+ * - Unknown extra fields in pages and details (for example "bookmarked")
+ *   are ignored; the fields used are still required (feedRow()). any other error (a 401 included) rejects, and the
  *   previous index stays as it was.
  * - Every build or refresh is reported to options.log: numbers only (pages,
  *   items, details fetched, removed, skipped, offsets added, fetch ms,
@@ -76,6 +87,8 @@ export interface IndexReport {
   skipped: number;
   /** Rows whose publishedAt had no offset (+08:00 assumed). */
   offsetAdded: number;
+  /** Details answered under another id (a newer revision); stored under the response id. */
+  forwarded: number;
   /** Rows in the index after this build. */
   rows: number;
   /** Time spent waiting for the network (pages and details). */
@@ -187,13 +200,23 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
         const mapStarted = clock();
         const mapped = feedRow(detail);
         report.indexMs += clock() - mapStarted;
-        if (mapped === null || mapped.row.announcement.id !== id) {
+        if (mapped === null) {
           report.skipped++;
           into.delete(id);
           continue;
         }
         if (mapped.offsetAdded) report.offsetAdded++;
-        into.set(id, { row: mapped.row, key: keys.get(id) as string });
+        const responseId = mapped.row.announcement.id;
+        if (responseId === id) {
+          into.set(id, { row: mapped.row, key: keys.get(id) as string });
+          continue;
+        }
+        report.forwarded++;
+        into.delete(id);
+        if (!into.has(responseId)) {
+          const listedKey = keys.get(responseId);
+          into.set(responseId, { row: mapped.row, key: listedKey === undefined ? "" : listedKey });
+        }
       }
     }
     const workers: Promise<void>[] = [];
@@ -204,7 +227,7 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
   function emptyReport(kind: IndexReport["kind"]): IndexReport {
     return {
       kind: kind, pages: 0, items: 0, detailsFetched: 0, removed: 0, skipped: 0,
-      offsetAdded: 0, rows: entries ? entries.size : 0, fetchMs: 0, indexMs: 0, truncated: false,
+      offsetAdded: 0, forwarded: 0, rows: entries ? entries.size : 0, fetchMs: 0, indexMs: 0, truncated: false,
     };
   }
 

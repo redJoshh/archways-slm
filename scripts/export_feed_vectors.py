@@ -377,6 +377,10 @@ def row_vectors() -> list[dict]:
         {**good, "publishedAt": "2026-11-07T15:33:53"},
         {**good, "publishedAt": None},
         {**good, "publishedAt": "yesterday"},
+        # Backend a823988: a trailing "bookmarked"; unknown fields are ignored.
+        {**good, "bookmarked": True},
+        {**good, "bookmarked": False, "someFutureField": {"nested": [1]}},
+        {**{k: v for k, v in good.items() if k != "title"}, "bookmarked": True},
         "not an object",
         None,
     ]
