@@ -1,6 +1,6 @@
 # Plan: window_v1, the 30-day window as a fallback (product correctness, NOT a scored fix)
 
-- **Status:** PROPOSED (2026-11-16), for the user's approval. Nothing is built.
+- **Status:** APPROVED as planned (user, 2026-11-17): rule 3 unchanged (`zero`, 365 days, only at `days` 30). Held-out final done first (2026-11-17, at `428b1ca`). Vectors `tests/vectors/window_fallback_vectors.json` written by hand before any code.
 - **Scope:** a product correctness change for UAT and the defense (2nd week of December). It is not an accuracy-phase change: it is not scored, not compared on the dev sets, and not part of the held-out final. It must be shown not to change any dev or held-out result at the fixed evaluation dates.
 
 ## 1. The problem

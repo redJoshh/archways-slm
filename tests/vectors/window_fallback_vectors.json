@@ -1,0 +1,309 @@
+{
+ "$comment": "window_v1 parity vectors, HAND-WRITTEN 2026-11-17 before any window_v1 code or run (docs/plans/window-fallback.md, section 3, approved by the user 2026-11-17). Expected values worked out by hand; never regenerate from the implementation. Every case runs with the FINAL search: rank_v1, and_v4, the first-500 excerpt. now - 30 days = 2026-10-11T10:00:00+08:00; now - 365 days = 2025-11-10T10:00:00+08:00.",
+ "format": "archways window fallback vectors v1",
+ "window": "window_v1",
+ "rank": "rank_v1",
+ "matcher": "and_v4",
+ "now": "2026-11-10T10:00:00+08:00",
+ "fallback_days": 365,
+ "details": [
+  {
+   "id": 1,
+   "title": "Uniform Policy",
+   "body": "Students wear the white uniform on Mondays.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-08T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 2,
+   "title": "Uniform Policy Archive",
+   "body": "Old uniform rules from last year.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-08-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 3,
+   "title": "Kite Festival",
+   "body": "The kite festival is on the field.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-10-10T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 4,
+   "title": "Glee Club Auditions",
+   "body": "Auditions for the glee club are open.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2025-11-09T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 5,
+   "title": "Robotics Workshop A",
+   "body": "Bring a laptop to the robotics workshop.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-09-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 6,
+   "title": "Robotics Workshop B",
+   "body": "The robotics workshop meets in room 3.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-07-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 7,
+   "title": "Robotics Workshop C",
+   "body": "This robotics workshop builds drones.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-06-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 8,
+   "title": "Robotics Workshop D",
+   "body": "The robotics workshop is free.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-05-01T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 9,
+   "title": "Lantern Parade",
+   "body": "The lantern parade starts at the gate.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-11-11T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 10,
+   "title": "Choir Concert",
+   "body": "The choir sings in the chapel.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2025-11-10T10:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 11,
+   "title": "Choir Rehearsal",
+   "body": "The choir rehearses after class.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2025-11-10T09:59:59+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 12,
+   "title": "Chess Tournament",
+   "body": "Sign up for the chess tournament.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-10-31T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 13,
+   "title": "Library Notice",
+   "body": "The library is closed for inventory.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-10-06T09:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  },
+  {
+   "id": 14,
+   "title": "Library Hours",
+   "body": "The library opens at 7.",
+   "priority": "NORMAL",
+   "officeName": "Test Office",
+   "publishedAt": "2026-10-06T10:00:00+08:00",
+   "version": 1,
+   "attachments": []
+  }
+ ],
+ "cases": [
+  {
+   "name": "W1: in-window results exist: no fallback, even though an older row matches",
+   "question": "uniform",
+   "arguments": {
+    "query": "uniform",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [
+    "1"
+   ],
+   "fell_back": false,
+   "why": "row 1 (2 days) is in the 30-day window; row 2 (101 days) also matches but the first search found 1 result"
+  },
+  {
+   "name": "W2: 0 in-window, a match at 31 days: found by the fallback",
+   "question": "kite festival",
+   "arguments": {
+    "query": "kite",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [
+    "3"
+   ],
+   "fell_back": true,
+   "why": "row 3 is 31 days 1 hour old: outside 30, inside 365"
+  },
+  {
+   "name": "W3: 0 in-window, the only match at 366 days: not found",
+   "question": "glee club",
+   "arguments": {
+    "query": "glee",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [],
+   "fell_back": true,
+   "why": "row 4 is 366 days 1 hour old: outside 365; the fallback ran and found nothing"
+  },
+  {
+   "name": "W4: days 7 (a named period), a match at 10 days: no fallback",
+   "question": "chess",
+   "arguments": {
+    "query": "chess",
+    "days": 7
+   },
+   "ok": true,
+   "expected_ids": [],
+   "fell_back": false,
+   "why": "row 12 is 10 days old; days < 30 keeps the window a hard filter"
+  },
+  {
+   "name": "W5: days 29, a match at 31 days: no fallback (only days 30 falls back)",
+   "question": "kite festival",
+   "arguments": {
+    "query": "kite",
+    "days": 29
+   },
+   "ok": true,
+   "expected_ids": [],
+   "fell_back": false,
+   "why": "days 29 is a shorter period than the maximum"
+  },
+  {
+   "name": "W6: days missing (default 7): no fallback",
+   "question": "kite festival",
+   "arguments": {
+    "query": "kite"
+   },
+   "ok": true,
+   "expected_ids": [],
+   "fell_back": false,
+   "why": "the contract default 7 applies first and counts as a shorter period"
+  },
+  {
+   "name": "W7: the fallback keeps rank_v1 order and the limit",
+   "question": "robotics drones",
+   "arguments": {
+    "query": "robotics workshop",
+    "days": 30,
+    "limit": 2
+   },
+   "ok": true,
+   "expected_ids": [
+    "7",
+    "5"
+   ],
+   "fell_back": true,
+   "why": "rows 5-8 are 70-193 days old, none in 30; rank_v1 words [robotics, drones]: row 7 = 2 points, rows 5, 6, 8 = 1; ties newest first (5, 6, 8); limit 2"
+  },
+  {
+   "name": "W8: a future row is never found, in or out of the fallback",
+   "question": "lantern parade",
+   "arguments": {
+    "query": "lantern",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [],
+   "fell_back": true,
+   "why": "row 9 is published after now; the fallback ran and found nothing"
+  },
+  {
+   "name": "W9: the 365-day boundary is inclusive",
+   "question": "choir",
+   "arguments": {
+    "query": "choir",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [
+    "10"
+   ],
+   "fell_back": true,
+   "why": "row 10 is exactly 365 days old (now - 365 d <= published); row 11 is one second older"
+  },
+  {
+   "name": "W10: the December case: every match 35 days old, all searchable again",
+   "question": "library",
+   "arguments": {
+    "query": "library",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [
+    "14",
+    "13"
+   ],
+   "fell_back": true,
+   "why": "rows 13 and 14 are 35 days old; rank_v1 [library] = 1 point each; newest first: 14 (10:00), 13 (09:00)"
+  },
+  {
+   "name": "W11: a query of stopwords only: 0 results, the fallback runs and finds nothing",
+   "question": "the",
+   "arguments": {
+    "query": "the",
+    "days": 30
+   },
+   "ok": true,
+   "expected_ids": [],
+   "fell_back": true,
+   "why": "no query words gives 0 results; days is 30, so the rule searches again, with the same empty result"
+  },
+  {
+   "name": "W12: invalid arguments (days 31) are rejected, no fallback",
+   "question": "kite festival",
+   "arguments": {
+    "query": "kite",
+    "days": 31
+   },
+   "ok": false,
+   "expected_ids": null,
+   "fell_back": false,
+   "why": "the contract maximum is 30; validation fails before any search"
+  }
+ ]
+}
