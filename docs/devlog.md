@@ -19,6 +19,33 @@ Template:
 
 ---
 
+## 2026-11-17: window_v1 built (vectors first, off by default); it can't change any dev or held-out result
+
+- **Date:** 2026-11-17 (+08:00)
+- **Approved by the user as planned** (`docs/plans/window-fallback.md`, section 3): a 365-day fallback only when the 30-day search returns 0 results, and only when `days` is 30 (the student named no shorter period). Built after the held-out FINAL, so it isn't part of it.
+- **What changed:**
+  - `592d8b3`: `tests/vectors/window_fallback_vectors.json`, 12 cases derived by hand and committed before any code. They cover in-window results present (no fallback), a match at 31 / 366 days, `days` 7, 29 and missing (no fallback), rank_v1 order and the limit, a future row, the inclusive 365-day boundary, the December case, a stopword-only query and invalid `days`.
+  - `73e1b2d`: Python `feedindex.search_feed_window` (reference) and `fakebackend.search_announcements(window_days=...)`, which replaces the validated `days` for the window only and never comes from the model.
+  - TS: `fallback.ts` `searchWithFallback`, `searchRows(..., windowDays)`, and `makeFeedSearch(..., fallback)`. It defaults to `null` (off), needs rank_v1 and refuses retry. `onSearch` now also reports `fellBack` (numbers and flags only).
+  - Hermes runs the new vectors.
+- **Why it can't change any dev or held-out result at the fixed evaluation dates:**
+  - **Structural (4.1):** at 2026-11-10T10:00 and 2026-11-14T10:00, no visible snapshot row is older than 30 days. So the fallback can only run when nothing at all is visible in the window, and then it finds nothing either. That holds for every query, so it covers flow13 and the held-out questions without reading them.
+  - **Sweep (4.2):** all 187 snapshot title words × `days` 1/7/14/30 × both instants (1496 searches) give identical results.
+  - **Dev replay (4.3):** all 57 saved searches of `strip_nf-1.json`, at their own `now`, give identical results. The fallback ran in 16 zero-result cases and found no older row in any of them.
+- **How it was verified:**
+  - `uv run pytest -q` → `1397 passed, 2 skipped` (23 new in `tests/test_window_fallback.py`).
+  - `npm test` → 305/305.
+  - `npm run test:hermes` → all pass, window_v1 fallback vectors 12/12.
+  - `ruff check` clean; generators `--check` up to date; `generated/` unchanged.
+  - The baseline search path is unchanged too: the 57 saved searches of `baseline-1.json`, replayed through `search_feed` with the defaults, are 57/57 identical. This was a one-off script, not a model run.
+- **Not done:**
+  - It isn't switched on as a phone default (plan step 5). That needs a phone setting next to `frozen.FINAL`, whose docstring says never to edit it after the held-out final, plus a re-vendor of the test app and a flow13 check on the defense date. Left for the user to decide.
+  - No model run.
+- **Commits:** `592d8b3`, `73e1b2d`, this `docs:` commit. Not pushed.
+- **Open questions / next:** where the phone setting lives (for example a separate `PHONE_FALLBACK` outside `FINAL`); re-vendor the test app; demo check at now = 2026-12-10 with flow13.
+
+---
+
 ## 2026-11-17: Held-out FINAL (run 2 of 2, by the user); phase conclusion; held-out set closed
 
 - **Date:** 2026-11-17 (+08:00)
