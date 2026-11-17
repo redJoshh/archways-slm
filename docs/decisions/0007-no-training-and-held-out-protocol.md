@@ -40,6 +40,14 @@ The three metrics of `accuracy-phase.md` section 0 (Helpfulness, AI answer accur
 - **Drift check (2026-11-14):** before the final run, `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` must print `VERIFY OK` at the same commit, with a clean tree. It proves the baseline configuration still reproduces the frozen dev baseline case by case.
 - **Two runs, then closed (user, 2026-11-16):** this held-out set is used at most twice, `--config baseline` (done 2026-11-14) and `--config final`. After the final run it is closed: any further improvement is a v2, evaluated on a NEW held-out set written for it. The same rules apply to the new set (written before the v2 changes are measured, never read by Claude Code, at most two runs).
 - **What the held-out runs measured vs. what ships (user, 2026-11-17):** both held-out runs are closed (baseline 2026-11-14 at `53f2ed3`, final 2026-11-17 at `428b1ca`, `--config final`). The shipped app = the evaluated FINAL configuration + window_v1 (ADR 0006 amendment), a phone-only setting outside `frozen.FINAL`. window_v1 provably can't change any dev or held-out result at the evaluation dates: no visible snapshot row is older than 30 days at 2026-11-10 or 2026-11-14 (`tests/test_window_fallback.py`). It does change behaviour from about 2026-12-07 on (its purpose), so the held-out numbers don't describe the app after that date. Any measurement of it is a v2 on a new held-out set.
+- **v2 held-out protocol (user, 2026-11-17):** the v1 set stays closed. The v2 phase ([`v2-improvements.md`](../plans/v2-improvements.md)) uses a NEW file written by the user.
+  - **The file:** 30 cases (24 answerable, 6 traps), snapshot only, never read by Claude Code.
+  - **Hash:** its SHA-256 `EE9F407AF9BD8899C1D247DCEE10330DD1D2860B13E3C6F6482C81FD5839173C` was recorded before any v2 fix, and the script refuses any other file for a v2 config.
+  - **Fixed now:** 2026-11-17T10:00:00+08:00.
+  - **Baseline:** `--config shipped` (FINAL + window_v1, what the app ships). **Final:** the v2 kept set.
+  - **Runs:** at most two, by the user, with the same manual review and scored and human-reviewed numbers side by side.
+  - **Drift check:** `VERIFY OK` at the run commit, clean tree, before the baseline.
+  - **Rules for v2 changes:** the same no-training rule. Each change is pre-registered, with parity and dev-only scoring, plus "no case loses AI-correct". The kept set is frozen by 2026-12-01.
 - **No pass/fail thresholds** are set in this ADR. The held-out run reports the baseline and final counts side by side. With so few cases it is a check that the dev-set gains carry over, not an error rate.
 
 ## Consequences

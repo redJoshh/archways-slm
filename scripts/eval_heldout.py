@@ -3,6 +3,7 @@
 Usage (the user runs this; Claude Code never does):
     uv run python scripts/eval_heldout.py PATH --config baseline
     uv run python scripts/eval_heldout.py PATH --config final
+    uv run python scripts/eval_heldout.py PATH_V2 --config shipped   (v2 baseline)
 
 docs/plans/accuracy-phase.md, section 2 (frozen 2026-11-14), and ADR 0007:
 
@@ -37,6 +38,18 @@ File format: JSON Lines, one case per line, every case over the snapshot
               superseded ({current: [...], old: [...]}),
               out_of_scope (bool), and notes (label, note, expected,
               category, english_twin, exclusion) that are never read.
+
+v2 protocol (docs/plans/v2-improvements.md, approved 2026-11-17; ADR 0007
+amendment): the v1 set is closed. A NEW file, written by the user for v2,
+whose SHA-256 was recorded before any v2 fix (V2_SHA256). Each config
+belongs to one protocol, so the date can't be mixed up:
+- v1 configs: baseline, final (fixed now 2026-11-14T10:00:00+08:00).
+- v2 configs: shipped = frozen.FINAL + window_v1 (archways_assistant.phone,
+  what the app ships; the v2 BASELINE), fixed now 2026-11-17T10:00:00+08:00.
+  The v2 FINAL config is added at the v2 freeze.
+- A v2 config refuses any file but the recorded one, and a v1 config
+  refuses the v2 file, before any model call (hash only; no value printed).
+At most two v2 runs, by the user, same manual review.
 
 A malformed file stops the run with the line number and the field name,
 never a value.
@@ -75,7 +88,7 @@ from eval_flow import (
 )
 from probe_tool_call import SCHEMA_PATH, git_commit, ollama_version
 
-from archways_assistant import assistant
+from archways_assistant import assistant, phone
 from archways_assistant.evalflow import (
     SCORER,
     CaseFileError,
@@ -88,7 +101,12 @@ from archways_assistant.evalflow import (
 from archways_assistant.frozen import FINAL
 
 FIXED_NOW = datetime.fromisoformat("2026-11-14T10:00:00+08:00")
-CONFIGS = ("baseline", "final")
+FIXED_NOW_V2 = datetime.fromisoformat("2026-11-17T10:00:00+08:00")
+# The v2 held-out file's SHA-256, recorded by the user with Get-FileHash on
+# 2026-11-17, before any v2 fix was built.
+V2_SHA256 = "ee9f407af9bd8899c1d247dcee10330dd1d2860b13e3c6f6482c81fd5839173c"
+CONFIGS = ("baseline", "final", "shipped")
+V2_CONFIGS = ("shipped",)
 MODEL = "qwen3:0.6b"
 REPO = Path(__file__).resolve().parents[1]
 
@@ -97,13 +115,29 @@ def config_run(name: str) -> tuple[Path, dict]:
     """(answer prompt, run_case keyword arguments) of a config."""
     if name == "baseline":
         return ANSWER_PROMPT, {}
-    return REPO / FINAL.answer_prompt, {
+    options = {
         "rank": FINAL.rank,
         "matcher": FINAL.matcher,
         "retry": FINAL.retry,
         "excerpt": FINAL.excerpt,
         "strip_nf": FINAL.strip_nf,
     }
+    if name == "shipped":
+        options["window"] = phone.FALLBACK
+    return REPO / FINAL.answer_prompt, options
+
+
+def fixed_now_for(name: str) -> datetime:
+    return FIXED_NOW_V2 if name in V2_CONFIGS else FIXED_NOW
+
+
+def check_protocol(name: str, data: bytes) -> None:
+    """Exit unless the file belongs to the config's protocol (hash only)."""
+    digest = hashlib.sha256(data).hexdigest()
+    if name in V2_CONFIGS and digest != V2_SHA256:
+        sys.exit("a v2 config runs only the recorded v2 held-out file (hash differs)")
+    if name not in V2_CONFIGS and digest == V2_SHA256:
+        sys.exit("this is the v2 held-out file: use a v2 config (the v1 set is closed)")
 
 
 def private_report_path(value: str) -> Path:
@@ -152,6 +186,8 @@ def main() -> None:
         data = args.path.read_bytes()
     except OSError:
         sys.exit("cannot read the held-out file")
+    check_protocol(args.config, data)
+    fixed_now = fixed_now_for(args.config)
     rows = load_sources()["snapshot"]
     by_id = {row["id"]: row for row in rows}
     offices = {row["office"] for row in rows}
@@ -159,7 +195,7 @@ def main() -> None:
         cases = load_cases(
             args.path,
             {"snapshot": set(by_id)},
-            fixed_now=FIXED_NOW,
+            fixed_now=fixed_now,
             default_data="snapshot",
         )
     except CaseFileError as error:
@@ -174,7 +210,7 @@ def main() -> None:
     with httpx.Client(timeout=600, trust_env=False) as client:
         settings = {
             "config": args.config,
-            "fixed_now": FIXED_NOW.isoformat(),
+            "fixed_now": fixed_now.isoformat(),
             "ollama": ollama_version(client),
             "model": MODEL,
             "model_digest": model_digest(client, MODEL),

@@ -19,6 +19,39 @@ Template:
 
 ---
 
+## 2026-11-17: v2 plan approved; v2 held-out protocol recorded; `shipped` config added
+
+- **Date:** 2026-11-17 (+08:00)
+- **Approved by the user**, with decisions (plan section 7):
+  - the hash first
+  - (a): permission questions only, "strictly" dropped, stop if `rules10` shows no contradiction; the user labels `rules10`
+  - (d): label "From the announcement below:", scored as an answer, reported as "extract correct"
+  - (f): the compact format as proposed
+  - **order a → b → c → e → d → f**, drop (f) first and then (d), keep (e)
+  - (c) also marks past dates in (d)'s quotes
+- **v2 held-out file hash** (the user, `Get-FileHash`, before any v2 fix): `EE9F407AF9BD8899C1D247DCEE10330DD1D2860B13E3C6F6482C81FD5839173C`. Claude Code has not seen the file.
+- **What changed:**
+  - **Protocol recorded:** `accuracy-phase.md`, new section "v2 held-out protocol"; ADR 0007, amendment.
+  - **`eval_heldout.py`:**
+    - **`--config shipped`** = `frozen.FINAL` + window_v1 (`phone.FALLBACK`), fixed now **2026-11-17T10:00:00+08:00**.
+    - **Hash checks:** a v2 config refuses any file whose SHA-256 isn't `V2_SHA256`, and the v1 configs refuse the v2 file. Both are checked before any model call, with no value printed.
+    - Instead of the plan's `--protocol` switch, each config carries its own date (recorded in the plan).
+  - **Tests** (`test_eval_heldout.py`, +5):
+    - `shipped` runs FINAL + window_v1 at 11-17, with the same four printed lines
+    - refusals in both directions
+    - the config list
+  - **`test_window_fallback.py`:** the v2 date 2026-11-17 added to the snapshot invariance tests (structural, and the 1496-search sweep). They pass, so **window_v1 can't change any v2 held-out result at its fixed date**: held-out files are snapshot-only, and no snapshot row is older than 30 days then.
+  - **Correction to the plan's section 1 note:** the 8 old seed rows don't affect the held-out file, which is snapshot-only.
+- **How it was verified:**
+  - `uv run pytest -q` → all pass (27 new or extended tests included); ruff clean.
+  - **`--verify-baseline`** runs at this commit with a clean tree. Its result is reported to the user and recorded with the v2 baseline entry, so this commit stays the run commit.
+- **Commits:** this commit (`feat:` + `docs:` together, so the run commit holds both). Not pushed.
+- **Open questions / next:**
+  - the user's v2 baseline at this commit, after VERIFY OK
+  - then `rules10` drafting (no fix code before the baseline)
+
+---
+
 ## 2026-11-17: v2 improvements planned (PROPOSED, no code)
 
 - **Date:** 2026-11-17 (+08:00)

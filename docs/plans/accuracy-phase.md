@@ -720,3 +720,21 @@ Committed with `tests/vectors/window_vectors.json` (13 cases; positions worked o
   - This is a model-capacity limitation of the 0.6B model. It supports the future-work recommendation (a larger or fine-tuned model, outside this no-training phase).
 - **Held-out (user, 2026-11-16):** used at most twice. After the final run, any further improvement is a v2 on a new held-out set (ADR 0007).
 - **Next:** the user's held-out final (step 4), then the phone smoke run of flow13 (step 3), then window_v1 (`docs/plans/window-fallback.md`) if approved.
+
+## 2026-11-17 (user): v2 held-out protocol (the v1 set stays closed)
+
+Plan: [`v2-improvements.md`](v2-improvements.md), approved 2026-11-17. ADR 0007, amendment of the same date.
+
+- **The file:**
+  - A NEW held-out file, written by the user for v2: 30 cases (24 answerable + 6 traps), the same JSONL format (snapshot only), outside the repository.
+  - Claude Code never opens, reads or asks for it. The user runs it and pastes only the printed lines.
+- **Hash recorded before any v2 fix:** `EE9F407AF9BD8899C1D247DCEE10330DD1D2860B13E3C6F6482C81FD5839173C` (user, `Get-FileHash`). Both v2 runs must match it; `eval_heldout.py` refuses any other file for a v2 config.
+- **Fixed now:** 2026-11-17T10:00:00+08:00 for every v2 case.
+- **Configs:**
+  - `shipped` = `frozen.FINAL` + window_v1, what the app ships. It is the **v2 BASELINE**.
+  - The **v2 FINAL** is the v2 kept set (a new frozen config, added at the v2 freeze).
+  - The v1 configs `baseline` and `final` refuse the v2 file.
+- **Runs:** at most two runs, by the user, each with the same manual review of the private report. Scored and human-reviewed numbers side by side.
+- **Drift check:** before the v2 baseline, `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` prints `VERIFY OK` at the run commit, with a clean tree.
+- **Order:** the v2 baseline runs before any v2 fix is built.
+- **v2 fixes:** the rules of section 3 apply, plus "no case loses AI-correct" (case by case). They are scored on the dev sets only, in the order a → b → c → e → d → f (time box 2026-12-01).

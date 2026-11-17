@@ -35,8 +35,12 @@ LOCAL = ROOT / "data" / "local"
 SNAPSHOT = LOCAL / "announcements_snapshot.json"
 SEED = ROOT / "data" / "seed" / "announcements.json"
 DEV_RUN = LOCAL / "runs" / "strip_nf-1.json"
-# The fixed evaluation instants: flow13 (dev) and the held-out script.
-EVAL_NOWS = ("2026-11-10T10:00:00+08:00", "2026-11-14T10:00:00+08:00")
+# The fixed evaluation instants: flow13 (dev), the v1 and the v2 held-out runs.
+EVAL_NOWS = (
+    "2026-11-10T10:00:00+08:00",
+    "2026-11-14T10:00:00+08:00",
+    "2026-11-17T10:00:00+08:00",  # the v2 held-out fixed now
+)
 
 
 def run(rows, arguments, now, question, **kw):

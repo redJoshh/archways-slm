@@ -1,6 +1,7 @@
 # Plan: v2 improvements (no training), with a new held-out protocol
 
-- **Status:** PROPOSED (2026-11-17), for the user's approval. **No code is written until it is approved.**
+- **Status:** APPROVED (user, 2026-11-17), with the decisions in section 7. They override the text above where they differ.
+  - v2 held-out hash: `EE9F407AF9BD8899C1D247DCEE10330DD1D2860B13E3C6F6482C81FD5839173C` (the user, `Get-FileHash`, before any v2 fix).
 - **Scope:**
   - **The rule** (ADR 0007): tools, code-level safeguards and prompt design only.
   - **Model:** qwen3:0.6b, on the device, with the same storage budget (no larger model).
@@ -177,3 +178,22 @@ If a step slips, the later fixes are dropped in order: (f), then (e), then (d). 
 3. (d): the label text, and scoring `extract` as an answer under scorer_v1.
 4. (f): the compact block with `posted_at`, in rank order.
 5. The drop order if time runs out: (f), (e), (d).
+
+## 7. Decisions (user, 2026-11-17), folded in
+
+1. **Approved,** including the hash first. The hash is above; `eval_heldout.py` checks it as `V2_SHA256`.
+2. **(a):** permission-type yes/no questions only, with "strictly" dropped. If `shipped` shows no contradiction on `rules10`, (a) is not built. Claude Code drafts `rules10` from the snapshot, and the user labels it before any run.
+3. **(d):** the label is "From the announcement below:" (never "AI answer"). The quote path is scored as an answer and reported separately as "extract correct".
+4. **(f):** the compact format as proposed (`posted_at` label, rank order).
+5. **New order: a → b → c → e → d → f,** so that (d)'s "every content word" check can use the Taglish lexicon from (e). If time runs short, drop **(f) first, then (d); keep (e)**. The schedule in section 4 is reordered to match: (e) on 11-22–23, (d) on 11-24–26.
+6. **(c) also marks past dates inside (d)'s quotes.**
+
+### Implementation notes (2026-11-17)
+
+- **Config to protocol, not `--protocol`:** each config belongs to one protocol (`baseline`, `final`: v1 at 11-14; `shipped`: v2 at 11-17).
+  - So the date can't be mixed up, and no switch is needed.
+  - A v2 config refuses any file but the recorded hash, and a v1 config refuses the v2 file, before any model call.
+- **Correction to section 1:** held-out files are over the **snapshot only** (`eval_heldout.py`'s format; source ids are checked against the snapshot). So the seed-age note doesn't apply to the held-out file.
+  - At 2026-11-17 every snapshot row (posted Nov 6–7) is inside the 30-day window.
+  - So window_v1 can't change any v2 held-out result at its fixed date, and `shipped` searches exactly like `final` there.
+  - The note stays true for dev cases on the seed at later dates.
