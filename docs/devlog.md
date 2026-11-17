@@ -19,6 +19,38 @@ Template:
 
 ---
 
+## 2026-11-17: Held-out FINAL (run 2 of 2, by the user); phase conclusion; held-out set closed
+
+- **Date:** 2026-11-17 (+08:00)
+- **Drift check first:** `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` at `428b1ca`, clean tree → `VERIFY OK` (57/57 identical). Checked from `data/local/runs/verify-baseline-428b1ca.json` (header: commit `428b1ca`, `tree_dirty` false) and its log.
+- **Run by the user, once, per protocol.** Settings line: `--config final`, commit `428b1ca`, `tree_dirty` false, fixed now 2026-11-14T10:00:00+08:00, Ollama 0.40.15, scorer_v1, and_v4, rank_v1, strip_nf_v1, retry and excerpt off.
+- **Held-out file:** SHA-256 `4707c20791744d00fbf63a3f793c4a0a0c7061db06392d9e913fa9082f3a2342`, 20 cases. **Matches the baseline run.**
+- **Totals, next to the baseline:**
+
+  | Run | | Helpful | AI correct | Unsafe | Traps clean | Traps with an unrelated list | Coverage | Out of scope |
+  |---|---|---|---|---|---|---|---|---|
+  | Baseline (`53f2ed3`) | scored | 13/16 | 2/5 | 0/20 | 4/4 | 0/4 | 13/16 | 0 |
+  | Baseline | human-reviewed | 13/16 | 2/5 | **1/20** | | | | |
+  | FINAL (`428b1ca`) | scored | 12/16 | 2/6 | 1/20 | 4/4 | 0/4 | 13/16 | 0 |
+  | FINAL | human-reviewed | **13/16** | **3/6** | **1/20** | | | | |
+
+  - Paths: baseline answer 5, answer_not_found 9, not_found 6; FINAL answer 6, answer_not_found 8, not_found 6.
+- **The user's manual review of the FINAL private report:**
+  - 0 of the 2 scored-correct answers disputed.
+  - The 1 scored-unsafe case is a scorer false positive. Its core answer is correct and complete; the flagged date is a true extra fact from another listed announcement on the same topic (scorer_v1's known "labelled extra fact" limitation). Human review: correct, not unsafe. This accounts for helpful 12 → 13 and AI correct 2 → 3.
+  - 1 AI answer contradicts its source on a yes/no question (says allowed where the source prohibits): unsafe. Same failure type as the baseline's unsafe case; no fix changed it.
+- **Phase conclusion (user):**
+  - Dev improved: helpful 37 → 39/42, Unsafe 1 → 0/57 (baseline-1 → strip_nf-1, as recorded above).
+  - Held-out: no measurable improvement after human review. Helpful and Unsafe unchanged; AI correct 2 → 3, within noise for 16 cases (the denominators differ too: 5 vs 6 AI answers).
+  - The dominant failure is a false "not found" (answer_not_found path, 8 of 16 answerable). It is a model-capacity limit, mitigated by the results list.
+  - The contradiction on yes/no questions persists. It is a recorded limitation.
+- **Held-out set closed** (ADR 0007, "Two runs, then closed"). Any later change is a v2, evaluated on a new held-out set.
+- **How it was verified:** docs only. The totals and review are copied from the user's paste; the drift check was read from the run files.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** window_v1 (approved by the user as planned).
+
+---
+
 ## 2026-11-16: Correction: test app path in the freeze entry
 
 - **Date:** 2026-11-16 (+08:00)
