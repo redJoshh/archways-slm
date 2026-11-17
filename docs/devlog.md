@@ -19,6 +19,55 @@ Template:
 
 ---
 
+## 2026-11-17: Integration guide frozen; feed index handles forwarded details (backend a823988)
+
+- **Date:** 2026-11-17 (+08:00)
+- **Backend re-verification** (user's paste; done read-only by Claude Code in the backend repo on `origin/main` `a823988`):
+  - The detail GET writes nothing. The feed's `MOBILE_VISIBLE`, sort, size and `SliceResponse` are unchanged.
+  - **NEW:** a detail GET for an id no longer visible forwards to the newest visible revision and returns that id.
+  - **NEW:** both DTOs have a trailing `bookmarked` boolean.
+  - `publishedAt` is unchanged since `b1b6396`, with `+08:00` live on 11-10 and 11-17. `dev-login` is still dev-profile only.
+  - **Spot-checked here** (read-only `git grep` at `a823988`): `bookmarked` is in `AnnouncementDetailResponse` and `AnnouncementSummaryResponse`.
+- **Code (`830dcfd`):**
+  1. **Forwarding.** Before, `createFeedIndex` **skipped** a detail whose id differed from the requested one. An edited announcement then vanished until the next refresh.
+     - Now the detail is stored under the **response** id and the requested id is dropped.
+     - **Dedupe:** if that id is already indexed, the existing row is kept.
+     - **Counting:** a new `forwarded` field in the index report.
+     - A revision the feed didn't list gets an empty summary key, so the next refresh fetches it again.
+     - New tests: stored under the response id; two forwards plus a listed copy give one row; refetched on refresh.
+  2. **Extra fields.** `feedRow` and the page parsing already ignored unknown fields; nothing changed in the code.
+     - Pinned by 3 new feed vectors (`bookmarked` true/false, an unknown nested field, and `bookmarked` with `title` missing → still rejected) from `export_feed_vectors.py`.
+     - Also pinned by an index test comparing a feed with and without the extra fields.
+- **Docs:** `docs/integration/INTEGRATION.md`, frozen.
+  - It updates the 2026-11-10 draft (a chat reply, pasted by the user) and keeps its 7 milestones, each with a phone acceptance check.
+  - **Shipped configuration:** FINAL + window_v1, vendored from `830dcfd`.
+  - **Behaviour:** the queue, readiness, budget, re-measure, and the label and list.
+  - **The user's decisions:**
+    - checksums: MD5 in the app, MD5 and SHA-256 in the release notes
+    - hosting: a GitHub release asset with Apache-2.0, a versioned file name, the old file deleted on update
+    - Android-only UAT
+    - real Google sign-in
+    - the Home header button, the build flag and the Settings opt-in
+  - **Also covered:**
+    - the licence notices (Qwen3 Apache-2.0, llama.cpp MIT) and the privacy line
+    - session-file cleanup as an M3 check
+    - background load and priming at sign-in
+    - the battery/heat note and the getting-ready times
+    - the known limitations
+    - the "never" list (including the DEV-ONLY simulate-date field)
+  - **Model checksums**, computed from the local Ollama blob: 522,640,096 bytes, MD5 `3def07fb2d88a5846fe5accf72c4297c`, SHA-256 `7f4030143c1c477224c5434f8272c662a8b042079a0a584f0a27a1684fe2e1fa`.
+  - **Expo SDK 57 file-system names** come from the SDK 57 docs: `File#md5`, legacy `getInfoAsync(..., { md5: true })`, `File.createDownloadTask`, `Paths.availableDiskSpace`, `Paths.document`. The `md5` entry shows an odd deprecation note, so the guide says to confirm it on the live page.
+  - **Correction to the draft:** `QuestionLog` has no `totalMs` (its fields are `path`, `rule`, `predictedMs`, `actualMs`, `resultCount`, `caseTokens`, `readyWaitMs`).
+  - **Mobile app hooks checked read-only** at `archways-mobile` `b43ffdc`: `AuthProvider` in `src/app/_layout.tsx`, `addBeforeSignOut` in `auth-context.tsx`, `src/app/legal/[slug].tsx`.
+- **How it was verified:**
+  - `npm test` → 309/309; `npm run test:hermes` → all pass (feed vectors 197/197).
+  - `uv run pytest -q` → `1398 passed, 2 skipped`; ruff clean; `export_feed_vectors.py --check` up to date.
+- **Not done:** the test app isn't re-vendored to `830dcfd` (not asked). Nothing in `archways-mobile` was changed.
+- **Commits:** `830dcfd`, this `docs:` commit. Not pushed.
+- **Open questions / next:** the release repository and URL for the model; the team's M1.
+
+---
+
 ## 2026-11-17: Phone readiness check: window_v1 works on the device at a simulated 2026-12-10 (by the user)
 
 - **Date:** 2026-11-17 (+08:00)
