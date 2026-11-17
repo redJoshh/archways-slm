@@ -33,6 +33,12 @@ question or reply text) and the totals per set and in total. Writes the
 full run (prompts' hashes, replies, final texts, scores) to --out, which
 must be inside data/local/ (gitignored: it holds announcement text).
 
+--window window_v1 searches with feedindex.search_feed_window (the phone's
+fallback, archways_assistant.phone). --now ISO replaces every case's now: a
+READINESS check only (e.g. the defense date). Its scores are not results
+(the cases' expected answers assume their own now) and are never compared
+with the dev runs; the header records now_override.
+
 --compare prints the case ids whose query reply, answer reply, path or
 final text differ between two run files (the baseline determinism check).
 
@@ -70,7 +76,11 @@ from archways_assistant.evalflow import (
     totals,
 )
 from archways_assistant.fakebackend import AND_V3_RULES, InvalidArguments, is_visible
-from archways_assistant.feedindex import search_feed, search_feed_retry
+from archways_assistant.feedindex import (
+    search_feed,
+    search_feed_retry,
+    search_feed_window,
+)
 from archways_assistant.rank import GATE_THETAS, gate_v1
 from archways_assistant.render import QWEN3_STOP
 from archways_assistant.snapshot import load_snapshot
@@ -161,6 +171,7 @@ def run_case(
     matcher: str = MATCHER,
     excerpt: str | None = None,
     strip_nf: str | None = None,
+    window: str | None = None,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -188,7 +199,21 @@ def run_case(
             arguments = None
         if arguments is not None:
             try:
-                if retry is None:
+                if window is not None:
+                    if retry is not None:
+                        raise ValueError("window_v1 runs without retry")
+                    search_reply, record["fell_back"] = search_feed_window(
+                        rows,
+                        arguments,
+                        now,
+                        contract,
+                        question=question,
+                        rank=rank,
+                        matcher=matcher,
+                        excerpt=excerpt,
+                        window=window,
+                    )
+                elif retry is None:
                     search_reply = search_feed(
                         rows,
                         arguments,
@@ -653,6 +678,10 @@ def main() -> None:
     parser.add_argument("--excerpt", choices=["excerpt_v2_centred"], default=None)
     parser.add_argument("--answer-prompt", choices=sorted(ANSWER_PROMPTS), default="v1")
     parser.add_argument("--strip-nf", choices=[assistant.STRIP_NF_V1], default=None)
+    parser.add_argument("--window", choices=["window_v1"], default=None)
+    parser.add_argument(
+        "--now", default=None, help="readiness only: replaces every case's now"
+    )
     parser.add_argument("--strip-nf-replay", type=Path, metavar="RUN")
     parser.add_argument("--excerpt-replay", type=Path, metavar="RUN")
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
@@ -716,9 +745,18 @@ def main() -> None:
         parser.error("--retry runs with and_v3 only")
     if args.retry is not None and args.rank is None:
         parser.error("--retry needs --rank (retry_v1 orders by rank_v1)")
+    if args.window is not None and args.retry is not None:
+        parser.error("--window runs without --retry")
+    now_override = None
+    if args.now is not None:
+        now_override = datetime.fromisoformat(args.now)
+        if now_override.tzinfo is None:
+            parser.error("--now needs an offset")
     if args.verify_baseline is not None:
         if (
-            args.rank is not None
+            args.window is not None
+            or args.now is not None
+            or args.rank is not None
             or args.matcher != MATCHER
             or args.excerpt is not None
             or args.answer_prompt != "v1"
@@ -759,6 +797,8 @@ def main() -> None:
         except CaseFileError as error:
             sys.exit(f"{name}: {error}")
         sets[name] = [c for c in cases if not wanted or c["id"] in wanted]
+        if now_override is not None:
+            sets[name] = [{**c, "now": now_override} for c in sets[name]]
 
     saved_header, saved = (None, {})
     if args.reuse_queries:
@@ -798,6 +838,8 @@ def main() -> None:
             "excerpt": args.excerpt,
             "answer_prompt": args.answer_prompt,
             "strip_nf": args.strip_nf,
+            "window": args.window,
+            "now_override": args.now,
             "query_replies_from": None
             if args.reuse_queries is None
             else [args.reuse_queries.name, sha256(args.reuse_queries)],
@@ -834,6 +876,7 @@ def main() -> None:
                     matcher=args.matcher,
                     excerpt=args.excerpt,
                     strip_nf=args.strip_nf,
+                    window=args.window,
                 )
                 score = score_case(
                     case,
