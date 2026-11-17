@@ -19,6 +19,60 @@ Template:
 
 ---
 
+## 2026-11-17: window_v1 on as a phone default (outside FINAL); test app re-vendored; flow13 readiness check at 2026-12-10
+
+- **Date:** 2026-11-17 (+08:00)
+- **Shipped app = the evaluated FINAL configuration + window_v1** (user, 2026-11-17):
+  - `3c3c75a`: `archways_assistant/phone.py` holds `FALLBACK = "window_v1"`, a phone-only setting outside `frozen.FINAL`. `frozen.py` is not edited, so `--config final` stays as evaluated.
+  - `export_assistant_ts.py` writes it as `PHONE_FALLBACK`, and `makeFeedSearch()` defaults to it. The fallback runs ranked or unranked, never with retry; the explicit UAT baseline passes `null`.
+  - Tests pin `PHONE_FALLBACK` and check that `Config` has no fallback field.
+  - `f8696ea`: amendments to ADR 0006 and ADR 0007.
+    - window_v1 provably can't change any dev or held-out result at the evaluation dates (entry below).
+    - It changes behaviour from about 2026-12-07, when the snapshot (posted Nov 6–7) leaves the 30-day window. That is its purpose.
+    - The held-out numbers don't describe the app after that date. Any measurement of it is a v2 on a new held-out set.
+  - `efbad5c`: `eval_flow.py --window window_v1` and `--now ISO`. `--now` is for readiness only: it replaces every case's now, and the header records `now_override`.
+- **Test app** (`C:\throw-away-app\gate1-llm`, `2163545`, not pushed):
+  - Re-vendored from `efbad5c` with `git show`. Content changes: `feedIndex.ts`, `generated.ts`, `search.ts`, new `fallback.ts` and `fallbackVectors.ts`, `VENDORED.md`. The other files differ only in line endings.
+  - `LiveTest.tsx` calls `makeFeedSearch(index.current)`, so it picks up window_v1 by default. `tsc --noEmit` clean.
+  - My `npx expo lint` set up ESLint by itself: it edited `package.json` and `package-lock.json` and added `eslint.config.js`. I reverted all three; the ESLint packages it installed may still be in `node_modules`.
+  - Lint's 3 errors (`react/no-unescaped-entities` in `App.tsx`, `FlowTest.tsx`, `LiveTest.tsx`) are in files this change doesn't touch.
+- **Readiness check: flow13 at now = 2026-12-10T10:00:00+08:00.** Not a scored result; not compared with the dev runs; not used to change anything.
+  - **Settings:** commit `efbad5c`, clean tree, Ollama 0.40.15, qwen3:0.6b, rank_v1 + and_v4 + strip_nf_v1, cold.
+  - **Run files:** `readiness-1210-off.json` (no window) and `readiness-1210-window.json` (window_v1, `--reuse-queries` of the first run, so the window is the only difference).
+  - **Queries:** all 13 send `days` 30. 12 are the same as the Nov 10 dev run; q09 changed "drop forms" to "dropping forms" (same row found).
+  - **Per case:**
+
+    | Case | Without window_v1 | With window_v1: results | Path | Old announcement presented as current? |
+    |---|---|---|---|---|
+    | q01 | not_found, none | found (source @1) | answer | no (the event date is in 2027) |
+    | q02 | not_found, none | found | answer | no (evergreen fact) |
+    | q03 | not_found, none | found | answer | no (the date is in 2027) |
+    | q04 | not_found, none | found | answer | no (rule; the date is in 2027) |
+    | q05 | not_found, none | found (2/2 sources) | answer_not_found | no AI text; the list shows posted dates |
+    | q06 | not_found, none | found (3/3 sources) | answer | no (standing rules) |
+    | q07 | not_found, none | found | answer_not_found | no AI text; the source's event is past, and the list shows its posted date |
+    | q08 | not_found, none | found | answer | no (standing rule) |
+    | q09 | not_found, none | found | answer_not_found | no AI text; the source's deadline is past (it already was on Nov 10) |
+    | q10 (trap) | not_found, clean | none (the fallback ran, nothing matched) | not_found | n/a |
+    | q11 | not_found, none | found | answer_not_found | no AI text |
+    | q12 | not_found, none | found | answer | **borderline:** it gives the correct, past date (Aug 2026) in the present tense ("is held"). The final text is identical to the Nov 10 dev run (the known past-date framing, ADR 0007 Consequences). window_v1 doesn't cause it; it just keeps the row findable. |
+    | q13 | not_found, none | found | answer | no (the date is in 2027) |
+
+  - **Summary:**
+    - Without window_v1, all 13 end with an empty list, which breaks the defense demo.
+    - With it, all 13 searches fell back, and every one returned the same ids as the Nov 10 dev run. 12 of 13 final texts are identical to Nov 10. q06's answer is reworded because the answer prompt carries today's date; its results are the same.
+    - No reply presents an old announcement as current, apart from q12's tense, which predates window_v1.
+    - The answer-path replies whose sources describe past events (q07, q09) give no AI text, only the dated list.
+- **How it was verified:**
+  - `uv run pytest -q` → `1398 passed, 2 skipped`. `npm test` → 305/305. `npm run test:hermes` → all pass. ruff clean. `export_assistant_ts.py --check` up to date.
+  - Test app: `tsc --noEmit` clean. The per-case table was checked by reading each reply against its source rows at Dec 10.
+- **Commits:** `3c3c75a`, `f8696ea`, `efbad5c`, this `docs:` commit; test app `2163545`. Not pushed.
+- **Open questions / next:**
+  - A phone smoke run of the re-vendored test app (LiveTest against the dev server at the defense date).
+  - The user may want to update `flow_test.json` (it was exported with the Nov search and doesn't exercise the fallback).
+
+---
+
 ## 2026-11-17: window_v1 built (vectors first, off by default); it can't change any dev or held-out result
 
 - **Date:** 2026-11-17 (+08:00)
