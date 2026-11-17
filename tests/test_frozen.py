@@ -31,6 +31,7 @@ def test_the_phone_defaults_are_generated_from_final():
         ("PHONE_RETRY", "null"),
         ("PHONE_EXCERPT", "null"),
         ("PHONE_STRIP_NF", '"strip_nf_v1"'),
+        ("PHONE_FALLBACK", '"window_v1"'),
         ("ANSWER_PROMPT_FILE", '"prompts/e2e_answer_v1.txt"'),
     ):
         assert f"export const {name} = {value};" in text
@@ -47,3 +48,14 @@ def test_python_flow_defaults_stay_the_baseline():
     assert params["rank"].default is None
     assert params["matcher"].default == "and_v3"
     assert params["excerpt"].default is None
+
+
+def test_the_phone_fallback_is_outside_final():
+    # The shipped app = FINAL + window_v1 (user, 2026-11-17); FINAL has no
+    # fallback field, so --config final stays exactly as evaluated.
+    from dataclasses import fields
+
+    from archways_assistant import phone
+
+    assert phone.FALLBACK == "window_v1"
+    assert "fallback" not in {f.name for f in fields(Config)}

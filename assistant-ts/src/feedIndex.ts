@@ -32,7 +32,7 @@
 
 import type { Announcement } from "./render.ts";
 import { feedRow } from "./feed.ts";
-import { PHONE_EXCERPT, PHONE_MATCHER, PHONE_RANK, PHONE_RETRY } from "./generated.ts";
+import { PHONE_EXCERPT, PHONE_FALLBACK, PHONE_MATCHER, PHONE_RANK, PHONE_RETRY } from "./generated.ts";
 import { rankScorer, type RankVersion } from "./rank.ts";
 import { searchWithRetry, type RetryResult, type RetryVersion } from "./retry.ts";
 import { excerptFor, type ExcerptRule } from "./window.ts";
@@ -322,9 +322,11 @@ export function createFeedIndex(fetchJson: FetchJson, options: FeedIndexOptions 
  * and the result count (numbers only, for the question log). matcher:
  * "and_v3" or "and_v4" (retry_v1 runs with and_v3 only). excerpt: null (the
  * first 500) or "excerpt_v2_centred" (needs the question; not with retry).
- * fallback: null (off, the default for now) or "window_v1" (fallback.ts:
- * after 0 results at days 30, the same search over 365 days; needs rank_v1,
- * not with retry). onSearch's fellBack is true when that second search ran.
+ * fallback: "window_v1" (the default, PHONE_FALLBACK from
+ * archways_assistant/phone.py, outside the frozen FINAL set; fallback.ts:
+ * after 0 results at days 30, the same search over 365 days) or null (off).
+ * It runs with or without rank, never with retry (pass null with retry).
+ * onSearch's fellBack is true when that second search ran.
  */
 export function makeFeedSearch(
   index: FeedIndex,
@@ -334,10 +336,9 @@ export function makeFeedSearch(
   onSearch?: (info: { retried: boolean; fellBack: boolean; count: number }) => void,
   matcher: Matcher = PHONE_MATCHER,
   excerpt: ExcerptRule | null = PHONE_EXCERPT,
-  fallback: FallbackVersion | null = null,
+  fallback: FallbackVersion | null = PHONE_FALLBACK,
 ) {
   if (fallback !== null && retry !== null) throw new Error("window_v1 runs without retry");
-  if (fallback !== null && rank === null) throw new Error("window_v1 needs rank_v1");
   if (excerpt !== null && retry !== null) throw new Error("the excerpt window runs without retry");
   if (retry !== null && rank === null) throw new Error("retry_v1 needs rank_v1");
   if (retry !== null && matcher !== "and_v3") throw new Error("retry_v1 runs with and_v3 only");
@@ -346,8 +347,15 @@ export function makeFeedSearch(
     if (rank !== null && context === undefined) throw new Error("rank needs the question");
     if (excerpt !== null && context === undefined) throw new Error("the excerpt window needs the question");
     if (rank === null) {
+      const at = nowMs();
       const window = excerpt === null ? undefined : excerptFor(excerpt, (context as { question: string }).question, matcher);
-      return index.search(args, nowMs(), undefined, matcher, window);
+      const plain = searchWithFallback(
+        (windowDays) => index.search(args, at, undefined, matcher, window, windowDays),
+        args,
+        fallback,
+      );
+      if (onSearch) onSearch({ retried: false, fellBack: plain.fellBack, count: plain.results.length });
+      return plain.results;
     }
     const question = (context as { question: string }).question;
     if (retry === null) {

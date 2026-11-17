@@ -37,19 +37,21 @@ test("searchWithFallback off is the first search only", () => {
   assert.throws(() => searchWithFallback(() => [], { query: "x", days: 30 }, "window_v2" as never));
 });
 
-test("makeFeedSearch: window_v1 needs rank, refuses retry, and reports fellBack", async () => {
+test("makeFeedSearch: window_v1 refuses retry, and reports fellBack", async () => {
   const index = createFeedIndex(async () => ({ content: [], last: true }));
-  assert.throws(() => makeFeedSearch(index, () => 0, null, null, undefined, "and_v4", null, "window_v1"));
   assert.throws(() => makeFeedSearch(index, () => 0, "rank_v1", "retry_v1", undefined, "and_v3", null, "window_v1"));
   const seen: { retried: boolean; fellBack: boolean; count: number }[] = [];
   const on = makeFeedSearch(index, () => 0, "rank_v1", null, (info) => seen.push(info), "and_v4", null, "window_v1");
   assert.deepEqual(await on({ query: "x", days: 30 }, { question: "x?" }), []);
   assert.deepEqual(await on({ query: "x", days: 7 }, { question: "x?" }), []);
-  const off = makeFeedSearch(index, () => 0, "rank_v1", null, (info) => seen.push(info), "and_v4", null);
+  const off = makeFeedSearch(index, () => 0, "rank_v1", null, (info) => seen.push(info), "and_v4", null, null);
   await off({ query: "x", days: 30 }, { question: "x?" });
+  const unranked = makeFeedSearch(index, () => 0, null, null, (info) => seen.push(info), "and_v3", null, "window_v1");
+  await unranked({ query: "x", days: 30 });
   assert.deepEqual(seen, [
     { retried: false, fellBack: true, count: 0 },
     { retried: false, fellBack: false, count: 0 },
     { retried: false, fellBack: false, count: 0 },
+    { retried: false, fellBack: true, count: 0 },
   ]);
 });

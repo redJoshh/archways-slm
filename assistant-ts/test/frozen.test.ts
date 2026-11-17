@@ -12,6 +12,7 @@ import {
   ANSWER_PROMPT_FILE,
   NOT_FOUND_MESSAGE,
   PHONE_EXCERPT,
+  PHONE_FALLBACK,
   PHONE_MATCHER,
   PHONE_RANK,
   PHONE_RETRY,
@@ -28,6 +29,8 @@ test("the generated phone defaults are the frozen FINAL set", () => {
   assert.equal(PHONE_RETRY, null);
   assert.equal(PHONE_EXCERPT, null);
   assert.equal(PHONE_STRIP_NF, "strip_nf_v1");
+  // Outside FINAL (archways_assistant/phone.py): shipped app = FINAL + window_v1.
+  assert.equal(PHONE_FALLBACK, "window_v1");
   assert.equal(ANSWER_PROMPT_FILE, "prompts/e2e_answer_v1.txt");
 });
 
@@ -37,8 +40,8 @@ function spyIndex(seen: unknown[]): FeedIndex {
     rebuild: async () => ({}) as never,
     clear: () => undefined,
     size: () => 0,
-    search: (_args: unknown, _now?: number, score?: unknown, matcher?: unknown, excerpt?: unknown) => {
-      seen.push({ ranked: score !== undefined, matcher: matcher, window: excerpt !== undefined });
+    search: (_args: unknown, _now?: number, score?: unknown, matcher?: unknown, excerpt?: unknown, windowDays?: unknown) => {
+      seen.push({ ranked: score !== undefined, matcher: matcher, window: excerpt !== undefined, windowDays: windowDays });
       return [];
     },
     searchRetry: () => {
@@ -53,11 +56,17 @@ test("makeFeedSearch defaults: rank_v1 with and_v4, no window, no retry", async 
   const search = makeFeedSearch(spyIndex(seen), () => 0);
   await assert.rejects(search({ query: "x" }), /rank needs the question/);
   await search({ query: "x" }, { question: "x?" });
-  assert.deepEqual(seen, [{ ranked: true, matcher: "and_v4", window: false }]);
+  assert.deepEqual(seen, [{ ranked: true, matcher: "and_v4", window: false, windowDays: undefined }]);
+  // window_v1 is on by default: 0 results at days 30 searches again over 365 days.
+  await search({ query: "x", days: 30 }, { question: "x?" });
+  assert.deepEqual(seen.slice(1), [
+    { ranked: true, matcher: "and_v4", window: false, windowDays: undefined },
+    { ranked: true, matcher: "and_v4", window: false, windowDays: 365 },
+  ]);
   // The UAT baseline is still reachable explicitly.
-  const baseline = makeFeedSearch(spyIndex(seen), () => 0, null, null, undefined, "and_v3", null);
-  await baseline({ query: "x" });
-  assert.deepEqual(seen[1], { ranked: false, matcher: "and_v3", window: false });
+  const baseline = makeFeedSearch(spyIndex(seen), () => 0, null, null, undefined, "and_v3", null, null);
+  await baseline({ query: "x", days: 30 });
+  assert.deepEqual(seen.slice(3), [{ ranked: false, matcher: "and_v3", window: false, windowDays: undefined }]);
 });
 
 async function ask(id: string, stripNf?: "strip_nf_v1" | null) {
