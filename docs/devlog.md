@@ -19,6 +19,39 @@ Template:
 
 ---
 
+## 2026-11-18: v2 fix (b) echo_v1: pre-registered, built, replayed on top of (a): KEPT
+
+- **Date:** 2026-11-18 (+08:00)
+- **Pre-registered** (`ce1e0b7`, before any code):
+  - **The rule** (`v2-improvements.md`, "echo_v1 rule, pre-registered"), made exact with rank_v1's own `question_terms`:
+    - content words, dates and numbers of the question and of the reply
+    - each word replaced by the matcher's `plural_alternative` when it has one
+    - fires if the reply's dates and numbers are subsets of the question's, and at most 2 normalised reply words are new
+    - then the path is `answer_not_found`, code `echo`, the list
+  - It runs after contradiction_v1.
+  - 13 hand-derived vectors, including the recorded risks: a two-word office answer (E4), a yes/no restatement (E6) and a bare "Yes." (E8) count as echoes.
+- **Built** (`5fcab46`, off by default):
+  - Python `echo.py` + `flow(..., echo=)`; TS `echo.ts` + `FlowOptions.echo` / `AssistantDeps.echo`
+  - `eval_flow.py --echo` (live runs and `--post-replay`)
+- **A vector gap, found and closed:**
+  - The first TS mutation check (dropping the plural step) **survived**: no vector depended on it. In E1 and E12 both sides stay at ≤ 2 new words without it.
+  - E14 was added (hand-derived, rule unchanged; marked in the file as added after the code). With the plural step, 1 new word; without it, 4.
+  - The mutant then fails in TS (1 test) and in Python (1 test).
+  - An earlier TS mutant didn't compile (an unused variable), so it ran no tests. It is not counted as a check.
+  - **Other mutation check:** `MAX_NEW_WORDS` 2 → 1 in Python (1 test fails). All restored from copies.
+- **Verified:**
+  - Python vectors 14/14 and flow tests (echo runs after contradiction)
+  - Node 318/318; Hermes echo 14/14, contradiction 20/20, askAssistant as expected
+  - `uv run pytest -q` → `1450 passed, 2 skipped`; ruff clean
+- **Result** (post replay on top of (a), no model call; `--nothing-worse --correct-case-by-case` against the (a) replay files):
+  - **flow13 q08:** answer → answer_not_found (the restated reply that listed none of the 5 items). Correct false → false; helpful true → true.
+  - **e2e34, taglish10:** 0 changes. **flow13** otherwise unchanged; the correct restate-then-answer replies (q01, q03, e2e-026) are not flagged. **rules10:** 0 changes from (b).
+  - Nothing got worse on any set, and no AI-correct was lost. **(b) is KEPT.**
+- **Commits:** `ce1e0b7`, `5fcab46`, this `docs:` commit. Not pushed.
+- **Open questions / next:** (c) past_note_v1, pre-registered next (it also covers dates inside (d)'s quotes).
+
+---
+
 ## 2026-11-18: v2 fix (a) contradiction_v1: pre-registered, built, replayed: KEPT (with a recorded human-judged loss)
 
 - **Date:** 2026-11-18 (+08:00)

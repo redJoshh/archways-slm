@@ -245,4 +245,5 @@ The rule of section 3 (b), made exact with rank_v1's own definitions, so that no
   - a short correct answer whose new content is 1–2 words (a two-word office name, or a bare "Yes.") counts as an echo
   - a yes/no restatement that adds nothing new counts as an echo
   - The keep rule ("no case loses AI-correct") decides.
-- **Vectors:** `tests/vectors/echo_vectors.json`, hand-written before any code.
+- **Vectors:** `tests/vectors/echo_vectors.json`, hand-written before any code (E14 added after the code to close a mutation gap; rule unchanged).
+- **Result (2026-11-18): KEPT** (devlog). flow13 q08 → answer_not_found; nothing else changed on any dev set.
