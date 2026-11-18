@@ -197,3 +197,29 @@ If a step slips, the later fixes are dropped in order: (f), then (e), then (d). 
   - At 2026-11-17 every snapshot row (posted Nov 6–7) is inside the 30-day window.
   - So window_v1 can't change any v2 held-out result at its fixed date, and `shipped` searches exactly like `final` there.
   - The note stays true for dev cases on the seed at later dates.
+
+## 2026-11-18: contradiction_v1 rule, pre-registered (fix (a); user: build exactly as registered)
+
+The rule of section 3 (a), with the details the plan left open written out. These details were written **after** the `rules10` baseline run. They are the reading the devlog's prediction used, and they change nothing it predicted (r04 and r02 blocked, nothing on the v1 dev sets). No threshold or word list is changed.
+
+- **Where it applies:**
+  - only when the flow would show the `answer` path (the guard passed the reply, and the list can be built), on the guard-passed reply text
+  - **if it fires:** path `guard_fired`, code `contradiction`, text = the results list
+  - **off:** nothing changes
+- **Tokens:** lowercase, then maximal runs of and_v3 word characters (`is_word_char`, the generated `WORD_RANGES`).
+  - An apostrophe (U+0027 or U+2019) between two word characters belongs to the token, and U+2019 is written as U+0027. So `can't` and `can’t` are one token, `can't`.
+  - A phrase matches when its tokens appear consecutively (whole words).
+- **1. Question trigger:** any phrase of `can i`, `can we`, `can students`, `may i`, `may we`, `is it allowed`, `are we allowed`, `am i allowed`, `allowed ba`, `pwede ba`, `puwede ba`, `pwede`, `puwede`, `bawal ba` in the question's tokens.
+- **2. Source marker:** any phrase of `prohibited`, `not allowed`, `not permitted`, `strictly prohibited`, `strictly not allowed`, `bawal`, `forbidden`, `banned`, `must not` in the tokens of `title + "\n" + excerpt` of **any** listed result.
+  - That is the contract fields the model and the student see. The flow has no other body text.
+- **3. Reply asserts permission:**
+  - **either** its first token is `yes`, `oo` or `opo`
+  - **or** a token `allowed`, `permitted`, `encouraged`, `pwede`, `puwede` or `can` has none of `not`, `never`, `no`, `hindi`, `bawal`, `cannot`, `can't` among the (up to) 3 tokens before it
+- **It fires when 1, 2 and 3 all hold.**
+- **Recorded with the decision (user, 2026-11-18):**
+  - **Evidence:** `shipped` produced a real contradiction on `rules10` (r04), which (a) blocks.
+  - **Known false block:** r02, a person-correct Taglish answer that restates "Pwede…?" and then states the prohibition. By human judgment one correct AI answer is lost. The student still sees the list with the source; the scorer doesn't see the loss.
+  - **Likely Taglish bias:** answers that echo a Taglish permission question ("pwede") are more likely to be falsely blocked.
+  - **Reach:** only snapshot rows 19 and 29 use (a)'s prohibition words.
+  - **Any refinement** (for example ignoring permission words that appear in the question) is a separately pre-registered contradiction_v2 **after the v2 final**, not in this phase.
+- **Vectors:** `tests/vectors/contradiction_vectors.json`, hand-written before any code.

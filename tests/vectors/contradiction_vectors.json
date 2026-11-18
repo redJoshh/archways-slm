@@ -1,0 +1,170 @@
+{
+ "$comment": "contradiction_v1 vectors, HAND-WRITTEN 2026-11-18 before any code (docs/plans/v2-improvements.md, 'contradiction_v1 rule, pre-registered'). 'expected' is whether the rule fires on a reply the guard passed. Never regenerate from the implementation.",
+ "format": "archways contradiction vectors v1",
+ "rule": "contradiction_v1",
+ "cases": [
+  {
+   "name": "C1: yes to a prohibited item, marker listed",
+   "question": "Can I wear a crop top on a wash day?",
+   "reply": "Yes, you can wear a crop top on a wash day.",
+   "results": [{"title": "Dress Code Advisory", "excerpt": "Sleeveless tops and crop tops are strictly prohibited inside the campus."}],
+   "expected": true,
+   "why": "trigger 'can i'; marker 'prohibited'; first token 'yes'"
+  },
+  {
+   "name": "C2: the known false block: echo of a Taglish 'pwede'",
+   "question": "Pwede ba mag-sleeveless sa campus?",
+   "reply": "Pwede mag-sleeveless sa campus? The dress code prohibits sleeveless tops.",
+   "results": [{"title": "Dress Code Advisory", "excerpt": "Sleeveless tops and crop tops are strictly prohibited inside the campus."}],
+   "expected": true,
+   "why": "trigger 'pwede ba'; marker; 'pwede' (token 1) has no negation before it; 'prohibits' is neither a marker nor a negation. The recorded false block (r02)"
+  },
+  {
+   "name": "C3: a correct no",
+   "question": "Can I wear a crop top on a wash day?",
+   "reply": "No, crop tops are not allowed on campus.",
+   "results": [{"title": "Dress Code Advisory", "excerpt": "Sleeveless tops and crop tops are strictly prohibited inside the campus."}],
+   "expected": false,
+   "why": "'allowed' has 'not' 1 token before it; first token 'no'"
+  },
+  {
+   "name": "C4: cannot",
+   "question": "Can I eat near the monument?",
+   "reply": "You cannot eat near the monument; it is strictly prohibited.",
+   "results": [{"title": "Monument Guidelines", "excerpt": "Climbing the steps is allowed, but eating near the structure is strictly prohibited."}],
+   "expected": false,
+   "why": "'cannot' is one token, not 'can'; no permission token"
+  },
+  {
+   "name": "C5: can't with an ASCII apostrophe",
+   "question": "Can I eat near the monument?",
+   "reply": "You can't eat near the monument.",
+   "results": [{"title": "Monument Guidelines", "excerpt": "Climbing the steps is allowed, but eating near the structure is strictly prohibited."}],
+   "expected": false,
+   "why": "'can't' is one token"
+  },
+  {
+   "name": "C6: can't with U+2019",
+   "question": "Can I eat near the monument?",
+   "reply": "You can’t eat near the monument.",
+   "results": [{"title": "Monument Guidelines", "excerpt": "Climbing the steps is allowed, but eating near the structure is strictly prohibited."}],
+   "expected": false,
+   "why": "U+2019 between word characters joins the token and is written as an ASCII apostrophe"
+  },
+  {
+   "name": "C7: no marker in any listed result",
+   "question": "Can I wear a crop top on a wash day?",
+   "reply": "Yes, you can.",
+   "results": [{"title": "Library Hours", "excerpt": "The library is open until 9 PM."}],
+   "expected": false,
+   "why": "condition 2 fails"
+  },
+  {
+   "name": "C8: question outside the trigger list",
+   "question": "Is it okay to wear a crop top?",
+   "reply": "Yes, crop tops are fine.",
+   "results": [{"title": "Dress Code Advisory", "excerpt": "Sleeveless tops and crop tops are strictly prohibited inside the campus."}],
+   "expected": false,
+   "why": "'is it okay' is not a trigger"
+  },
+  {
+   "name": "C9: marker in a second listed result",
+   "question": "May I bring food to the monument?",
+   "reply": "Yes, you may bring food.",
+   "results": [
+    {"title": "Library Hours", "excerpt": "The library is open until 9 PM."},
+    {"title": "Monument Guidelines", "excerpt": "Climbing the steps is allowed, but eating near the structure is strictly prohibited."}
+   ],
+   "expected": true,
+   "why": "trigger 'may i'; marker in result 2; first token 'yes'"
+  },
+  {
+   "name": "C10: hindi before pwede",
+   "question": "Pwede ba mag-crop top?",
+   "reply": "Hindi pwede mag-crop top sa campus.",
+   "results": [{"title": "Dress Code Advisory", "excerpt": "Sleeveless tops and crop tops are strictly prohibited inside the campus."}],
+   "expected": false,
+   "why": "'hindi' 1 token before 'pwede'; first token 'hindi'"
+  },
+  {
+   "name": "C11: a negation 4 tokens back does not count",
+   "question": "Can we eat near the monument?",
+   "reply": "Not sure, but maybe you can eat there.",
+   "results": [{"title": "Monument Guidelines", "excerpt": "Climbing the steps is allowed, but eating near the structure is strictly prohibited."}],
+   "expected": true,
+   "why": "the 3 tokens before 'can' are 'but', 'maybe', 'you'; 'not' is further back"
+  },
+  {
+   "name": "C12: uppercase YES",
+   "question": "CAN I WEAR A CROP TOP?",
+   "reply": "YES. It is fine.",
+   "results": [{"title": "Dress Code Advisory", "excerpt": "Sleeveless tops and crop tops are strictly prohibited inside the campus."}],
+   "expected": true,
+   "why": "lowercased first; first token 'yes'"
+  },
+  {
+   "name": "C13: 'yes' not first, no permission token",
+   "question": "Can I wear a crop top?",
+   "reply": "The answer is yes for uniforms only.",
+   "results": [{"title": "Dress Code Advisory", "excerpt": "Sleeveless tops and crop tops are strictly prohibited inside the campus."}],
+   "expected": false,
+   "why": "'yes' counts only as the first token; no permission token"
+  },
+  {
+   "name": "C14: 'oo' first, Taglish marker 'bawal'",
+   "question": "Pwede ba kumain dito?",
+   "reply": "Oo, kumain ka.",
+   "results": [{"title": "Paalala", "excerpt": "Bawal kumain sa loob ng aklatan."}],
+   "expected": true,
+   "why": "trigger 'pwede ba'; marker 'bawal'; first token 'oo'"
+  },
+  {
+   "name": "C15: 'scan' and 'cannot' are not 'can'",
+   "question": "Can I scan my ID?",
+   "reply": "You scan your ID; entry cannot be skipped.",
+   "results": [{"title": "Rules", "excerpt": "Entry without an ID is not allowed."}],
+   "expected": false,
+   "why": "tokens 'scan' and 'cannot' are not 'can'; first token 'you'"
+  },
+  {
+   "name": "C16: 'is it allowed' trigger, 'allowed' asserted",
+   "question": "Is it allowed to loiter near the monument?",
+   "reply": "Loitering is allowed near the monument.",
+   "results": [{"title": "Monument Guidelines", "excerpt": "Climbing the steps is allowed, but eating near the structure is strictly prohibited."}],
+   "expected": true,
+   "why": "trigger; marker; the tokens before 'allowed' are 'loitering', 'is'"
+  },
+  {
+   "name": "C17: 'prohibits' in the source is not a marker",
+   "question": "Can I wear a crop top?",
+   "reply": "Yes, you can.",
+   "results": [{"title": "Dress code", "excerpt": "The code prohibits crop tops."}],
+   "expected": false,
+   "why": "'prohibits' is not 'prohibited'"
+  },
+  {
+   "name": "C18: the marker phrase 'must not'",
+   "question": "Can students park here?",
+   "reply": "Yes, students can park here.",
+   "results": [{"title": "Parking", "excerpt": "Students must not park at the gate."}],
+   "expected": true,
+   "why": "trigger 'can students'; marker phrase 'must not'; first token 'yes'"
+  },
+  {
+   "name": "C19: 'must' and 'not' apart are not the phrase",
+   "question": "Can students park here?",
+   "reply": "Yes, students can park here.",
+   "results": [{"title": "Parking", "excerpt": "Students must register; parking is not free."}],
+   "expected": false,
+   "why": "'must' and 'not' are not consecutive; no other marker"
+  },
+  {
+   "name": "C20: 'can i' must be consecutive, but 'can students' matches",
+   "question": "Can students I know enter?",
+   "reply": "Yes.",
+   "results": [{"title": "Dress Code Advisory", "excerpt": "Sleeveless tops and crop tops are strictly prohibited inside the campus."}],
+   "expected": true,
+   "why": "'can students' is a trigger although 'can i' is not consecutive"
+  }
+ ]
+}
