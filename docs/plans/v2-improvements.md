@@ -286,4 +286,4 @@ The name is **past_date_v1** (the plan's "past_note_v1"). The user pinned the po
   - The scorer can't measure tense. The targeted benefit (dev: flow13 q12, and q07 if it reaches the answer path) is judged by the user's review.
   - "Nothing gets worse" applies to the scored metrics as usual.
 - **Vectors:** `tests/vectors/past_date_vectors.json`, hand-written before any code (P21–P22 added after the code to close a mutation gap; rule unchanged).
-- **Result (2026-11-18): passes the keep rule** (devlog). Only flow13 q12 changes; the benefit is for the user's review.
+- **Result (2026-11-18): KEPT** (devlog). Only flow13 q12 changes; the user reviewed it ("correct and clear").

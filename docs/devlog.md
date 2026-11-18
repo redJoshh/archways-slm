@@ -19,6 +19,16 @@ Template:
 
 ---
 
+## 2026-11-18: v2 fix (c) past_date_v1: KEPT (the user's review of q12)
+
+- **Date:** 2026-11-18 (+08:00)
+- **The user's review:** flow13 q12 ("…August 7, 2026 (already passed)…") is correct and clear. With the keep rule already passed (entry below), **(c) is KEPT.**
+- **Kept so far:** (a) contradiction_v1, (b) echo_v1, (c) past_date_v1, all off by default until the v2 freeze.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Next:** (e) Taglish lexicon v1.
+
+---
+
 ## 2026-11-18: v2 fix (c) past_date_v1: pre-registered, built, replayed on top of (a)+(b): passes the keep rule; benefit for the user's review
 
 - **Date:** 2026-11-18 (+08:00)
