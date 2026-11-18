@@ -247,3 +247,42 @@ The rule of section 3 (b), made exact with rank_v1's own definitions, so that no
   - The keep rule ("no case loses AI-correct") decides.
 - **Vectors:** `tests/vectors/echo_vectors.json`, hand-written before any code (E14 added after the code to close a mutation gap; rule unchanged).
 - **Result (2026-11-18): KEPT** (devlog). flow13 q08 → answer_not_found; nothing else changed on any dev set.
+
+## 2026-11-18: past_date_v1 rule, pre-registered (fix (c), on top of (a) and (b))
+
+The name is **past_date_v1** (the plan's "past_note_v1"). The user pinned the points marked (user); the rest makes them exact. Written before any past_date_v1 code or run.
+
+- **Scope (user):**
+  - only the AI-answer text: the guard-passed reply on the `answer` path, after contradiction_v1 and echo_v1
+  - and (d)'s quotes, when (d) is built
+  - **never** the results list or any other path
+  - If at least one note is added, the outcome gets code `past_date`; the path stays `answer`.
+- **Date spans:** exactly the spans the guard and scorer parse.
+  - Python `e2escore.date_scan(text)`, TS guard-ts `claimsAndRest(text).spans`: the same patterns, order and blanking. Neither frozen module is edited.
+  - Spans are sorted by start. Offsets are code points (Python) or UTF-16 units (TS) of the same text; every match is ASCII.
+- **A span's year:**
+  - for `YYYY-MM-DD`, its first four digits
+  - otherwise, the four-digit run that ends the span text, if any (a day has at most 2 digits, so a trailing 4-digit run is the year)
+  - otherwise none
+- **Year-less dates (user):** annotated only if they resolve to a full date in the cited source.
+  - **Cited source:** for an AI answer, every listed result; for a (d) quote, the quoted row.
+  - Each source text is `title + "\n" + excerpt`.
+  - Collect the years of the source spans with a year and the same (month, day). If there is **exactly one** distinct year, use it. Otherwise (none, or several) leave the date.
+- **Ranges (user: judged by the end date, the note after the whole range):**
+  - Two consecutive spans A, B form a range when the text between A's end and B's start, with ASCII whitespace stripped and lowercased, is exactly one of `to`, `until`, `through`, `thru`, `-`, `–` (U+2013), `—` (U+2014).
+  - A is then not judged alone. The range is judged by B (its year, or B resolved as above), and the note goes after B.
+  - No chaining: the scan continues after B.
+  - Recorded limit: a day-only end ("June 5 to 7, 2026") is not a parsed date, so it is not a range. "June 5" is then judged alone, and without a resolvable year it is left.
+- **Past (user):** the calendar date (year, month, day) is **strictly before** now's date in Manila (UTC+08:00). The same day is not past. An impossible date (for example February 30) is left.
+- **The note (user):**
+  - The text ` (already passed)` (a space, then the words) is inserted right after the span's end, or after B for a range.
+  - The span includes the year when it has one, so the note follows the complete date.
+  - Insertions go from last to first, so the offsets stay valid.
+- **Invariance (user):** for every vector, the guard and scorer read the annotated text the same way as the original:
+  - `claims(annotated) == claims(original)` (Python `e2escore.claims`, TS guard-ts `claims`)
+  - the guard's `fired` and `codes` are equal on both texts, with the vector's results
+  - The note has no digit and no month name.
+- **Measurement (user):**
+  - The scorer can't measure tense. The targeted benefit (dev: flow13 q12, and q07 if it reaches the answer path) is judged by the user's review.
+  - "Nothing gets worse" applies to the scored metrics as usual.
+- **Vectors:** `tests/vectors/past_date_vectors.json`, hand-written before any code.

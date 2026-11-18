@@ -1,0 +1,151 @@
+{
+ "$comment": "past_date_v1 vectors, HAND-WRITTEN 2026-11-18 before any code or run (docs/plans/v2-improvements.md, 'past_date_v1 rule, pre-registered'). 'expected' is the AI-answer text after the rule. Every case also asserts that claims() and the guard read 'expected' the same way as 'reply'. Never regenerate from the implementation.",
+ "format": "archways past_date vectors v1",
+ "rule": "past_date_v1",
+ "note": " (already passed)",
+ "cases": [
+  {
+   "name": "P1: a past full date (q12-like)",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "The Misa de Apertura is held on August 7, 2026, at the church.",
+   "results": [{"title": "Misa de Apertura", "excerpt": "The Mass is on August 7, 2026, at the church."}],
+   "expected": "The Misa de Apertura is held on August 7, 2026 (already passed), at the church."
+  },
+  {
+   "name": "P2: a future date is left",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Classes start on January 15, 2027.",
+   "results": [{"title": "Second term", "excerpt": "Classes start on January 15, 2027."}],
+   "expected": "Classes start on January 15, 2027."
+  },
+  {
+   "name": "P3: the same day is not past",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "The deadline is November 10, 2026.",
+   "results": [{"title": "Deadline", "excerpt": "The deadline is November 10, 2026."}],
+   "expected": "The deadline is November 10, 2026."
+  },
+  {
+   "name": "P4: the day before is past",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "The deadline was November 9, 2026.",
+   "results": [{"title": "Deadline", "excerpt": "The deadline is November 9, 2026."}],
+   "expected": "The deadline was November 9, 2026 (already passed)."
+  },
+  {
+   "name": "P5: a year-less date resolved from a listed result",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "The Mass is on August 7.",
+   "results": [{"title": "Opening", "excerpt": "The Mass is on August 7, 2026."}],
+   "expected": "The Mass is on August 7 (already passed)."
+  },
+  {
+   "name": "P6: a year-less date with no year in any source is left",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "It is on August 7.",
+   "results": [{"title": "Feast", "excerpt": "Every August 7 we celebrate."}],
+   "expected": "It is on August 7."
+  },
+  {
+   "name": "P7: a year-less date with two different source years is left",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "It is on August 7.",
+   "results": [
+    {"title": "Old", "excerpt": "Held on August 7, 2025."},
+    {"title": "New", "excerpt": "Held on August 7, 2027."}
+   ],
+   "expected": "It is on August 7."
+  },
+  {
+   "name": "P8: a past range is judged by its end; the note after the whole range",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Prelims run from September 28 to October 3, 2026.",
+   "results": [{"title": "Prelims", "excerpt": "Prelims run from September 28 to October 3, 2026."}],
+   "expected": "Prelims run from September 28 to October 3, 2026 (already passed)."
+  },
+  {
+   "name": "P9: a range with a future end is left although its start is past",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Enrollment runs from November 2 to November 20, 2026.",
+   "results": [{"title": "Enrollment", "excerpt": "Enrollment runs from November 2 to November 20, 2026."}],
+   "expected": "Enrollment runs from November 2 to November 20, 2026."
+  },
+  {
+   "name": "P10: an en-dash range",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Prelims: September 28 – October 3, 2026.",
+   "results": [{"title": "Prelims", "excerpt": "Prelims: September 28 – October 3, 2026."}],
+   "expected": "Prelims: September 28 – October 3, 2026 (already passed)."
+  },
+  {
+   "name": "P11: two separate dates, only the past one is noted",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Dropping closed on October 25, 2026 and classes start on January 15, 2027.",
+   "results": [{"title": "Dates", "excerpt": "Dropping closes on October 25, 2026. Classes start on January 15, 2027."}],
+   "expected": "Dropping closed on October 25, 2026 (already passed) and classes start on January 15, 2027."
+  },
+  {
+   "name": "P12: an ISO date",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Posted for 2026-08-07.",
+   "results": [{"title": "Notice", "excerpt": "For 2026-08-07."}],
+   "expected": "Posted for 2026-08-07 (already passed)."
+  },
+  {
+   "name": "P13: day-month order with a year",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "It was on 7 August 2026.",
+   "results": [{"title": "Notice", "excerpt": "It is on 7 August 2026."}],
+   "expected": "It was on 7 August 2026 (already passed)."
+  },
+  {
+   "name": "P14: an impossible date is left",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "It was on February 30, 2026.",
+   "results": [{"title": "Notice", "excerpt": "It is on February 30, 2026."}],
+   "expected": "It was on February 30, 2026."
+  },
+  {
+   "name": "P15: a year-less date resolved to a future year is left",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Classes start on January 15.",
+   "results": [{"title": "Second term", "excerpt": "Classes start on January 15, 2027."}],
+   "expected": "Classes start on January 15."
+  },
+  {
+   "name": "P16: an ordinal with a year",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "It was on August 7th, 2026.",
+   "results": [{"title": "Notice", "excerpt": "It is on August 7th, 2026."}],
+   "expected": "It was on August 7th, 2026 (already passed)."
+  },
+  {
+   "name": "P17: a year-less date resolved from an ISO date in the source",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "It was on August 7.",
+   "results": [{"title": "Notice", "excerpt": "Date: 2026-08-07."}],
+   "expected": "It was on August 7 (already passed)."
+  },
+  {
+   "name": "P18: no date, unchanged",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "The Office of the Secretary-General published it.",
+   "results": [{"title": "Notice", "excerpt": "Published by the Office of the Secretary-General."}],
+   "expected": "The Office of the Secretary-General published it."
+  },
+  {
+   "name": "P19: 'until' range with a year-less end resolved from the source",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Open from September 1 until September 30.",
+   "results": [{"title": "Window", "excerpt": "Open from September 1 until September 30, 2026."}],
+   "expected": "Open from September 1 until September 30 (already passed)."
+  },
+  {
+   "name": "P20: a range whose year-less end can't be resolved is left",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Open from September 1 to September 30.",
+   "results": [{"title": "Window", "excerpt": "Open every September 1 to September 30."}],
+   "expected": "Open from September 1 to September 30."
+  }
+ ]
+}
