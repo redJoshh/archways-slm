@@ -19,6 +19,26 @@ Template:
 
 ---
 
+## 2026-11-18: `rules10` drafted for fix (a) (awaiting the user's labels; no run)
+
+- **Date:** 2026-11-18 (+08:00)
+- **What changed:** `data/local/rules_cases.jsonl` (gitignored: it holds snapshot-derived text). Ten dev cases drafted by Claude Code from the **snapshot only**, at now 2026-11-17T10:00+08:00. They load with `evalflow.load_cases`.
+  - **4 prohibitions (a) can act on:** r01–r04. The source is row 29 or 19, which contain "strictly prohibited", and the question is on the permission-trigger list.
+  - **3 limit cases (a) cannot act on:**
+    - r05 and r06: restriction-only sources (rows 21, 31: "may only", "strictly reserved")
+    - r07: a prohibition asked outside the trigger list ("is it okay")
+  - **3 controls whose honest answer is yes:**
+    - r08: row 19, which permits one thing and prohibits others. This is the false-block risk.
+    - r09: row 56, encouraged.
+    - r10: row 8, a conditional yes.
+- **Finding:** only rows 19 and 29 of the 53 snapshot rows use a word on (a)'s marker list (`strictly prohibited`). The others phrase rules as "may only", "reserved", "ban", "limited to". So (a) can only reach a small part of real rules: recorded, not acted on (the rule is pre-registered).
+- **Scoring note:** scorer_v1 matches case-insensitive substrings, so `must_not_include` avoids phrases whose negation contains them ("pwede" in "hindi pwede", "you can" in "you cannot").
+- **Not done:** no run, and the file's hash isn't recorded yet. Both follow the user's labels.
+- **Commits:** this `docs:` commit (the case file is gitignored). Not pushed.
+- **Open questions / next:** the user labels `rules10`; then its SHA-256 goes in the devlog, `rules10` is added to `eval_flow.py`'s sets, and the `shipped` baseline runs on it (the admissibility check for (a)).
+
+---
+
 ## 2026-11-18: v2 held-out BASELINE (run 1 of 2, by the user); VERIFY OK at `4dd1c45`
 
 - **Date:** 2026-11-18 (+08:00)
