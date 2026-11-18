@@ -1,0 +1,98 @@
+{
+ "$comment": "echo_v1 vectors, HAND-WRITTEN 2026-11-18 before any code or run (docs/plans/v2-improvements.md, 'echo_v1 rule, pre-registered'). 'expected' is whether the rule fires on a reply the guard passed. Words come from rank_v1's question_terms (AND_V2_STOPWORDS + rank_stopwords_v1 dropped; tokens with a digit or of one code point dropped), each replaced by plural_alternative when it has one. Never regenerate from the implementation.",
+ "format": "archways echo vectors v1",
+ "rule": "echo_v1",
+ "cases": [
+  {
+   "name": "E1: restates the question (q08-like)",
+   "question": "Which items are included in the campus ban on plastics?",
+   "reply": "The campus ban on plastics includes items.",
+   "expected": true,
+   "why": "Q {item, included, campus, ban, plastic}; R {campus, ban, plastic, include, item}; new {include} = 1"
+  },
+  {
+   "name": "E2: restates, then adds the answer",
+   "question": "Who publishes the outing notice?",
+   "reply": "The outing notice is published by the Office of the Secretary General.",
+   "expected": false,
+   "why": "Q {publishe, outing, notice}; new {published, by, office, secretary, general} = 5"
+  },
+  {
+   "name": "E3: three new words",
+   "question": "Which office published the outing notice?",
+   "reply": "The office that published the outing notice is the Secretary General.",
+   "expected": false,
+   "why": "new {that, secretary, general} = 3"
+  },
+  {
+   "name": "E4: a correct two-word answer counts as an echo (recorded risk)",
+   "question": "Which office published the outing notice?",
+   "reply": "The Secretary General published the outing notice.",
+   "expected": true,
+   "why": "new {secretary, general} = 2, at most 2"
+  },
+  {
+   "name": "E5: a new date is never an echo",
+   "question": "When is the outing?",
+   "reply": "The outing is on May 14, 2027.",
+   "expected": false,
+   "why": "reply date (5, 14) and number 2027 are not in the question"
+  },
+  {
+   "name": "E6: a yes/no restatement with the question's own date (recorded risk)",
+   "question": "Is there an outing on May 14, 2027?",
+   "reply": "There is an outing on May 14, 2027.",
+   "expected": true,
+   "why": "dates {(5, 14)} and numbers {2027} are subsets; words {outing} vs {outing}; new 0"
+  },
+  {
+   "name": "E7: a new number is never an echo",
+   "question": "How many water stations are there?",
+   "reply": "There are 40 water stations.",
+   "expected": false,
+   "why": "number 40 is not in the question"
+  },
+  {
+   "name": "E8: a bare yes counts as an echo (recorded risk)",
+   "question": "Can I bring a tumbler?",
+   "reply": "Yes.",
+   "expected": true,
+   "why": "Q {can, bring, tumbler}; R {yes}; new {yes} = 1"
+  },
+  {
+   "name": "E9: Taglish with a new date",
+   "question": "Kailan ang pasok sa second term?",
+   "reply": "Ang pasok sa second term ay sa January 15, 2027.",
+   "expected": false,
+   "why": "reply date (1, 15) is new"
+  },
+  {
+   "name": "E10: a Taglish pure echo",
+   "question": "Pwede ba mag-sleeveless sa campus?",
+   "reply": "Pwede mag-sleeveless sa campus.",
+   "expected": true,
+   "why": "Q {pwede, mag, sleeveless, campus}; R the same; new 0"
+  },
+  {
+   "name": "E11: a Taglish echo followed by the answer",
+   "question": "Pwede ba mag-sleeveless sa campus?",
+   "reply": "Pwede mag-sleeveless sa campus? The dress code prohibits sleeveless tops.",
+   "expected": false,
+   "why": "new {dress, code, prohibit, tops} = 4 ('tops' has 4 code points, so no plural alternative)"
+  },
+  {
+   "name": "E12: plurals normalised on both sides",
+   "question": "What are the uniform rules?",
+   "reply": "The uniform rule applies.",
+   "expected": true,
+   "why": "Q {uniform, rule}; R {uniform, rule, applie}; new {applie} = 1"
+  },
+  {
+   "name": "E13: three new words after the restatement",
+   "question": "What are the uniform rules?",
+   "reply": "Uniform rules require Type A polo.",
+   "expected": false,
+   "why": "new {require, type, polo} = 3 ('a' is a stopword)"
+  }
+ ]
+}

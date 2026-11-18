@@ -223,3 +223,26 @@ The rule of section 3 (a), with the details the plan left open written out. Thes
   - **Reach:** only snapshot rows 19 and 29 use (a)'s prohibition words.
   - **Any refinement** (for example ignoring permission words that appear in the question) is a separately pre-registered contradiction_v2 **after the v2 final**, not in this phase.
 - **Vectors:** `tests/vectors/contradiction_vectors.json`, hand-written before any code.
+- **Result (2026-11-18): KEPT** (devlog). rules10: helpful 6 → 7, wrong answers 2 → 1; v1 dev sets unchanged. r02 is the recorded human-judged loss.
+
+## 2026-11-18: echo_v1 rule, pre-registered (fix (b), on top of contradiction_v1)
+
+The rule of section 3 (b), made exact with rank_v1's own definitions, so that nothing new is invented. Written before any echo_v1 code or run.
+
+- **Where it applies:**
+  - only when the flow would show the `answer` path: the guard passed the reply, the list can be built, and contradiction_v1 didn't fire
+  - on the guard-passed reply text
+  - **if it fires:** path `answer_not_found`, code `echo`, text = the results list
+  - **off:** nothing changes
+- **Terms:** `rank.question_terms(text)` (Python) / `questionTerms(text)` (TS), applied to the question and to the reply alike:
+  - content words: the lowercased text with parsed dates blanked; tokens with a digit or of one code point dropped; `AND_V2_STOPWORDS` and `rank_stopwords_v1` dropped; first occurrence kept
+  - dates, and numbers (a date's year is a number, its day is not)
+- **Plural:** each content word is replaced by the matcher's `plural_alternative(word)` (`pluralAlternative`) when that is not null. So `items` → `item`, `includes` → `include`; `included` is unchanged.
+- **It fires when both hold:**
+  1. the reply's dates are a subset of the question's dates, and the reply's numbers a subset of the question's numbers
+  2. the number of distinct normalised reply words that are not normalised question words is **at most 2**
+- **Recorded risks (from the plan; vectors E4, E6, E8 pin them):**
+  - a short correct answer whose new content is 1–2 words (a two-word office name, or a bare "Yes.") counts as an echo
+  - a yes/no restatement that adds nothing new counts as an echo
+  - The keep rule ("no case loses AI-correct") decides.
+- **Vectors:** `tests/vectors/echo_vectors.json`, hand-written before any code.
