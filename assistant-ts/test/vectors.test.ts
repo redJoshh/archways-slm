@@ -83,7 +83,10 @@ function input(value: unknown): StepInput {
 for (const vector of file.flow) {
   test(`flow stepper ${vector.id}`, () => {
     const seed = vector.speed === null ? null : { promptTps: vector.speed.prompt_tps, genTps: vector.speed.gen_tps };
-    let step: Step = startQuestion(vector.question, vector.now_ms, seed, { stripNf: vector.strip_nf || null });
+    let step: Step = startQuestion(vector.question, vector.now_ms, seed, {
+      stripNf: vector.strip_nf || null,
+      extract: vector.extract || null,
+    });
     const sent: string[] = [];
     while (step.kind !== "done") {
       if (step.kind === "query") {
@@ -132,6 +135,7 @@ for (const vector of file.flow) {
       speed: speedState(seed),
       log: (entry) => logs.push(entry),
       stripNf: vector.strip_nf || null,
+      extract: vector.extract || null,
     });
     assert.equal(result.path, vector.expected.path);
     assert.equal(result.text, vector.expected.text);

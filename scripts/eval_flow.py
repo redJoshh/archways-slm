@@ -51,7 +51,7 @@ import hashlib
 import json
 import subprocess
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -66,6 +66,7 @@ from probe_tool_call import (
 )
 
 from archways_assistant import assistant
+from archways_assistant import extract as extract_rule
 from archways_assistant.evalflow import (
     SCORER,
     CaseFileError,
@@ -116,6 +117,45 @@ BASE_OPTIONS = {
     "stop": list(QWEN3_STOP),
 }
 KEEP_ALIVE = 0
+
+
+def score_outcome(
+    case: dict,
+    path: str,
+    text: str,
+    results: list[dict],
+    rows_by_id: dict[str, dict],
+    offices: set[str],
+):
+    """scorer_v1 (frozen) on a flow outcome; an extract is scored as an answer.
+
+    v2-improvements.md, extract_v1 rule (user 7.3): the extract label is
+    replaced by the answer label, so the quote is "the AI answer" for every
+    scorer_v1 rule. The score keeps the path "extract", so totals'
+    ai_correct is "answer correct (AI + extract)".
+    """
+    if path != "extract":
+        return score_case(case, path, text, results, rows_by_id, offices)
+    head = extract_rule.LABEL + extract_rule.LABEL_SEPARATOR
+    if not text.startswith(head):
+        raise ValueError("an extract text without its label")
+    as_answer = (
+        assistant.ANSWER_LABEL + assistant.ANSWER_LABEL_SEPARATOR + text[len(head) :]
+    )
+    score = score_case(case, "answer", as_answer, results, rows_by_id, offices)
+    return replace(score, path="extract")
+
+
+def format_extract(name: str, scores: list) -> str | None:
+    """The extract_v1 report line (None when no case took the extract path)."""
+    on = [s for s in scores if s.path == "extract" and not s.out_of_scope]
+    if not on:
+        return None
+    correct = sum(s.correct for s in on)
+    return (
+        f"  {name} extract correct {correct}/{len(on)}  (ai_correct above = answer "
+        "correct (AI + extract))"
+    )
 
 
 def sha256(path: Path) -> str:
@@ -181,6 +221,7 @@ def run_case(
     contradiction: str | None = None,
     echo: str | None = None,
     past_date: str | None = None,
+    extract: str | None = None,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -249,8 +290,9 @@ def run_case(
             except InvalidArguments:
                 search_reply = assistant.ERROR
                 record["search"] = "invalid_arguments"
+            # With extract_v1, a case that extracts makes no count or answer call.
             _, calls, _ = assistant.flow(
-                question, now, prompts, query_reply, search_reply
+                question, now, prompts, query_reply, search_reply, extract=extract
             )
             if calls.answer_case_part is not None:
                 case_tokens = generate(client, model, calls.answer_case_part, 1)[
@@ -275,6 +317,7 @@ def run_case(
         contradiction=contradiction,
         echo=echo,
         past_date=past_date,
+        extract=extract,
     )
     results = search_reply if isinstance(search_reply, list) else []
     record.update(
@@ -662,6 +705,7 @@ def post_replay(
     contradiction: str | None,
     echo: str | None = None,
     past_date: str | None = None,
+    extract: str | None = None,
 ) -> None:
     """No model call: a saved run's replies through flow() again, rescored.
 
@@ -688,7 +732,7 @@ def post_replay(
         "answer": ANSWER_PROMPT.read_text(encoding="utf-8"),
     }
     print(f"post replay of {run_path.name} (commit {header['commit']})")
-    records, changed = [], 0
+    records, changed, post_scores = [], 0, []
     for saved in run["cases"]:
         case = cases[(saved["set"], saved["id"])]
         outcome, _, _ = assistant.flow(
@@ -704,12 +748,13 @@ def post_replay(
             contradiction=contradiction,
             echo=echo,
             past_date=past_date,
+            extract=extract,
         )
         if saved["query_reply"] is None or not isinstance(saved["arguments"], dict):
             outcome_path, text = saved["path"], saved["text"]
         else:
             outcome_path, text = outcome.path, outcome.text
-        score = score_case(
+        score = score_outcome(
             case,
             outcome_path,
             text,
@@ -723,16 +768,21 @@ def post_replay(
                 f"{saved['set']} {saved['id']}: {saved['path']} -> {outcome_path}"
                 f"  ({format_case(score)})"
             )
+        post_scores.append(score)
         records.append(
             {**saved, "path": outcome_path, "text": text, "score": asdict(score)}
         )
     print(f"changed {changed}")
+    line = format_extract("post replay", post_scores)
+    if line:
+        print(line)
     report = {
         "header": {
             **header,
             "contradiction": contradiction,
             "echo": echo,
             "past_date": past_date,
+            "extract": extract,
             "post_replay_of": [run_path.name, sha256(run_path)],
             "replay_commit": git_commit(),
             "replay_tree_dirty": tree_is_dirty(),
@@ -788,6 +838,7 @@ def main() -> None:
     parser.add_argument("--contradiction", choices=["contradiction_v1"], default=None)
     parser.add_argument("--echo", choices=["echo_v1"], default=None)
     parser.add_argument("--past-date", choices=["past_date_v1"], default=None)
+    parser.add_argument("--extract", choices=[extract_rule.EXTRACT_V1], default=None)
     parser.add_argument("--post-replay", type=Path, metavar="RUN")
     parser.add_argument("--excerpt-replay", type=Path, metavar="RUN")
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
@@ -831,7 +882,12 @@ def main() -> None:
         if not out.is_relative_to(LOCAL.resolve()):
             sys.exit("--out must be inside data/local/ (gitignored)")
         post_replay(
-            args.post_replay, out, args.contradiction, args.echo, args.past_date
+            args.post_replay,
+            out,
+            args.contradiction,
+            args.echo,
+            args.past_date,
+            args.extract,
         )
         return
     if args.strip_nf_replay:
@@ -958,6 +1014,7 @@ def main() -> None:
             "contradiction": args.contradiction,
             "echo": args.echo,
             "past_date": args.past_date,
+            "extract": args.extract,
             "now_override": args.now,
             "query_replies_from": None
             if args.reuse_queries is None
@@ -999,8 +1056,9 @@ def main() -> None:
                     contradiction=args.contradiction,
                     echo=args.echo,
                     past_date=args.past_date,
+                    extract=args.extract,
                 )
-                score = score_case(
+                score = score_outcome(
                     case,
                     record["path"],
                     record["text"],
@@ -1022,7 +1080,13 @@ def main() -> None:
                 )
             all_scores += scores
             print(format_totals(name, totals(scores)))
+            line = format_extract(name, scores)
+            if line:
+                print(line)
         print(format_totals("TOTAL", totals(all_scores)))
+        line = format_extract("TOTAL", all_scores)
+        if line:
+            print(line)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     report = {

@@ -183,6 +183,7 @@ def test_flow_vectors_reproduce():
             vector["elapsed_ms"],
             speed_of(vector["speed"]),
             strip_nf=vector.get("strip_nf"),
+            extract=vector.get("extract"),
         )
         expected = vector["expected"]
         budget = outcome.budget
@@ -285,11 +286,13 @@ def test_every_path_with_results_ends_with_the_results_list():
         listed = assistant.results_list(vector["search_reply"])
         assert expected["text"].endswith(listed), vector["id"]
         assert listed.count("\n- ") == expected["result_count"], vector["id"]
-        if expected["path"] != "answer":
+        # The answer and extract paths put their text above the list.
+        if expected["path"] not in ("answer", "extract"):
             assert expected["text"] == listed, vector["id"]
         seen.add(expected["path"])
     assert seen == {
         "answer",
+        "extract",
         "answer_not_found",
         "guard_fired",
         "budget_fallback",

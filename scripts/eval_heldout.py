@@ -81,9 +81,11 @@ from eval_flow import (
     QUERY_N_PREDICT,
     QUERY_PROMPT,
     SNAPSHOT,
+    format_extract,
     load_sources,
     model_digest,
     run_case,
+    score_outcome,
     tree_is_dirty,
 )
 from probe_tool_call import SCHEMA_PATH, git_commit, ollama_version
@@ -95,7 +97,6 @@ from archways_assistant.evalflow import (
     format_case,
     format_totals,
     load_cases,
-    score_case,
     totals,
 )
 from archways_assistant.frozen import FINAL
@@ -249,7 +250,8 @@ def main() -> None:
                 record = run_case(
                     client, MODEL, case, prompts, rows, contract, **run_options
                 )
-                score = score_case(
+                # An extract (v2 fix (d)) is scored as an answer.
+                score = score_outcome(
                     case,
                     record["path"],
                     record["text"],
@@ -265,6 +267,9 @@ def main() -> None:
                     f"case number {number} failed ({type(error).__name__}); no totals"
                 )
     print(format_totals("HELD-OUT", totals(scores)))
+    line = format_extract("HELD-OUT", scores)
+    if line:
+        print(line)
     if report is not None:
         write_private_report(report, blocks)
 

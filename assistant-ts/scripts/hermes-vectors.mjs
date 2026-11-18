@@ -37,6 +37,7 @@ const fallbackVectorsPath = join(root, "..", "tests", "vectors", "window_fallbac
 const contradictionVectorsPath = join(root, "..", "tests", "vectors", "contradiction_vectors.json");
 const echoVectorsPath = join(root, "..", "tests", "vectors", "echo_vectors.json");
 const pastDateVectorsPath = join(root, "..", "tests", "vectors", "past_date_vectors.json");
+const extractVectorsPath = join(root, "..", "tests", "vectors", "extract_vectors.json");
 
 const runner = `
 var log = typeof print === "function" ? print : console.log;
@@ -105,6 +106,11 @@ log("hermes past_date vectors: " + pastDateReport.passed + "/" + pastDateReport.
     pastDateReport.failed + " failed");
 for (var pv = 0; pv < pastDateReport.failures.length; pv++) log("FAIL " + pastDateReport.failures[pv]);
 if (pastDateReport.failed) { throw new Error("past_date vectors failed"); }
+var extractReport = runExtractVectors(EXTRACT_VECTORS);
+log("hermes extract vectors: " + extractReport.passed + "/" + extractReport.total + " passed, " +
+    extractReport.failed + " failed");
+for (var xv = 0; xv < extractReport.failures.length; xv++) log("FAIL " + extractReport.failures[xv]);
+if (extractReport.failed) { throw new Error("extract vectors failed"); }
 
 var flowVector = VECTORS.flow[0];
 askAssistant(flowVector.question, {
@@ -227,6 +233,8 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "echoVectors.js"],
   ["assistant-ts", "src", "pastDate.js"],
   ["assistant-ts", "src", "pastDateVectors.js"],
+  ["assistant-ts", "src", "extract.js"],
+  ["assistant-ts", "src", "extractVectors.js"],
 ];
 const declared = {};
 for (const parts of BUNDLE_FILES) {
@@ -256,6 +264,7 @@ const bundle = [
   "var CONTRADICTION_VECTORS = " + readFileSync(contradictionVectorsPath, "utf8").trim() + ";",
   "var ECHO_VECTORS = " + readFileSync(echoVectorsPath, "utf8").trim() + ";",
   "var PAST_DATE_VECTORS = " + readFileSync(pastDateVectorsPath, "utf8").trim() + ";",
+  "var EXTRACT_VECTORS = " + readFileSync(extractVectorsPath, "utf8").trim() + ";",
   runner,
 ].join("\n");
 mkdirSync(join(root, "dist-hermes"), { recursive: true });

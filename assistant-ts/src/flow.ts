@@ -38,6 +38,13 @@
 import { fallback, guard } from "../../guard-ts/src/guard.ts";
 import { CONTRADICTION_CODE, contradictionBlocks, type ContradictionRule } from "./contradiction.ts";
 import { ECHO_CODE, echoBlocks, type EchoRule } from "./echo.ts";
+import {
+  EXTRACT_LABEL,
+  EXTRACT_LABEL_SEPARATOR,
+  extractQuote,
+  extractSourceText,
+  type ExtractRule,
+} from "./extract.ts";
 import { annotatePastDates, PAST_DATE_CODE, pastResultSources, type PastDateRule } from "./pastDate.ts";
 import { decideBudget, type Budget, type Speed, type SpeedState } from "./budget.ts";
 import {
@@ -68,6 +75,8 @@ import { replaceAll, trimAscii } from "./text.ts";
 
 export type Path =
   | "answer"
+  /** v2 fix (d): a quote from the top result, then the list; no answer call. */
+  | "extract"
   | "answer_not_found"
   | "guard_fired"
   | "budget_fallback"
@@ -151,6 +160,8 @@ export interface FlowOptions {
   echo?: EchoRule;
   /** v2 fix (c), pastDate.ts: notes in the AI answer only. Omitted or null: off. */
   pastDate?: PastDateRule;
+  /** v2 fix (d), extract.ts: a quote instead of the answer call. Omitted or null: off. */
+  extract?: ExtractRule;
 }
 
 /**
@@ -191,6 +202,8 @@ export function startQuestion(
   if (pastDate !== null && pastDate !== "past_date_v1") {
     throw new Error("unknown past_date rule " + String(pastDate));
   }
+  const extract: ExtractRule = options && options.extract ? options.extract : null;
+  if (extract !== null && extract !== "extract_v1") throw new Error("unknown extract rule " + String(extract));
   if (stripNf !== null && stripNf !== "strip_nf_v1") throw new Error("unknown strip_nf rule " + String(stripNf));
   const trace: Trace = {
     arguments: null,
@@ -274,6 +287,22 @@ export function startQuestion(
     trace.results = results;
     resultCount = results.length;
     if (results.length === 0) return done("not_found", NOT_FOUND_MESSAGE);
+    if (extract !== null) {
+      const found = extractQuote(question, results);
+      const listed = safeResultsList(results);
+      if (found.quote !== null && listed !== null) {
+        let quote = found.quote;
+        let codes: string[] = [];
+        if (pastDate !== null) {
+          const noted = annotatePastDates(quote, [extractSourceText(results[0])], nowMs);
+          if (noted !== quote) {
+            quote = noted;
+            codes = [PAST_DATE_CODE];
+          }
+        }
+        return done("extract", EXTRACT_LABEL + EXTRACT_LABEL_SEPARATOR + quote + ANSWER_LIST_SEPARATOR + listed, codes);
+      }
+    }
     const aPrefix = systemTurn(answerSystem(nowMs));
     const aCase = casePart(answerUserMessage(question, results));
     trace.answerCasePart = aCase;
@@ -373,6 +402,8 @@ export interface AssistantDeps {
   echo?: EchoRule;
   /** v2 fix (c) past_date_v1. Omitted or null: off. */
   pastDate?: PastDateRule;
+  /** v2 fix (d) extract_v1. Omitted or null: off. */
+  extract?: ExtractRule;
 }
 
 export interface AssistantResult extends Outcome {
@@ -409,6 +440,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
       contradiction: deps.contradiction === undefined ? null : deps.contradiction,
       echo: deps.echo === undefined ? null : deps.echo,
       pastDate: deps.pastDate === undefined ? null : deps.pastDate,
+      extract: deps.extract === undefined ? null : deps.extract,
     });
     while (step.kind !== "done") {
       const started = clock();

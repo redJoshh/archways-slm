@@ -124,6 +124,7 @@ ANSWER_LABEL_SEPARATOR = "\n"
 
 PATHS = (
     "answer",  # the guard passed the reply: the reply, then the results list
+    "extract",  # v2 fix (d): a quote from the top result, then the list; no answer call
     "answer_not_found",  # the reply was the not-found sentence: the list only
     "guard_fired",  # the guard rejected the reply: the list only
     "budget_fallback",  # over budget, no answer call: the list only
@@ -609,6 +610,7 @@ def flow(
     contradiction: str | None = None,
     echo: str | None = None,
     past_date: str | None = None,
+    extract: str | None = None,
 ) -> tuple[Outcome, Calls | None, dict | None]:
     """One question through the UAT flow, with every step's result scripted.
 
@@ -632,6 +634,10 @@ def flow(
     past_date: None (off) or "past_date_v1" (v2 fix (c), past_date.py):
     " (already passed)" after past dates in the AI answer (never the
     list); code "past_date" when a note is added.
+    extract: None (off) or "extract_v1" (v2 fix (d), extract.py): right
+    after a search with results, a when/what-time question may take the
+    "extract" path (a quote from the top result, then the list) with no
+    token count, budget or answer call; past_date also notes the quote.
     Returns the outcome, the prompts sent (None if no call was made) and the
     search arguments (None if no search was made).
     """
@@ -651,6 +657,10 @@ def flow(
 
     if past_date not in (None, past_rule.PAST_DATE_V1):
         raise ValueError(f"unknown past_date rule {past_date!r}")
+    from archways_assistant import extract as extract_rule
+
+    if extract not in (None, extract_rule.EXTRACT_V1):
+        raise ValueError(f"unknown extract rule {extract!r}")
     try:
         check_question(question)
     except ContractError:
@@ -680,6 +690,25 @@ def flow(
     count = len(results)
     if not results:
         return Outcome("not_found", NOT_FOUND_MESSAGE, result_count=0), calls, arguments
+    if extract is not None:
+        found = extract_rule.extract(question, results)
+        listed = safe_results_list(results)
+        if found.quote is not None and listed is not None:
+            quote, codes = found.quote, ()
+            if past_date is not None:
+                source = [extract_rule.source_text(results[0])]
+                noted = past_rule.annotate(quote, source, now)
+                if noted != quote:
+                    quote, codes = noted, (past_rule.CODE,)
+            text = (
+                extract_rule.LABEL
+                + extract_rule.LABEL_SEPARATOR
+                + quote
+                + ANSWER_LIST_SEPARATOR
+                + listed
+            )
+            outcome = Outcome("extract", text, codes, None, count)
+            return outcome, calls, arguments
 
     answer_system = fill_prompt(prompts["answer"], now)
     user = answer_user_message(question, results)

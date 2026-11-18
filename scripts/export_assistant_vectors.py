@@ -505,12 +505,41 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
         (s[0], *s[1:5], strip_replies[s[0]], *s[5:]) if s[0] in strip_replies else s
         for s in scripts
     ]
+    scripts = [(*s, None) for s in scripts]
+    # v2 fix (d) extract_v1 (off until kept): only these vectors carry the
+    # "extract" key. The second is the same question with the rule off.
+    dated = [
+        {
+            "id": "70",
+            "title": "Enrollment for the Second Term",
+            "excerpt": "Online enrollment opens on November 20, 2026. The deadline "
+            "for enrollment is December 5, 2026.",
+            "office": "Office of the Registrar",
+            "priority": "NORMAL",
+            "year_level": None,
+            "posted_at": "2026-11-06T09:00:00+08:00",
+        }
+    ]
+    q_when = "When is the enrollment deadline?"
+    query_when = '{"query": "enrollment deadline", "days": 30}'
+    reply_when = "The deadline is December 5, 2026."
+    for id_, rule in (
+        ("extract-quote", "extract_v1"),
+        ("extract-off-same-question", None),
+    ):
+        scripts.append(
+            (id_, q_when, query_when, dated, 150, reply_when, 0, None, None, rule)
+        )
 
     def encode(value):
         return THROWS if value is ERROR else value
 
     out = []
-    for id_, question, query, search, tokens, answer, elapsed, speed, rule in scripts:
+    extract_ids = {s[0] for s in scripts if s[0].startswith("extract-")}
+    for script in scripts:
+        id_, question, query, search, tokens, answer, elapsed, speed, rule, xrule = (
+            script
+        )
         outcome, calls, arguments = flow(
             question,
             now,
@@ -522,9 +551,12 @@ def flow_vectors(rows: list[dict]) -> list[dict]:
             elapsed,
             speed,
             strip_nf=rule,
+            extract=xrule,
         )
         budget = outcome.budget
         extra = {} if id_ not in strip_replies else {"strip_nf": rule}
+        if id_ in extract_ids:
+            extra = {"extract": xrule}
         out.append(
             {
                 "id": id_,
