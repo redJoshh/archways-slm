@@ -19,6 +19,38 @@ Template:
 
 ---
 
+## 2026-11-18: v2 held-out BASELINE (run 1 of 2, by the user); VERIFY OK at `4dd1c45`
+
+- **Date:** 2026-11-18 (+08:00)
+- **Drift check first:** `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` at `4dd1c45`, clean tree, Ollama 0.40.15 → `VERIFY OK` (57/57 identical). Run by Claude Code (`data/local/runs/verify-baseline-4dd1c45.json`, header commit `4dd1c45`, `tree_dirty` false).
+- **Run by the user, once, per protocol.** Settings: `--config shipped`, fixed now 2026-11-17T10:00:00+08:00, commit `4dd1c45`, `tree_dirty` false, Ollama 0.40.15, scorer_v1, and_v4, rank_v1, strip_nf_v1, window_v1.
+- **Held-out file:** SHA-256 `ee9f407af9bd8899c1d247dcee10330dd1d2860b13e3c6f6482c81fd5839173c`, 30 cases. **It matches the hash recorded before any v2 fix.** The v2 final must match it too.
+- **Totals:**
+
+  | Run | | Helpful | AI correct | Unsafe | Traps clean | Traps with an unrelated list | Coverage | Out of scope |
+  |---|---|---|---|---|---|---|---|---|
+  | v2 baseline (`shipped`, `4dd1c45`) | scored | 12/24 | 1/2 | 0/30 | 6/6 | 0/6 | 12/24 | 0 |
+  | v2 baseline | human-reviewed | 12/24 | 1/2 | 0/30 | | | | |
+
+  - Paths: answer 2, answer_not_found 12, not_found 16.
+- **The user's manual review:**
+  - 0 of 1 scored-correct answer disputed.
+  - Human-reviewed unsafe: 0/30.
+  - One AI answer only repeats the question: not unsafe, and not correct.
+- **Finding (user):**
+  - 10 of the 24 answerable cases returned no results. That is a retrieval failure, before the model.
+  - Helpful is 12/24 on this more natural-Taglish set, against 13/16 on the v1 set.
+  - Not acted on beyond the pre-registered plan.
+- **Protocol deviation, recorded:**
+  - The v2 baseline's private report was viewed by the user's external advisor (a chat assistant). Claude Code has not seen the report, the file or any case.
+  - The v2 fix order (a → b → c → e → d → f) and the rules were pre-registered before this run (`docs/plans/v2-improvements.md`, approved 2026-11-17) and stay unchanged.
+  - Nothing from this run, including any vocabulary, is used to design v2 fixes. The Taglish lexicon (e) is built from general language knowledge only.
+- **How it was verified:** docs only, apart from the drift check. The totals and the review are copied from the user's paste.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** drafting `rules10` for (a), for the user to label before any run.
+
+---
+
 ## 2026-11-17: v2 plan approved; v2 held-out protocol recorded; `shipped` config added
 
 - **Date:** 2026-11-17 (+08:00)
