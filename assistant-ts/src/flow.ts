@@ -37,6 +37,7 @@
 
 import { fallback, guard } from "../../guard-ts/src/guard.ts";
 import { CONTRADICTION_CODE, contradictionBlocks, type ContradictionRule } from "./contradiction.ts";
+import { ECHO_CODE, echoBlocks, type EchoRule } from "./echo.ts";
 import { decideBudget, type Budget, type Speed, type SpeedState } from "./budget.ts";
 import {
   ANSWER_LABEL,
@@ -145,6 +146,8 @@ export interface FlowOptions {
   stripNf?: StripNf;
   /** v2 fix (a), contradiction.ts. Omitted or null: off. */
   contradiction?: ContradictionRule;
+  /** v2 fix (b), echo.ts (after contradiction). Omitted or null: off. */
+  echo?: EchoRule;
 }
 
 /**
@@ -179,6 +182,8 @@ export function startQuestion(
   if (contradiction !== null && contradiction !== "contradiction_v1") {
     throw new Error("unknown contradiction rule " + String(contradiction));
   }
+  const echo: EchoRule = options && options.echo ? options.echo : null;
+  if (echo !== null && echo !== "echo_v1") throw new Error("unknown echo rule " + String(echo));
   if (stripNf !== null && stripNf !== "strip_nf_v1") throw new Error("unknown strip_nf rule " + String(stripNf));
   const trace: Trace = {
     arguments: null,
@@ -227,6 +232,9 @@ export function startQuestion(
     if (listed === null) return done("answer_error", LAST_RESORT_MESSAGE);
     if (contradictionBlocks(contradiction, question, guarded.text, results)) {
       return done("guard_fired", listed, guarded.codes.concat([CONTRADICTION_CODE]));
+    }
+    if (echoBlocks(echo, question, guarded.text)) {
+      return done("answer_not_found", listed, guarded.codes.concat([ECHO_CODE]));
     }
     const text = ANSWER_LABEL + ANSWER_LABEL_SEPARATOR + guarded.text + ANSWER_LIST_SEPARATOR + listed;
     return done("answer", text, guarded.codes.slice());
@@ -345,6 +353,8 @@ export interface AssistantDeps {
   stripNf?: StripNf;
   /** v2 fix (a) contradiction_v1. Omitted or null: off. */
   contradiction?: ContradictionRule;
+  /** v2 fix (b) echo_v1. Omitted or null: off. */
+  echo?: EchoRule;
 }
 
 export interface AssistantResult extends Outcome {
@@ -379,6 +389,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
     let step = startQuestion(question, deps.nowMs(), deps.speed ? deps.speed.get() : null, {
       stripNf: deps.stripNf === undefined ? PHONE_STRIP_NF : deps.stripNf,
       contradiction: deps.contradiction === undefined ? null : deps.contradiction,
+      echo: deps.echo === undefined ? null : deps.echo,
     });
     while (step.kind !== "done") {
       const started = clock();

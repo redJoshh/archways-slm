@@ -93,6 +93,13 @@
    "reply": "Uniform rules require Type A polo.",
    "expected": false,
    "why": "new {require, type, polo} = 3 ('a' is a stopword)"
+  },
+  {
+   "name": "E14: plural normalisation decides (added 2026-11-18 after the code: the TS mutation check showed no vector tested it; hand-derived, rule unchanged)",
+   "question": "What are the rules for uniforms and shoes?",
+   "reply": "The rule covers uniform and shoe.",
+   "expected": true,
+   "why": "normalised Q {rule, uniform, shoe}; R {rule, cover, uniform, shoe}; new {cover} = 1. Without the plural step, new = {rule, covers, uniform, shoe} = 4"
   }
  ]
 }

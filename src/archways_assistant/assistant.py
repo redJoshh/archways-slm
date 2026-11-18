@@ -607,6 +607,7 @@ def flow(
     budget: str = "on",
     strip_nf: str | None = None,
     contradiction: str | None = None,
+    echo: str | None = None,
 ) -> tuple[Outcome, Calls | None, dict | None]:
     """One question through the UAT flow, with every step's result scripted.
 
@@ -624,6 +625,9 @@ def flow(
     contradiction: None (off) or "contradiction_v1" (v2 fix (a),
     contradiction.py): a guard-passed reply it fires on takes the
     guard_fired path with code "contradiction" (the list only).
+    echo: None (off) or "echo_v1" (v2 fix (b), echo.py): after
+    contradiction, a guard-passed reply that only restates the question
+    takes the answer_not_found path with code "echo" (the list only).
     Returns the outcome, the prompts sent (None if no call was made) and the
     search arguments (None if no search was made).
     """
@@ -635,6 +639,10 @@ def flow(
 
     if contradiction not in (None, contra.CONTRADICTION_V1):
         raise ValueError(f"unknown contradiction rule {contradiction!r}")
+    from archways_assistant import echo as echo_rule
+
+    if echo not in (None, echo_rule.ECHO_V1):
+        raise ValueError(f"unknown echo rule {echo!r}")
     try:
         check_question(question)
     except ContractError:
@@ -727,6 +735,9 @@ def flow(
     elif contradiction is not None and contra.fires(question, guarded.text, results):
         codes = (*guarded.codes, contra.CODE)
         outcome = Outcome("guard_fired", listed, codes, budget, count)
+    elif echo is not None and echo_rule.is_echo(question, guarded.text):
+        codes = (*guarded.codes, echo_rule.CODE)
+        outcome = Outcome("answer_not_found", listed, codes, budget, count)
     else:
         text = (
             ANSWER_LABEL
