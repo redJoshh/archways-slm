@@ -19,6 +19,43 @@ Template:
 
 ---
 
+## 2026-11-18: v2 fix (c) past_date_v1: pre-registered, built, replayed on top of (a)+(b): passes the keep rule; benefit for the user's review
+
+- **Date:** 2026-11-18 (+08:00)
+- **Pinned by the user before any code:**
+  - notes only in the AI-answer text and (d)'s quotes, never the list
+  - a year-less date only if it resolves to a full date in the cited source
+  - a range is judged by its end, with the note after the whole range
+  - the note goes after the complete date including the year; the guard and scorer must read annotated replies the same way (vectors)
+  - past means strictly before now's date
+  - **Recorded:** the scorer can't measure tense. The targeted benefit (dev: q12, q07) is judged by the user's review; "nothing gets worse" applies to the scored metrics.
+- **Pre-registered** (`4f756b8`, before any code):
+  - The rule (`v2-improvements.md`, "past_date_v1 rule, pre-registered"; named past_date_v1, not the plan's past_note_v1).
+  - **Spans:** exactly the guard's and scorer's own parse (`e2escore.date_scan`, guard-ts `claimsAndRest().spans`); neither frozen module is edited. A span's year is the ISO year, or a trailing 4-digit run.
+  - **Cited source:** every listed result for an AI answer, the quoted row for (d). A year-less date takes a year only if exactly one year is found.
+  - **Ranges:** joined only by to/until/through/thru or a dash.
+  - 20 hand-derived vectors.
+- **Built** (`533861d`, off by default):
+  - Python `past_date.py` + `flow(..., past_date=)`; TS `pastDate.ts` + `FlowOptions.pastDate` / `AssistantDeps.pastDate`; `eval_flow.py --past-date`
+  - **Code:** `past_date` when a note is added; the path stays `answer`
+  - **Invariance on every vector,** Python and TS: `claims(annotated) == claims(original)`, and the guard's fired and codes are equal on both
+- **A vector gap, found and closed (as with echo):**
+  - The first TS mutation check (range joining disabled) **survived**. In every range vector the start date is year-less and unresolvable, so judging each date alone gave the same text.
+  - P21 (a dated past start with a future end: no note) and P22 (a dated past start with a past end: one note after the end) were added, hand-derived, rule unchanged, and marked in the file as added after the code.
+  - The range mutant then fails in TS (1 test) and Python (2 tests). **Other mutation check:** `<` → `<=` for "past" (P3 fails). All restored from copies.
+- **Verified:**
+  - Python 49 past_date tests (22 vectors, 22 invariance checks, flow); Node 322/322; Hermes past_date 22/22, echo 14/14, contradiction 20/20, askAssistant as expected
+  - `uv run pytest -q` → `1499 passed, 2 skipped`; ruff clean
+- **Result** (post replay on top of (a)+(b), no model call; `--nothing-worse --correct-case-by-case` against the (a)+(b) files):
+  - **Only flow13 q12 changes:** "…held on August 7, 2026 (already passed), at the … Parish Church." (now 2026-11-10).
+  - **q07** is answer_not_found in the dev run, so it isn't reached (no AI text to note).
+  - **Scored metrics:** nothing got worse on any set (e2e34, taglish10, flow13, rules10), and no AI-correct was lost.
+  - **The keep rule passes. The targeted benefit (q12's tense) is for the user's review**, as pinned.
+- **Commits:** `4f756b8`, `533861d`, this `docs:` commit. Not pushed.
+- **Open questions / next:** the user's review of q12. Then (e), the Taglish lexicon v1: built from general language knowledge only and frozen before any run.
+
+---
+
 ## 2026-11-18: v2 fix (b) echo_v1: pre-registered, built, replayed on top of (a): KEPT
 
 - **Date:** 2026-11-18 (+08:00)
