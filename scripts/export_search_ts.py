@@ -36,6 +36,7 @@ from archways_assistant.fakebackend import (
     EXCERPT_CHARS,
     SYNONYMS,
     SYNONYMS_V2,
+    SYNONYMS_V3,
     is_word_char,
 )
 
@@ -97,6 +98,9 @@ def render() -> str:
         + ";",
         "export const SYNONYMS_V2: { readonly [word: string]: readonly string[] } = "
         + literal(dict(sorted(SYNONYMS_V2.items())))
+        + ";",
+        "export const SYNONYMS_V3: { readonly [word: string]: readonly string[] } = "
+        + literal(dict(sorted(SYNONYMS_V3.items())))
         + ";",
         "// Code points where Python's str.isspace() is true (query splitting).",
         "export const PY_SPACE: readonly number[] = ["

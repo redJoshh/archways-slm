@@ -774,7 +774,9 @@ def main() -> None:
     parser.add_argument("--compare", nargs=2, type=Path, metavar="RUN")
     parser.add_argument("--rank", choices=["rank_v1"], default=None)
     parser.add_argument("--retry", choices=["retry_v1"], default=None)
-    parser.add_argument("--matcher", choices=["and_v3", "and_v4"], default=MATCHER)
+    parser.add_argument(
+        "--matcher", choices=["and_v3", "and_v4", "and_v5"], default=MATCHER
+    )
     parser.add_argument("--excerpt", choices=["excerpt_v2_centred"], default=None)
     parser.add_argument("--answer-prompt", choices=sorted(ANSWER_PROMPTS), default="v1")
     parser.add_argument("--strip-nf", choices=[assistant.STRIP_NF_V1], default=None)

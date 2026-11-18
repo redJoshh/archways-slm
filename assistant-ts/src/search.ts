@@ -22,14 +22,27 @@
 import { checkArguments } from "./contract.ts";
 import type { Announcement } from "./render.ts";
 import { countCodePoints } from "./plaintext.ts";
-import { DAYS_DEFAULT, LIMIT_DEFAULT, PY_SPACE, STOPWORDS, SYNONYMS, SYNONYMS_V2, WORD_RANGES } from "./searchData.ts";
+import {
+  DAYS_DEFAULT,
+  LIMIT_DEFAULT,
+  PY_SPACE,
+  STOPWORDS,
+  SYNONYMS,
+  SYNONYMS_V2,
+  SYNONYMS_V3,
+  WORD_RANGES,
+} from "./searchData.ts";
 
-/** and_v3, or and_v4 = and_v3's rules with SYNONYMS_V2 (accuracy-phase.md (c)). */
-export type Matcher = "and_v3" | "and_v4";
+/**
+ * and_v3, or and_v4 = and_v3's rules with SYNONYMS_V2 (accuracy-phase.md (c)),
+ * or and_v5 = and_v3's rules with SYNONYMS_V3 (v2 fix (e), the Taglish lexicon v1).
+ */
+export type Matcher = "and_v3" | "and_v4" | "and_v5";
 
 export function synonymsFor(matcher: Matcher): { readonly [word: string]: readonly string[] } {
   if (matcher === "and_v3") return SYNONYMS;
   if (matcher === "and_v4") return SYNONYMS_V2;
+  if (matcher === "and_v5") return SYNONYMS_V3;
   throw new Error("unknown matcher");
 }
 

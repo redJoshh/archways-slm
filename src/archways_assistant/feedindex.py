@@ -143,9 +143,11 @@ def search_feed(
     matcher: str = "and_v3",
     excerpt: str | None = None,
 ) -> list[dict]:
-    """and_v3 (or and_v4) over feed rows; rank "rank_v1" orders by the question."""
-    if matcher not in ("and_v3", "and_v4"):
-        raise ValueError(f"the feed search runs and_v3 or and_v4, not {matcher!r}")
+    """and_v3 (or and_v4, and_v5) over feed rows; rank "rank_v1" orders by the question."""
+    if matcher not in ("and_v3", "and_v4", "and_v5"):
+        raise ValueError(
+            f"the feed search runs and_v3, and_v4 or and_v5, not {matcher!r}"
+        )
     return search_announcements(
         rows,
         arguments,

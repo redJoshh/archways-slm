@@ -149,9 +149,19 @@ if frozenset(_SYNONYM_MAP_V2["extra_stopwords"]) != frozenset(
     _SYNONYM_MAP["extra_stopwords"]
 ):
     raise RuntimeError("synonyms v2 must keep v1's extra stopwords")
-MATCHERS = ("and_v1", "prefix_v2", "and_v2", "and_v3", "and_v4")
+# and_v5 (v2 fix (e), docs/plans/v2-improvements.md): and_v3's rules with
+# synonyms v3 (v2 plus the Taglish lexicon v1); the same extra stopwords.
+_SYNONYM_MAP_V3 = json.loads(
+    (SYNONYMS_PATH.parent / "search_synonyms_v3.json").read_text(encoding="utf-8")
+)
+SYNONYMS_V3: dict[str, list[str]] = _SYNONYM_MAP_V3["synonyms"]
+if frozenset(_SYNONYM_MAP_V3["extra_stopwords"]) != frozenset(
+    _SYNONYM_MAP["extra_stopwords"]
+):
+    raise RuntimeError("synonyms v3 must keep v1's extra stopwords")
+MATCHERS = ("and_v1", "prefix_v2", "and_v2", "and_v3", "and_v4", "and_v5")
 # The matchers that use and_v3's rules, with their synonym maps.
-AND_V3_RULES = {"and_v3": SYNONYMS, "and_v4": SYNONYMS_V2}
+AND_V3_RULES = {"and_v3": SYNONYMS, "and_v4": SYNONYMS_V2, "and_v5": SYNONYMS_V3}
 # and_v2 replaced and_v1 on 2026-10-31, and and_v3 replaced and_v2 on
 # 2026-11-07 (devlog); the older matchers stay for comparisons.
 DEFAULT_MATCHER = "and_v3"
@@ -307,7 +317,7 @@ def search_announcements(
         from archways_assistant import rank as ranking  # rank imports this module
 
         if rank not in ranking.RANKS or matcher not in AND_V3_RULES or question is None:
-            raise ValueError("rank_v1 needs matcher and_v3 or and_v4, and the question")
+            raise ValueError("rank_v1 needs an and_v3-rules matcher, and the question")
         terms = ranking.question_terms(question)
     schema = contract["$defs"]["arguments"]
     errors = [
@@ -374,7 +384,7 @@ def search_announcements(
         from archways_assistant import window
 
         if excerpt not in window.EXCERPTS or matcher not in AND_V3_RULES:
-            raise ValueError("excerpt_v2_centred needs and_v3 or and_v4")
+            raise ValueError("excerpt_v2_centred needs an and_v3-rules matcher")
         if question is None:
             raise ValueError("excerpt_v2_centred needs the question")
         for result, (_, row) in zip(results, matches[:limit], strict=True):

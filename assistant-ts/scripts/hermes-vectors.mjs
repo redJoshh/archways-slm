@@ -29,6 +29,7 @@ const feedVectorsPath = join(root, "..", "tests", "vectors", "feed_vectors.json"
 const rankVectorsPath = join(root, "..", "tests", "vectors", "rank_vectors.json");
 const retryVectorsPath = join(root, "..", "tests", "vectors", "retry_vectors.json");
 const andV4VectorsPath = join(root, "..", "tests", "vectors", "and_v4_vectors.json");
+const andV5VectorsPath = join(root, "..", "tests", "vectors", "and_v5_vectors.json");
 const gateVectorsPath = join(root, "..", "tests", "vectors", "gate_vectors.json");
 const windowVectorsPath = join(root, "..", "tests", "vectors", "window_vectors.json");
 const stripNfVectorsPath = join(root, "..", "tests", "vectors", "strip_nf_vectors.json");
@@ -64,6 +65,11 @@ log("hermes and_v4 vectors: " + andV4Report.passed + "/" + andV4Report.total + "
     andV4Report.failed + " failed");
 for (var a4 = 0; a4 < andV4Report.failures.length; a4++) log("FAIL " + andV4Report.failures[a4]);
 if (andV4Report.failed) { throw new Error("and_v4 vectors failed"); }
+var andV5Report = runAndV5Vectors(AND_V5_VECTORS);
+log("hermes and_v5 vectors: " + andV5Report.passed + "/" + andV5Report.total + " passed, " +
+    andV5Report.failed + " failed");
+for (var a5 = 0; a5 < andV5Report.failures.length; a5++) log("FAIL " + andV5Report.failures[a5]);
+if (andV5Report.failed) { throw new Error("and_v5 vectors failed"); }
 var gateReport = runGateVectors(GATE_VECTORS);
 log("hermes gate vectors: " + gateReport.passed + "/" + gateReport.total + " passed, " +
     gateReport.failed + " failed");
@@ -208,6 +214,7 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "retry.js"],
   ["assistant-ts", "src", "retryVectors.js"],
   ["assistant-ts", "src", "andV4Vectors.js"],
+  ["assistant-ts", "src", "andV5Vectors.js"],
   ["assistant-ts", "src", "gateVectors.js"],
   ["assistant-ts", "src", "window.js"],
   ["assistant-ts", "src", "windowVectors.js"],
@@ -241,6 +248,7 @@ const bundle = [
   "var RANK_VECTORS = " + readFileSync(rankVectorsPath, "utf8").trim() + ";",
   "var RETRY_VECTORS = " + readFileSync(retryVectorsPath, "utf8").trim() + ";",
   "var AND_V4_VECTORS = " + readFileSync(andV4VectorsPath, "utf8").trim() + ";",
+  "var AND_V5_VECTORS = " + readFileSync(andV5VectorsPath, "utf8").trim() + ";",
   "var GATE_VECTORS = " + readFileSync(gateVectorsPath, "utf8").trim() + ";",
   "var WINDOW_VECTORS = " + readFileSync(windowVectorsPath, "utf8").trim() + ";",
   "var STRIP_NF_VECTORS = " + readFileSync(stripNfVectorsPath, "utf8").trim() + ";",
