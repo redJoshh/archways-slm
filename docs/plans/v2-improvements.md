@@ -330,3 +330,48 @@ Written before the checks were run and before any dev run.
   - Keeping (e) was decided at plan approval (section 7.5, "drop (f), then (d); keep (e)"), **before** the v2 baseline ran.
   - The v2 final measures the kept set as a whole, so the lexicon's individual effect **can't be isolated or claimed**.
   - Unlike excerpt_v2_centred (v1), which was inert by design and stays off.
+
+## 2026-11-18: extract_v1 rule, pre-registered (fix (d), on top of (a), (b), (c) and (e))
+
+The rule of section 3 (d), with the user's decisions (section 7.3, 7.5, 7.6), written out exactly. Written before any extract_v1 code, before any (d) vector run, and before looking at which dev cases it would reach. Nothing here is fitted to a dev case.
+
+- **Where it applies:**
+  - in the flow, right after a valid search with at least one result, **before** the token count, the budget and the answer call
+  - **if it fires:** a new path `extract`. No answer call is made (Python: the scripted answer reply and case tokens are ignored; TS: no count or answer step). `budget` is None, `result_count` is the result count.
+  - **if it doesn't:** the normal path (budget, answer call, guard, (a), (b), (c)), unchanged
+  - **off:** nothing changes
+- **Text the rule reads (a deviation from section 3's wording, forced by the flow):** the flow, the phone and Spring results only carry the contract fields. So "the top result's whole plain body" is its **`title` and `excerpt`** (the excerpt is the body's first 500 code points), the same text (a) reads. The top result is `results[0]` (rank_v1's order in every v2 config).
+- **1. Classifier.** Question tokens: `rank.tokens(question.lower())` (runs of and_v3 word characters). A phrase matches when its tokens appear consecutively.
+  - **Time phrases:** `when`, `what time`, `what date`, `what day`, `until when`, `until what time`, `how long`, `kailan`, `hanggang kailan`, `anong oras`, `anong araw`, `anong petsa`, `ilang araw`.
+  - **Entity phrases:** `which`, `who`, `what office`, `ano ang`.
+  - **Classified** when at least one time phrase matches and no entity phrase matches.
+  - Whole tokens only: `whenever`, `what times`, `what days` don't match.
+- **2. The question's terms for (d):** `rank.question_terms(question)` (rank_v1's content words, dates and numbers), with every token of every **matched** time phrase removed from the content words. Dates and numbers are kept.
+  - **Recorded consequence:** every other content word must be in the row, including verbs and fillers that rank_v1 doesn't drop ("does", "magbubukas", "it" as a substring). This makes (d) fire less often; the normal path runs instead. No stopword is added here.
+- **3. Admissible top result.** Both must hold:
+  - the reduced terms have **at least one content word** (a question that is only a time phrase, like "When is it?" reduced to nothing, is not extracted; "it" stays a word)
+  - `rank.points(reduced, title.lower(), excerpt.lower(), SYNONYMS_V3) == reduced.possible`: **every** reduced content word and every date or number anchor is found in `results[0]` by the matcher's one-word test, **always with the v3 map** (the Taglish lexicon (e), as the user ordered), whatever matcher ran the search
+- **4. Sentences** of `results[0]`:
+  - **sentence 0** is the title, stripped of ASCII whitespace (never split)
+  - the excerpt is split into lines at every run of `\n` / `\r`; each line is split after a `.`, `!` or `?` that is followed by one or more ASCII whitespace characters and then an ASCII uppercase letter or digit
+  - **no split** after a period that ends one of `A.Y.`, `No.`, `St.`, `Dr.`, `Mr.`, `Ms.`, `Sr.`, `a.m.`, `p.m.`, `e.g.`, `i.e.`, `vs.` (compared case-insensitively), when the character before the abbreviation is not an ASCII letter (or there is none)
+  - each sentence is stripped of ASCII whitespace; empty ones are dropped; order is kept
+  - **a cut excerpt:** if the excerpt is exactly 500 code points long (`EXCERPT_CHARS`), its last sentence is dropped, because it may be cut mid-sentence
+- **5. Candidates:** sentences with a **date** (any `e2escore.date_scan` span) or a **time**: `(?<![0-9])[0-9]{1,2}(?::[0-9]{2})?[ ]?(?:a\.m\.|p\.m\.|am|pm|nn|noon|mn)(?![a-z0-9])`, case-insensitive, ASCII, on the sentence with the guard's space table applied.
+  - Correction to section 3: its time pattern ended in `\b`, which can't follow `a.m.`'s final period before a space, so "8 a.m. " would not match. The lookahead fixes that; nothing else changes.
+- **6. Pick:** the candidate with the most `rank.points(reduced, sentence.lower(), "", SYNONYMS_V3)`; ties go to the earlier sentence (the title first). No candidate: not extracted.
+- **7. Cut to 300 code points:** a picked sentence of at most 300 code points is the quote as is. A longer one is cut at the last ASCII space at index ≤ 299 that is **not inside** a date span or time match of the sentence; the quote is the text before it, right-stripped, plus `…` (U+2026). No such space, or no date or time left in the cut text: not extracted.
+- **8. Guard:** `guard(quote, results, question, [])` (the same guard as the answer path). If it fires (for example a non-ASCII digit copied from the source), not extracted: the normal path runs.
+- **9. Past dates ((c), user 7.6):** with past_date_v1 on, `annotate(quote, [results[0]'s title + "\n" + excerpt], now)` (the quoted row is the cited source). If a note is added, the code `past_date` is added.
+- **Output:** path `extract`, text = `From the announcement below:` + `\n` + the (noted) quote + `\n\n` + the results list (`RESULTS_HEADER` and the same lines as every other path). Codes: `past_date` or none.
+  - The quote has **no added quote marks**. The label is never "AI answer" (user 7.3).
+  - Interaction: (a) contradiction_v1 and (b) echo_v1 apply to the model's answer only, so never to an extract.
+- **Scoring (user 7.3; scorer_v1 stays frozen):**
+  - `eval_flow.py` scores an `extract` outcome **exactly as an `answer`**: it hands scorer_v1 the path `answer` and the text with the extract label replaced by the answer label, so the quote is "the AI answer" for every scorer_v1 rule (must_include, must_not_include, wrong claims, unsupported, wrong row, stale, entity; a trap's extract is never correct and not clean).
+  - The saved outcome keeps the path `extract`. Reports add **"extract correct"** (correct cases on the `extract` path) and name the combined metric **"answer correct (AI + extract)"**. The keep rule is the usual "nothing gets worse" on that combined metric, case by case.
+- **Replay (rule 5):** (d) needs no model call. `--post-replay` re-runs every saved case of `strip_nf-1.json` and `rules10-shipped.json` through the flow with the kept set ((a), (b), (c), and_v5) and `--extract extract_v1`. A case that extracts doesn't use its saved answer reply.
+- **Recorded risks (section 3):**
+  - the quote is the wrong date of a several-date row (unsafe, and visible in the replay)
+  - a correct AI answer replaced by a less specific quote (loses answer-correct)
+  - the verb/filler consequence above (fewer extracts, no harm)
+- **Vectors:** `tests/vectors/extract_vectors.json`, hand-written before any code: the classifier, the reduced words, the sentences, the pick, the cut, the guard, the past-date note, and the full flow text.

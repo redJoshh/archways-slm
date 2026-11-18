@@ -1,0 +1,847 @@
+{
+ "$comment": "extract_v1 vectors, HAND-WRITTEN 2026-11-18 before any extract_v1 code or run (docs/plans/v2-improvements.md, 'extract_v1 rule, pre-registered'). Per case: 'classified' (step 1); 'words' = the reduced content words (step 2, null if not classified); 'admissible' (step 3); 'sentences' = every sentence in order, title first, without a cut excerpt's dropped last sentence (step 4, null if not admissible); 'guard_fired' (step 8); 'quote' = the final quote after (c)'s note (null: no extract, the normal path runs); 'codes' = the extract outcome's codes. The flow text is LABEL + '\\n' + quote + '\\n\\n' + the results list. Run with past_date_v1 on. Never regenerate from the implementation.",
+ "format": "archways extract vectors v1",
+ "rule": "extract_v1",
+ "label": "From the announcement below:",
+ "cases": [
+  {
+   "name": "X1: an English when-question; the sentence with both words wins",
+   "question": "When is the enrollment deadline?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Enrollment for the Second Term",
+     "excerpt": "Online enrollment opens on November 20, 2026. The deadline for enrollment is December 5, 2026. Late enrollees pay a fee.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    },
+    {
+     "id": "r2",
+     "title": "Library Hours",
+     "excerpt": "The library is open from 7:00 a.m. to 8:00 p.m.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "enrollment",
+    "deadline"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Enrollment for the Second Term",
+    "Online enrollment opens on November 20, 2026.",
+    "The deadline for enrollment is December 5, 2026.",
+    "Late enrollees pay a fee."
+   ],
+   "guard_fired": false,
+   "quote": "The deadline for enrollment is December 5, 2026.",
+   "codes": []
+  },
+  {
+   "name": "X2: a past date in the quote gets (c)'s note, cited source = the quoted row",
+   "question": "When is the Misa de Apertura?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Misa de Apertura",
+     "excerpt": "The Misa de Apertura is held on August 7, 2026 at the UST Church. All students are invited.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "misa",
+    "de",
+    "apertura"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Misa de Apertura",
+    "The Misa de Apertura is held on August 7, 2026 at the UST Church.",
+    "All students are invited."
+   ],
+   "guard_fired": false,
+   "quote": "The Misa de Apertura is held on August 7, 2026 (already passed) at the UST Church.",
+   "codes": [
+    "past_date"
+   ]
+  },
+  {
+   "name": "X3: Taglish words found through the v3 lexicon (bayad, matrikula)",
+   "question": "Kailan ang bayad ng matrikula?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Tuition Payment Schedule",
+     "excerpt": "Payment of tuition for the second term is due on January 9, 2027. Pay at the Cashier.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "bayad",
+    "matrikula"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Tuition Payment Schedule",
+    "Payment of tuition for the second term is due on January 9, 2027.",
+    "Pay at the Cashier."
+   ],
+   "guard_fired": false,
+   "quote": "Payment of tuition for the second term is due on January 9, 2027.",
+   "codes": []
+  },
+  {
+   "name": "X4: a content word missing from the top result: not admissible",
+   "question": "Kailan ang bayad ng matrikula?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Library Hours",
+     "excerpt": "The library opens at 8:00 a.m. on November 20, 2026.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "bayad",
+    "matrikula"
+   ],
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X5: the taglish-09 safeguard: pangalawang is not in a first-term row",
+   "question": "Kailan ang pasok sa pangalawang semestre?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "First Term Class Schedule",
+     "excerpt": "Classes for the first semester start on August 3, 2026.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "pasok",
+    "pangalawang",
+    "semestre"
+   ],
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X6: 'which' is an entity question: not classified",
+   "question": "Which office handles enrollment and when?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Enrollment",
+     "excerpt": "Enrollment opens on November 20, 2026.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": false,
+   "words": null,
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X7: 'who' is an entity question: not classified",
+   "question": "Who do I ask about the deadline and when?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Deadline",
+     "excerpt": "The deadline is November 20, 2026.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": false,
+   "words": null,
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X8: 'ano ang' with 'kailan': not classified",
+   "question": "Ano ang oras at kailan ang misa?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Misa",
+     "excerpt": "The Mass is on November 20, 2026 at 6:00 p.m.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": false,
+   "words": null,
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X9: 'what office' with 'what time': not classified",
+   "question": "What office and what time for the ID release?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "ID Release",
+     "excerpt": "IDs are released on November 20, 2026 at 9:00 a.m.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": false,
+   "words": null,
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X10: no time phrase: not classified",
+   "question": "Where is the registrar?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Registrar",
+     "excerpt": "The Office of the Registrar is at the Main Building.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": false,
+   "words": null,
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X11: whole tokens only: 'whenever' is not 'when'",
+   "question": "Whenever it rains, are classes suspended?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Class Suspension",
+     "excerpt": "Classes are suspended on November 20, 2026.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": false,
+   "words": null,
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X12: a question that is only a time phrase has no content word left",
+   "question": "What time?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Library Hours",
+     "excerpt": "The library opens at 8:00 a.m.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [],
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X13: anong oras removed; aklatan found as library; a.m./p.m. don't split",
+   "question": "Anong oras ang aklatan?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Library Hours",
+     "excerpt": "The Miguel de Benavides Library is open from 7:00 a.m. to 8:00 p.m. on weekdays. It is closed on Sundays.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "aklatan"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Library Hours",
+    "The Miguel de Benavides Library is open from 7:00 a.m. to 8:00 p.m. on weekdays.",
+    "It is closed on Sundays."
+   ],
+   "guard_fired": false,
+   "quote": "The Miguel de Benavides Library is open from 7:00 a.m. to 8:00 p.m. on weekdays.",
+   "codes": []
+  },
+  {
+   "name": "X14: the recorded consequence: 'does' is a content word not in the row",
+   "question": "What time does the fair open?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Career Fair",
+     "excerpt": "Doors open at 8 a.m. on November 25, 2026.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "does",
+    "fair",
+    "open"
+   ],
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X15: 'a.m.' before an uppercase word does not split; the dated sentence wins",
+   "question": "When is the career fair?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Career Fair 2026",
+     "excerpt": "Doors open at 8 a.m. Students must bring their IDs. The career fair is on November 25, 2026 at the Quadricentennial Pavilion.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "career",
+    "fair"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Career Fair 2026",
+    "Doors open at 8 a.m. Students must bring their IDs.",
+    "The career fair is on November 25, 2026 at the Quadricentennial Pavilion."
+   ],
+   "guard_fired": false,
+   "quote": "The career fair is on November 25, 2026 at the Quadricentennial Pavilion.",
+   "codes": []
+  },
+  {
+   "name": "X16: a tie goes to the earlier sentence",
+   "question": "When is the blood drive?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Blood Drive",
+     "excerpt": "The blood drive starts on November 24, 2026. The blood drive ends on November 26, 2026.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "blood",
+    "drive"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Blood Drive",
+    "The blood drive starts on November 24, 2026.",
+    "The blood drive ends on November 26, 2026."
+   ],
+   "guard_fired": false,
+   "quote": "The blood drive starts on November 24, 2026.",
+   "codes": []
+  },
+  {
+   "name": "X17: the title (sentence 0) can be the quote",
+   "question": "When is the Paskuhan concert?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Paskuhan Concert on December 18, 2026",
+     "excerpt": "Join the Thomasian community for the Paskuhan concert. Gates open at 5:00 p.m.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "paskuhan",
+    "concert"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Paskuhan Concert on December 18, 2026",
+    "Join the Thomasian community for the Paskuhan concert.",
+    "Gates open at 5:00 p.m."
+   ],
+   "guard_fired": false,
+   "quote": "Paskuhan Concert on December 18, 2026",
+   "codes": []
+  },
+  {
+   "name": "X18: a 500-code-point excerpt drops its last (cut) sentence",
+   "question": "When is the thesis defense?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Thesis Defense Schedule",
+     "excerpt": "Panels are announced on November 30, 2026. Students must submit their final manuscripts to the department office before the panels are announced. Students must submit their final manuscripts to the department office before the panels are announced. Students must submit their final manuscripts to the department office before the panels are announced. The thesis defense is on December 2, 2026 in the Albertus Magnus Building, Room 401, for all graduating students of the program and their advisers w",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "thesis",
+    "defense"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Thesis Defense Schedule",
+    "Panels are announced on November 30, 2026.",
+    "Students must submit their final manuscripts to the department office before the panels are announced.",
+    "Students must submit their final manuscripts to the department office before the panels are announced.",
+    "Students must submit their final manuscripts to the department office before the panels are announced."
+   ],
+   "guard_fired": false,
+   "quote": "Panels are announced on November 30, 2026.",
+   "codes": []
+  },
+  {
+   "name": "X19: a long sentence is cut before a date span that holds the last space <= 299",
+   "question": "When is the general assembly?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "General Assembly",
+     "excerpt": "The general assembly of all student organizations is on November 30, 2026, and every organization must send its president, its secretary and its treasurer, who will present the annual report of the organization to the council, answer questions from members, and join the closing rite on December 15, 2026 at the Plaza Mayor.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "general",
+    "assembly"
+   ],
+   "admissible": true,
+   "sentences": [
+    "General Assembly",
+    "The general assembly of all student organizations is on November 30, 2026, and every organization must send its president, its secretary and its treasurer, who will present the annual report of the organization to the council, answer questions from members, and join the closing rite on December 15, 2026 at the Plaza Mayor."
+   ],
+   "guard_fired": false,
+   "quote": "The general assembly of all student organizations is on November 30, 2026, and every organization must send its president, its secretary and its treasurer, who will present the annual report of the organization to the council, answer questions from members, and join the closing rite on…",
+   "codes": []
+  },
+  {
+   "name": "X20: the cut leaves no date or time: no extract",
+   "question": "When is the closing program?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Closing Program",
+     "excerpt": "Every organization must send its president, its secretary and its treasurer, who will present the annual report of the organization to the council and answer questions from the members of the council, the faculty advisers and the student body, and after that the whole assembly will join the closing program on December 15, 2026 at the Plaza Mayor.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "closing",
+    "program"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Closing Program",
+    "Every organization must send its president, its secretary and its treasurer, who will present the annual report of the organization to the council and answer questions from the members of the council, the faculty advisers and the student body, and after that the whole assembly will join the closing program on December 15, 2026 at the Plaza Mayor."
+   ],
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X21: the guard fires on a non-ASCII digit copied from the source: no extract",
+   "question": "When is the orientation?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Freshman Orientation",
+     "excerpt": "The orientation is on November 25, 2026 in Room ٣.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "orientation"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Freshman Orientation",
+    "The orientation is on November 25, 2026 in Room ٣."
+   ],
+   "guard_fired": true,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X22: lines are split at newlines",
+   "question": "When is the retreat?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Junior Retreat",
+     "excerpt": "Schedule of the retreat\nDate: November 28, 2026\nVenue: Thomas Aquinas Research Complex",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "retreat"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Junior Retreat",
+    "Schedule of the retreat",
+    "Date: November 28, 2026",
+    "Venue: Thomas Aquinas Research Complex"
+   ],
+   "guard_fired": false,
+   "quote": "Date: November 28, 2026",
+   "codes": []
+  },
+  {
+   "name": "X23: the question's date anchor must be in the row (found)",
+   "question": "What time is the Mass on December 8?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Feast of the Immaculate Conception",
+     "excerpt": "The Mass is on December 8, 2026 at 12:00 nn at the UST Church.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "mass"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Feast of the Immaculate Conception",
+    "The Mass is on December 8, 2026 at 12:00 nn at the UST Church."
+   ],
+   "guard_fired": false,
+   "quote": "The Mass is on December 8, 2026 at 12:00 nn at the UST Church.",
+   "codes": []
+  },
+  {
+   "name": "X24: the question's date anchor must be in the row (missing)",
+   "question": "What time is the Mass on December 8?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Feast",
+     "excerpt": "The Mass is on December 9, 2026 at 12:00 nn.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "mass"
+   ],
+   "admissible": false,
+   "sentences": null,
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  },
+  {
+   "name": "X25: the time pattern: '12 amenities' is not a time, '7AM' is",
+   "question": "What time is the cleanup?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Cleanup Drive",
+     "excerpt": "Bring gloves to Room 12 amenities area for the cleanup. The cleanup starts at 7AM sharp.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "cleanup"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Cleanup Drive",
+    "Bring gloves to Room 12 amenities area for the cleanup.",
+    "The cleanup starts at 7AM sharp."
+   ],
+   "guard_fired": false,
+   "quote": "The cleanup starts at 7AM sharp.",
+   "codes": []
+  },
+  {
+   "name": "X26: ilang araw removed; bakasyon found as vacation; a future range, no note",
+   "question": "Ilang araw ang bakasyon?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Christmas Vacation",
+     "excerpt": "The Christmas vacation is from December 20, 2026 to January 3, 2027. Classes resume on January 4, 2027.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "bakasyon"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Christmas Vacation",
+    "The Christmas vacation is from December 20, 2026 to January 3, 2027.",
+    "Classes resume on January 4, 2027."
+   ],
+   "guard_fired": false,
+   "quote": "The Christmas vacation is from December 20, 2026 to January 3, 2027.",
+   "codes": []
+  },
+  {
+   "name": "X27: a past range: one note after the end date",
+   "question": "Ilang araw ang bakasyon?",
+   "now": "2027-01-10T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Christmas Vacation",
+     "excerpt": "The Christmas vacation is from December 20, 2026 to January 3, 2027. Classes resume on January 4, 2027.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "bakasyon"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Christmas Vacation",
+    "The Christmas vacation is from December 20, 2026 to January 3, 2027.",
+    "Classes resume on January 4, 2027."
+   ],
+   "guard_fired": false,
+   "quote": "The Christmas vacation is from December 20, 2026 to January 3, 2027 (already passed).",
+   "codes": [
+    "past_date"
+   ]
+  },
+  {
+   "name": "X28: 'until what time' (and 'what time' inside it) removed",
+   "question": "Until what time is the cashier open?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Cashier Hours",
+     "excerpt": "The Cashier is open until 4:00 p.m. on weekdays.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "cashier",
+    "open"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Cashier Hours",
+    "The Cashier is open until 4:00 p.m. on weekdays."
+   ],
+   "guard_fired": false,
+   "quote": "The Cashier is open until 4:00 p.m. on weekdays.",
+   "codes": []
+  },
+  {
+   "name": "X29: hanggang kailan removed; pagpapatala found as enrollment",
+   "question": "Hanggang kailan ang pagpapatala?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Enrollment Period",
+     "excerpt": "Enrollment runs until November 30, 2026.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "pagpapatala"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Enrollment Period",
+    "Enrollment runs until November 30, 2026."
+   ],
+   "guard_fired": false,
+   "quote": "Enrollment runs until November 30, 2026.",
+   "codes": []
+  },
+  {
+   "name": "X30: admissible, but no sentence has a date or time: no extract",
+   "question": "When is the career talk?",
+   "now": "2026-11-18T10:00:00+08:00",
+   "results": [
+    {
+     "id": "r1",
+     "title": "Career Talk",
+     "excerpt": "The career talk will be announced soon.",
+     "office": "Office of the Registrar",
+     "priority": "normal",
+     "year_level": null,
+     "posted_at": "2026-11-06T09:00:00+08:00"
+    }
+   ],
+   "classified": true,
+   "words": [
+    "career",
+    "talk"
+   ],
+   "admissible": true,
+   "sentences": [
+    "Career Talk",
+    "The career talk will be announced soon."
+   ],
+   "guard_fired": false,
+   "quote": null,
+   "codes": []
+  }
+ ]
+}
