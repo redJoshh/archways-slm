@@ -334,3 +334,22 @@ def test_scorer_v1_is_frozen():
     data = (ROOT / "src" / "archways_assistant" / "evalflow.py").read_bytes()
     digest = hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
     assert digest == SCORER_V1_SHA256, "scorer_v1 is frozen; a change is scorer_v2"
+
+
+def test_rules10_is_a_named_set_outside_the_default_and_the_drift_check():
+    import importlib.util
+    import sys
+
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    sys.path.insert(0, str(scripts))
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "eval_flow", scripts / "eval_flow.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(scripts))
+    assert module.DEFAULT_SETS == ("e2e34", "taglish10", "flow13")
+    assert module.SETS["rules10"][1] == "snapshot"
+    assert module.SETS["rules10"][0].name == "rules_cases.jsonl"

@@ -100,7 +100,13 @@ SETS = {
     "e2e34": (ROOT / "evals" / "e2e_cases.jsonl", "seed"),
     "taglish10": (ROOT / "evals" / "taglish_cases.jsonl", "seed"),
     "flow13": (LOCAL / "flow_cases.jsonl", "snapshot"),
+    # v2 fix (a)'s dev set (docs/plans/v2-improvements.md): drafted from the
+    # snapshot, labelled by the user 2026-11-18, SHA-256 in the devlog.
+    "rules10": (LOCAL / "rules_cases.jsonl", "snapshot"),
 }
+# The v1 dev sets: the default, and what --verify-baseline replays
+# (baseline-1.json has exactly these). rules10 runs only when named.
+DEFAULT_SETS = ("e2e34", "taglish10", "flow13")
 QUERY_N_PREDICT = 64  # assistant-ts N_PREDICT.query
 MATCHER = "and_v3"  # feedindex.search_feed
 BASE_OPTIONS = {
@@ -668,7 +674,7 @@ def gate_apply(run_path: Path, p: int, q: int, out: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path)
-    parser.add_argument("--sets", default=",".join(SETS))
+    parser.add_argument("--sets", default=",".join(DEFAULT_SETS))
     parser.add_argument("--ids", default="")
     parser.add_argument("--model", default="qwen3:0.6b")
     parser.add_argument("--compare", nargs=2, type=Path, metavar="RUN")
@@ -765,7 +771,7 @@ def main() -> None:
             or args.reuse_queries is not None
         ):
             parser.error("--verify-baseline runs the baseline configuration only")
-        if args.sets != ",".join(SETS) or args.ids:
+        if args.sets != ",".join(DEFAULT_SETS) or args.ids:
             parser.error("--verify-baseline runs every case of every dev set")
         args.reuse_queries = args.verify_baseline
     out = args.out.resolve()

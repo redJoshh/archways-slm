@@ -19,6 +19,31 @@ Template:
 
 ---
 
+## 2026-11-18: `rules10` labelled by the user; hash recorded; added as a named dev set
+
+- **Date:** 2026-11-18 (+08:00)
+- **Labels (user):** confirmed as drafted. r10 is a conditional yes (verified alumni with a special pass). r05–r07 are kept, because they document the check's limited reach.
+- **Phrase lists tightened (user;** case-insensitive substrings, scorer_v1):
+  - **r01–r04, r07:** `must_include` any of [prohibited, not allowed, bawal, not permitted]; `must_not_include` [`yes,`, is allowed, are allowed to, encouraged].
+  - **r05:** `must_include` any of [only, over the, Type A polo]; `must_not_include` [`yes,`, is allowed, are allowed to].
+  - **r06:** `must_include` any of [accredited, reserved]; `must_not_include` [`yes,`, any student, anyone can].
+  - **r08:** `must_include` any of [allowed, permitted]; no `must_not_include` (checked by hand).
+  - **r09:** `must_include` any of [encouraged, bring your own, reusable]; `must_not_include` [prohibited, not allowed].
+  - **r10:** `must_include` any of [verified, pass]; `must_not_include` [not allowed, prohibited].
+- **Provenance (user):**
+  - r01 and r03 were inspired by **closed v1** held-out questions.
+  - No `rules10` case uses a row from the open v2 set. This is the user's statement: Claude Code has not seen the v2 file.
+- **Finding (recorded):** only snapshot rows 19 and 29 use (a)'s prohibition words.
+- **`data/local/rules_cases.jsonl` SHA-256:** `d9862d6962c42f9642d3e52483a0cc3e562b4083137c861a65db84e82c9b5b26` (10 cases; loads with `load_cases`). It is frozen from here; a change is a new file.
+- **`eval_flow.py`:**
+  - `rules10` added to `SETS`, but **outside `DEFAULT_SETS`** (e2e34, taglish10, flow13). The default runs and `--verify-baseline` stay exactly as before, because `baseline-1.json` has only those three. `rules10` runs only when named (`--sets rules10`).
+  - A test pins this.
+- **How it was verified:** `uv run pytest -q` → `1405 passed, 2 skipped`; ruff clean.
+- **Commits:** this commit. Not pushed.
+- **Next:** the `shipped` baseline on `rules10`, then the pre-registered admissibility rule for (a).
+
+---
+
 ## 2026-11-18: `rules10` drafted for fix (a) (awaiting the user's labels; no run)
 
 - **Date:** 2026-11-18 (+08:00)
