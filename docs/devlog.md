@@ -19,6 +19,53 @@ Template:
 
 ---
 
+## 2026-11-18: v2 fix (d) extract_v1 pre-registered, built and replayed: 12 dev extracts, all correct; nothing gets worse (+1 answer correct)
+
+- **Date:** 2026-11-18 (+08:00)
+- **Pre-registered** (`041fa02`, before any code or dev run): the rule in `docs/plans/v2-improvements.md` ("extract_v1 rule, pre-registered") and 30 hand-written vectors in `tests/vectors/extract_vectors.json`.
+  - **Classifier:** the plan's time phrases and entity phrases, as whole consecutive tokens.
+  - **Admissibility:** rank_v1's question terms without the matched time-phrase tokens. Every word and anchor must be in `results[0]`, always with the v3 map (the (e) lexicon, as the user ordered).
+  - **Picker:** sentences of the title and the excerpt; the abbreviation list; the last sentence of a 500-code-point excerpt is dropped.
+  - **Cut:** 300 code points, never inside a date or time span.
+  - **Guard:** the guard must pass the quote.
+  - **(c)'s note:** the cited source is the quoted row.
+  - **Scoring:** as an answer (user 7.3), with "extract correct" reported separately.
+  - **Two deviations from the plan's wording, fixed before any code:**
+    - the rule reads `title` + `excerpt`, because the flow, the phone and Spring have no other body text (the same text (a) reads)
+    - the plan's time pattern ended in ``, which can't match "8 a.m. " (no word boundary after the final period), so a lookahead replaces it
+  - **Recorded consequence:** content words that rank_v1 doesn't drop (for example "does") must be in the row, so (d) fires less often. No stopword was added.
+- **Built** (`c562bac`):
+  - **Python:** `extract.py`, and in `assistant.flow(extract=...)` a new path `extract` right after a search with results: no token count, budget or answer call; `budget` None.
+  - **TS:** `extract.ts`, and in flow.ts `FlowOptions.extract` / `AssistantDeps.extract` (no count or answer step).
+  - **Lengths:** in code points in both. The time pattern's lookbehind is a scan in TS, for Hermes.
+  - **Harness:**
+    - `eval_flow.py --extract`, also in `--post-replay`. `score_outcome` hands frozen scorer_v1 the extract as an answer (label swapped) and keeps the path.
+    - `format_extract` prints "extract correct" and names ai_correct "answer correct (AI + extract)".
+    - `eval_heldout.py` uses the same adapter (no change for existing configs).
+  - **Generated parity vectors:** two flow vectors carry an `extract` key (on and off).
+- **How it was verified:**
+  - **Python:** `uv run pytest -q` → `1594 passed, 2 skipped`; ruff clean; all generators `--check` up to date.
+  - **TS:** Node 333/333; Hermes extract 30/30 and assistant 254/254.
+  - **Mutation checks,** each restored afterwards:
+    - **Python, 12 mutants, all caught:** abbreviations off, ties go to the later sentence, no cut-excerpt drop, the cut ignores spans, the v2 map, phrase tokens kept, entity check off, the plan's `` time pattern, no guard, no newline split, anchors ignored.
+    - **TS, 8 compiling mutants, all caught by a failing vector test.**
+  - **Replay** (no model call), on the kept (a)+(b)+(c) replays. The modified harness first reproduces `strip_nf-1-abc.json` and `rules10-shipped-abc.json` exactly.
+    - `eval_flow.py --post-replay ... --contradiction contradiction_v1 --echo echo_v1 --past-date past_date_v1 --extract extract_v1` → `strip_nf-1-abcd.json`, `rules10-shipped-abcd.json`
+    - **12 extracts, extract correct 12/12:** e2e34 7, taglish10 3, flow13 2. None on rules10, and no trap.
+  - `--nothing-worse ... --correct-case-by-case` → `RESULT: nothing got worse` on every set:
+    - e2e34: helpful 22 → 22, answer correct 18 → 18
+    - **taglish10: helpful 5 → 5, answer correct 3 → 4** (taglish-01: answer_not_found → a correct extract)
+    - flow13: 12 → 12, 6 → 6
+    - rules10: unchanged
+    - no new unsafe, no correct case lost, all 14 traps clean and unchanged
+  - **Wrong-date risk, read case by case:** every quote has the same date (and time) as the earlier AI answer, or for taglish-01 the right window. No quote picked another date of a several-date row.
+  - **Phone budget benefit (not scored):** 12 of 57 dev cases make no answer call.
+- **Result:** passes the keep rule, with +1 answer correct. **Kept, pending the user's review of flow13 q12 and q13** (snapshot text, not reproduced here; in `data/local/runs/strip_nf-1-abcd.json`), as for (c).
+- **Commits:** `041fa02`, `c562bac`, this `docs:` commit. Not pushed.
+- **Open questions / next:** the user's review of q12/q13; then (f) answer prompt v5 (pre-registered first); then the pre-freeze full cold dev run of the kept set.
+
+---
+
 ## 2026-11-18: v2 fix (e) taglish_lexicon_v1 / and_v5 KEPT ON (user decision)
 
 - **Date:** 2026-11-18 (+08:00)

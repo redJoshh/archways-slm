@@ -375,3 +375,9 @@ The rule of section 3 (d), with the user's decisions (section 7.3, 7.5, 7.6), wr
   - a correct AI answer replaced by a less specific quote (loses answer-correct)
   - the verb/filler consequence above (fewer extracts, no harm)
 - **Vectors:** `tests/vectors/extract_vectors.json`, hand-written before any code: the classifier, the reduced words, the sentences, the pick, the cut, the guard, the past-date note, and the full flow text.
+- **Built** (`c562bac`) and replayed (2026-11-18), on top of the kept (a)+(b)+(c) replay (`strip_nf-1-abc.json`, `rules10-shipped-abc.json`; the modified harness reproduces both exactly first):
+  - 12 dev cases take the `extract` path, **all 12 extract-correct**: e2e34 7, taglish10 3, flow13 2 (q12, q13); none on rules10; no trap.
+  - "Nothing gets worse", case by case: e2e34 22 → 22 helpful, answer correct 18 → 18; **taglish10 answer correct 3 → 4** (taglish-01: answer_not_found → a correct extract); flow13 12 → 12, 6 → 6; rules10 unchanged; no new unsafe; no AI-correct case lost; every trap clean and unchanged.
+  - Read case by case (the recorded wrong-date risk): every quote has the same date (and time) as the earlier AI answer, or for taglish-01 the right window. No quote picked another date of a several-date row.
+  - **Result: passes the keep rule (+1 answer correct). KEPT, pending the user's review of the two snapshot quotes (flow13 q12 and q13)**, as for (c), since they are snapshot text.
+- **Deviations from section 3, all written into the pre-registration before any code:** the text read is `title` + `excerpt` (the flow has no other body text), and the time pattern ends in a lookahead instead of `\b`.
