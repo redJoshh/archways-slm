@@ -19,6 +19,44 @@ Template:
 
 ---
 
+## 2026-11-18: v2 fix (e) Taglish lexicon v1: pre-registered, checked, frozen (98 terms); vectors written; no dev run yet
+
+- **Date:** 2026-11-18 (+08:00)
+- **Pinned by the user before any run:**
+  - collision checks against an English word list AND the snapshot vocabulary
+  - drop terms whose expansion would match unrelated announcements, and terms that are a month or a common English word ("may")
+  - decide the scope (matcher only, or also rank_v1) before any run
+  - 50–100 terms, frozen with the hash in the devlog, committed before any run; vectors first; Python + TS parity; all dev sets under "nothing gets worse"
+- **Pre-registered** (`dbb1796`, before running the checks):
+  - **The rule** (`v2-improvements.md`, "taglish_lexicon_v1 rule, pre-registered"): checks C1–C8.
+    - C1: key shape
+    - C2: English word list and months, incl. "may"
+    - C3: no v2 key or stopword
+    - C4: the key never occurs inside a longer corpus token
+    - C5: an expansion only at a token start, with suffixes s/es/d/ed/ing/er/ers
+    - C6: an expansion in more than 25% of snapshot rows is removed
+    - C7: a term with no expansion left is dropped
+    - C8: at most 100 kept, stop if fewer than 50
+  - **The candidates:** 119 terms written from general language knowledge only (`contracts/taglish_lexicon_candidates_v1.json`). No dev Taglish case, held-out file or report, or snapshot text was consulted to write them.
+  - **The check script:** `scripts/build_taglish_lexicon.py`.
+  - **Scope, decided before any run: both the matcher and rank_v1.** rank_v1 is pre-registered as "found by the matcher's one-word test" with the active matcher's synonyms, as and_v4 did. Matcher-only would need a new rank version.
+- **The English word list:** dwyl `english-words` `words_alpha.txt` (public domain), downloaded to `data/local/wordlists/` (gitignored), 370,105 words, SHA-256 `3ed0c94610d8bcf7c11bbb49c56aa49c7234d32b66824df91f554169e572da48`. The script refuses any other hash.
+- **Checks run → 98 terms kept** (21 of 119 dropped):
+  - **C2 (in the English word list):** marka, ulan, deposito, libre, termino, tubig, balita.
+  - **C4 (key inside a longer corpus word):** baha, ospital.
+  - **C7 (no expansion left):**
+    - over the 25% cap (C6): unibersidad (university, 21/53 rows), estudyante (student, 34/53)
+    - expansions only ever inside other words (C5): iskolar, kaganapan, tanggapan, opisina, misa, pamasahe, buhok, pormularyo, dokumento, sayaw
+  - **Expansions removed, term kept:** e.g. "exam" (inside "examination"), "fee" and "aid" (shorter than 4), "class" for pasukan, "break", "show".
+- **Frozen:** `contracts/search_synonyms_v3.json` = v2's map + the 98 terms, matcher and_v5. **SHA-256 `06f9e96425c5a692c2099f8ca68a763cf3519e4009b9b55cf071129a8de8d12b`.** `build_taglish_lexicon.py --check` reports it up to date.
+- **Vectors:** `tests/vectors/and_v5_vectors.json`, 10 hand-derived cases on synthetic rows, written after the checks and before any code or dev run.
+  - Each case gives the ids and rank_v1 points under and_v5 and under and_v4.
+  - T7 and T8 pin the scope (Taglish question words add rank points and change the order). T9 pins a dropped term; T10 a v2 entry.
+- **Commits:** `dbb1796`, this commit (frozen v3 map + vectors). Not pushed.
+- **Next:** wiring and_v5 into Python and TS, then the retrieval replay and the dev runs on top of (a)+(b)+(c).
+
+---
+
 ## 2026-11-18: v2 fix (c) past_date_v1: KEPT (the user's review of q12)
 
 - **Date:** 2026-11-18 (+08:00)

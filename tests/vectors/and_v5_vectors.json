@@ -1,0 +1,100 @@
+{
+ "$comment": "and_v5 parity vectors, HAND-WRITTEN 2026-11-18 after the lexicon checks and before any and_v5 code or dev run (docs/plans/v2-improvements.md, 'taglish_lexicon_v1 rule, pre-registered'). Expected ids and rank_v1 points worked out by hand under and_v5 (search_synonyms_v3) and and_v4 (v2). Synthetic rows only. T7 and T8 pin the scope decision: the lexicon also applies to rank_v1's question-overlap points. Never regenerate from the implementation.",
+ "format": "archways and_v5 vectors v1",
+ "matcher": "and_v5",
+ "synonyms": "search_synonyms_v3",
+ "synonyms_sha256": "06f9e96425c5a692c2099f8ca68a763cf3519e4009b9b55cf071129a8de8d12b",
+ "rank": "rank_v1",
+ "now": "2026-11-10T10:00:00+08:00",
+ "details": [
+  {"id": 1, "title": "Midterm Examination Schedule", "body": "The midterm examination is on November 20, 2026.", "priority": "NORMAL", "officeName": "Test Office", "publishedAt": "2026-11-09T09:00:00+08:00", "version": 1, "attachments": []},
+  {"id": 2, "title": "Library Hours", "body": "The library is open until 9 PM.", "priority": "NORMAL", "officeName": "Test Office", "publishedAt": "2026-11-08T09:00:00+08:00", "version": 1, "attachments": []},
+  {"id": 3, "title": "Tuition Payment Deadline", "body": "Pay the tuition fee at the cashier.", "priority": "NORMAL", "officeName": "Test Office", "publishedAt": "2026-11-07T09:00:00+08:00", "version": 1, "attachments": []},
+  {"id": 4, "title": "Christmas Concert", "body": "The concert is at the auditorium.", "priority": "NORMAL", "officeName": "Test Office", "publishedAt": "2026-11-06T09:00:00+08:00", "version": 1, "attachments": []},
+  {"id": 5, "title": "Volunteer Call", "body": "Volunteers are needed for the outreach.", "priority": "NORMAL", "officeName": "Test Office", "publishedAt": "2026-11-05T09:00:00+08:00", "version": 1, "attachments": []},
+  {"id": 6, "title": "Earthquake Drill", "body": "An earthquake drill is scheduled.", "priority": "NORMAL", "officeName": "Test Office", "publishedAt": "2026-11-09T12:00:00+08:00", "version": 1, "attachments": []},
+  {"id": 7, "title": "Typhoon Advisory", "body": "Classes are suspended due to the typhoon.", "priority": "NORMAL", "officeName": "Test Office", "publishedAt": "2026-11-03T09:00:00+08:00", "version": 1, "attachments": []}
+ ],
+ "cases": [
+  {
+   "name": "T1: a Taglish query word found through its expansion",
+   "question": "Kailan ang pagsusulit?",
+   "arguments": {"query": "pagsusulit", "days": 30},
+   "and_v5": {"expected_ids": ["1"], "expected_points": [1]},
+   "and_v4": {"expected_ids": [], "expected_points": []},
+   "why": "pagsusulit -> examination (row 1); question words [pagsusulit] (kailan, ang are stopwords)"
+  },
+  {
+   "name": "T2: aklatan -> library",
+   "question": "Bukas ba ang aklatan?",
+   "arguments": {"query": "aklatan", "days": 30},
+   "and_v5": {"expected_ids": ["2"], "expected_points": [1]},
+   "and_v4": {"expected_ids": [], "expected_points": []},
+   "why": "words [bukas, aklatan]; only aklatan is found (library)"
+  },
+  {
+   "name": "T3: matrikula -> tuition",
+   "question": "Magkano ang matrikula?",
+   "arguments": {"query": "matrikula", "days": 30},
+   "and_v5": {"expected_ids": ["3"], "expected_points": [1]},
+   "and_v4": {"expected_ids": [], "expected_points": []},
+   "why": "words [magkano, matrikula]; matrikula found (tuition)"
+  },
+  {
+   "name": "T4: two lexicon words, AND across groups",
+   "question": "Pasko konsiyerto?",
+   "arguments": {"query": "pasko konsiyerto", "days": 30},
+   "and_v5": {"expected_ids": ["4"], "expected_points": [2]},
+   "and_v4": {"expected_ids": [], "expected_points": []},
+   "why": "christmas AND concert: row 4; both question words found"
+  },
+  {
+   "name": "T5: boluntaryo -> volunteer (substring, also in 'Volunteers')",
+   "question": "Boluntaryo?",
+   "arguments": {"query": "boluntaryo", "days": 30},
+   "and_v5": {"expected_ids": ["5"], "expected_points": [1]},
+   "and_v4": {"expected_ids": [], "expected_points": []},
+   "why": "row 5"
+  },
+  {
+   "name": "T6: an English query is unchanged",
+   "question": "When is the earthquake drill?",
+   "arguments": {"query": "earthquake drill", "days": 30},
+   "and_v5": {"expected_ids": ["6"], "expected_points": [2]},
+   "and_v4": {"expected_ids": ["6"], "expected_points": [2]},
+   "why": "row 6 under both; words [earthquake, drill]"
+  },
+  {
+   "name": "T7: scope: a Taglish QUESTION word adds rank_v1 points under and_v5",
+   "question": "Kailan ang pagsusulit sa midterm?",
+   "arguments": {"query": "examination", "days": 30},
+   "and_v5": {"expected_ids": ["1"], "expected_points": [2]},
+   "and_v4": {"expected_ids": ["1"], "expected_points": [1]},
+   "why": "same row; words [pagsusulit, midterm]: and_v5 finds both (examination, midterm), and_v4 only midterm"
+  },
+  {
+   "name": "T8: scope: the Taglish question words change the rank order",
+   "question": "Iskedyul ng pagsusulit?",
+   "arguments": {"query": "schedule", "days": 30},
+   "and_v5": {"expected_ids": ["1", "6"], "expected_points": [2, 1]},
+   "and_v4": {"expected_ids": ["6", "1"], "expected_points": [0, 0]},
+   "why": "'schedule' is in rows 1 (title) and 6 ('scheduled'). Words [iskedyul, pagsusulit]. and_v5: row 1 = schedule + examination = 2, row 6 = schedule = 1. and_v4: 0 and 0, so newest first: row 6 (11-09 12:00) before row 1 (11-09 09:00)"
+  },
+  {
+   "name": "T9: a dropped candidate (ospital, C4) has no expansion",
+   "question": "Ospital?",
+   "arguments": {"query": "ospital", "days": 30},
+   "and_v5": {"expected_ids": [], "expected_points": []},
+   "and_v4": {"expected_ids": [], "expected_points": []},
+   "why": "no row has 'ospital', and v3 has no such key"
+  },
+  {
+   "name": "T10: a v2 entry still works (pasok -> class)",
+   "question": "May pasok ba?",
+   "arguments": {"query": "pasok", "days": 30},
+   "and_v5": {"expected_ids": ["7"], "expected_points": [1]},
+   "and_v4": {"expected_ids": ["7"], "expected_points": [1]},
+   "why": "'class' in row 7 ('Classes'); words [pasok] (may, ba are stopwords)"
+  }
+ ]
+}
