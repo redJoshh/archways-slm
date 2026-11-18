@@ -19,6 +19,23 @@ Template:
 
 ---
 
+## 2026-11-18: v2 fix (e) taglish_lexicon_v1 / and_v5 KEPT ON (user decision)
+
+- **Date:** 2026-11-18 (+08:00)
+- **Decision (user):** keep (e) on in the v2 kept set.
+- **Reason, recorded precisely:**
+  - It passes "nothing gets worse" with **zero dev effect** because no dev question or query contains any of its 98 terms. That is a **dev-coverage gap, not evidence of no effect**.
+  - It only adds alternatives for non-English terms that passed every collision check (C1–C8: English word list, months incl. "may", snapshot and seed vocabulary, generic expansions).
+  - Keeping (e) was decided at plan approval ("drop (f), then (d); keep (e)"), **before** the v2 baseline ran.
+  - The v2 final measures the kept set as a whole, so the lexicon's **individual effect can't be isolated or claimed**.
+  - Unlike excerpt_v2_centred (v1), which was inert by design and stays off.
+- **Recorded in:** `docs/plans/v2-improvements.md` (the taglish_lexicon_v1 section's Result line).
+- **How it was verified:** no code change; the build and replay evidence is in the entry below.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** (d) extract_v1, pre-registered before any code, with its "every content word" check using and_v5's lexicon.
+
+---
+
 ## 2026-11-18: v2 fix (e) and_v5 built and replayed: no effect on any dev case (passes the keep rule; decision to the user)
 
 - **Date:** 2026-11-18 (+08:00)

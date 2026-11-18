@@ -324,3 +324,9 @@ Written before the checks were run and before any dev run.
   - first the retrieval replay (traps' results and the source rows' places)
   - then the dev runs with `--reuse-queries` (the query prompt is unchanged), cumulative on (a)+(b)+(c)
   - "nothing gets worse" on every dev set; any term that occurs in a dev question is reported separately ("dev contamination note", section 3 (e))
+- **Result (2026-11-18): KEPT ON** in the v2 kept set (user decision; devlog).
+  - It passes "nothing gets worse" with zero dev effect. That is because no dev question or query contains any of its 98 terms: a **dev-coverage gap, not evidence of no effect**.
+  - It only adds alternatives for non-English terms that passed every collision check (C1–C8).
+  - Keeping (e) was decided at plan approval (section 7.5, "drop (f), then (d); keep (e)"), **before** the v2 baseline ran.
+  - The v2 final measures the kept set as a whole, so the lexicon's individual effect **can't be isolated or claimed**.
+  - Unlike excerpt_v2_centred (v1), which was inert by design and stays off.
