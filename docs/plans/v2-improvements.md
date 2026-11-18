@@ -287,3 +287,40 @@ The name is **past_date_v1** (the plan's "past_note_v1"). The user pinned the po
   - "Nothing gets worse" applies to the scored metrics as usual.
 - **Vectors:** `tests/vectors/past_date_vectors.json`, hand-written before any code (P21–P22 added after the code to close a mutation gap; rule unchanged).
 - **Result (2026-11-18): KEPT** (devlog). Only flow13 q12 changes; the user reviewed it ("correct and clear").
+
+## 2026-11-18: taglish_lexicon_v1 rule, pre-registered (fix (e): synonym file v3, matcher and_v5)
+
+Written before the checks were run and before any dev run.
+
+- **Candidates:** `contracts/taglish_lexicon_candidates_v1.json`, 119 Taglish/Filipino → English campus terms.
+  - Written by Claude Code from general language knowledge only.
+  - No dev Taglish case, held-out file or report, and no snapshot text was consulted to write them.
+  - Their order is the keep order (C8).
+- **The English word list:** dwyl `english-words` `words_alpha.txt` (370,105 words, public domain, Unlicense), `data/local/wordlists/words_alpha.txt` (gitignored), SHA-256 `3ed0c94610d8bcf7c11bbb49c56aa49c7234d32b66824df91f554169e572da48`.
+  - It is broad rather than "common", so it errs towards dropping terms.
+- **The corpus** for the collision checks: the title and plain body of every snapshot row and every seed row, lowercased. Tokens are maximal runs of letters (`str.isalpha`).
+- **Checks, in order** (the user: "an English word list AND the snapshot vocabulary"; drop expansions that match unrelated announcements; drop months and common English words):
+  - **C1 (key shape):** the key is `^[a-z]{4,}$` (one lowercase word of at least 4 ASCII letters).
+  - **C2 (English and months):**
+    - the key is not in the English word list
+    - it is not a month name: English `january`…`december`; Filipino `enero`, `pebrero`, `marso`, `abril`, `mayo`, `hunyo`, `hulyo`, `agosto`, `setyembre`, `oktubre`, `nobyembre`, `disyembre`; and `may` (the "may" problem)
+  - **C3 (no overlap):** the key is not already a key of `search_synonyms_v2.json`, and not in `AND_V2_STOPWORDS`, the map's `extra_stopwords` or `rank_stopwords_v1`.
+  - **C4 (key collision):** in the corpus, the key never occurs inside a longer token. Every token containing it is the key itself; the matcher matches the query word as a substring, so "tren" inside "strength" is dropped.
+  - **C5 (expansion collision):** each expansion has at least 4 non-space characters.
+    - Every substring occurrence in the corpus must start at a token start.
+    - It must be followed only by one of the suffixes `""`, `s`, `es`, `d`, `ed`, `ing`, `er`, `ers` before the token ends. A multi-word expansion is checked at its first and last token.
+    - An expansion that fails is removed ("dress" in "address", "form" in "information").
+  - **C6 (generic expansion):** an expansion found (the matcher's substring test on the lowercased title or body) in more than 25% of snapshot rows (more than 13 of 53) is removed.
+  - **C7:** a term with no expansion left is dropped.
+  - **C8 (size):** the survivors keep candidate order, and at most the first 100 are kept. If fewer than 50 survive, (e) stops and is reported; no new candidates are added after the checks.
+- **Scope (decided before any run):** the expansions apply to **both** the matcher's query groups **and** rank_v1's question-overlap scoring.
+  - rank_v1 is pre-registered as "a word is found by the matcher's test for a one-word query", using the active matcher's synonym map (as and_v4 did). So with and_v5 the Taglish words of the **question** are also found through their English expansions.
+  - The alternative, matcher-only, would need a new rank version, which isn't in this plan.
+- **The frozen files:**
+  - `contracts/search_synonyms_v3.json` = v2's map + the survivors, with v2's `extra_stopwords`. Its SHA-256 goes in the devlog.
+  - Matcher **and_v5** = and_v3's rules with the v3 map. It is generated into assistant-ts (`SYNONYMS_V3`) like v2.
+- **Vectors:** `tests/vectors/and_v5_vectors.json`, hand-written after the checks and before any dev run.
+- **Measured:**
+  - first the retrieval replay (traps' results and the source rows' places)
+  - then the dev runs with `--reuse-queries` (the query prompt is unchanged), cumulative on (a)+(b)+(c)
+  - "nothing gets worse" on every dev set; any term that occurs in a dev question is reported separately ("dev contamination note", section 3 (e))
