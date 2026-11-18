@@ -608,6 +608,7 @@ def flow(
     strip_nf: str | None = None,
     contradiction: str | None = None,
     echo: str | None = None,
+    past_date: str | None = None,
 ) -> tuple[Outcome, Calls | None, dict | None]:
     """One question through the UAT flow, with every step's result scripted.
 
@@ -628,6 +629,9 @@ def flow(
     echo: None (off) or "echo_v1" (v2 fix (b), echo.py): after
     contradiction, a guard-passed reply that only restates the question
     takes the answer_not_found path with code "echo" (the list only).
+    past_date: None (off) or "past_date_v1" (v2 fix (c), past_date.py):
+    " (already passed)" after past dates in the AI answer (never the
+    list); code "past_date" when a note is added.
     Returns the outcome, the prompts sent (None if no call was made) and the
     search arguments (None if no search was made).
     """
@@ -643,6 +647,10 @@ def flow(
 
     if echo not in (None, echo_rule.ECHO_V1):
         raise ValueError(f"unknown echo rule {echo!r}")
+    from archways_assistant import past_date as past_rule
+
+    if past_date not in (None, past_rule.PAST_DATE_V1):
+        raise ValueError(f"unknown past_date rule {past_date!r}")
     try:
         check_question(question)
     except ContractError:
@@ -739,12 +747,19 @@ def flow(
         codes = (*guarded.codes, echo_rule.CODE)
         outcome = Outcome("answer_not_found", listed, codes, budget, count)
     else:
+        answer = guarded.text
+        codes = tuple(guarded.codes)
+        if past_date is not None:
+            sources = past_rule.result_sources(results)
+            noted = past_rule.annotate(answer, sources, now)
+            if noted != answer:
+                answer, codes = noted, (*codes, past_rule.CODE)
         text = (
             ANSWER_LABEL
             + ANSWER_LABEL_SEPARATOR
-            + guarded.text
+            + answer
             + ANSWER_LIST_SEPARATOR
             + listed
         )
-        outcome = Outcome("answer", text, tuple(guarded.codes), budget, count)
+        outcome = Outcome("answer", text, codes, budget, count)
     return outcome, calls, arguments

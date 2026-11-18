@@ -38,6 +38,7 @@
 import { fallback, guard } from "../../guard-ts/src/guard.ts";
 import { CONTRADICTION_CODE, contradictionBlocks, type ContradictionRule } from "./contradiction.ts";
 import { ECHO_CODE, echoBlocks, type EchoRule } from "./echo.ts";
+import { annotatePastDates, PAST_DATE_CODE, pastResultSources, type PastDateRule } from "./pastDate.ts";
 import { decideBudget, type Budget, type Speed, type SpeedState } from "./budget.ts";
 import {
   ANSWER_LABEL,
@@ -148,6 +149,8 @@ export interface FlowOptions {
   contradiction?: ContradictionRule;
   /** v2 fix (b), echo.ts (after contradiction). Omitted or null: off. */
   echo?: EchoRule;
+  /** v2 fix (c), pastDate.ts: notes in the AI answer only. Omitted or null: off. */
+  pastDate?: PastDateRule;
 }
 
 /**
@@ -184,6 +187,10 @@ export function startQuestion(
   }
   const echo: EchoRule = options && options.echo ? options.echo : null;
   if (echo !== null && echo !== "echo_v1") throw new Error("unknown echo rule " + String(echo));
+  const pastDate: PastDateRule = options && options.pastDate ? options.pastDate : null;
+  if (pastDate !== null && pastDate !== "past_date_v1") {
+    throw new Error("unknown past_date rule " + String(pastDate));
+  }
   if (stripNf !== null && stripNf !== "strip_nf_v1") throw new Error("unknown strip_nf rule " + String(stripNf));
   const trace: Trace = {
     arguments: null,
@@ -236,8 +243,17 @@ export function startQuestion(
     if (echoBlocks(echo, question, guarded.text)) {
       return done("answer_not_found", listed, guarded.codes.concat([ECHO_CODE]));
     }
-    const text = ANSWER_LABEL + ANSWER_LABEL_SEPARATOR + guarded.text + ANSWER_LIST_SEPARATOR + listed;
-    return done("answer", text, guarded.codes.slice());
+    let answer = guarded.text;
+    let codes = guarded.codes.slice();
+    if (pastDate !== null) {
+      const noted = annotatePastDates(answer, pastResultSources(results), nowMs);
+      if (noted !== answer) {
+        answer = noted;
+        codes = codes.concat([PAST_DATE_CODE]);
+      }
+    }
+    const text = ANSWER_LABEL + ANSWER_LABEL_SEPARATOR + answer + ANSWER_LIST_SEPARATOR + listed;
+    return done("answer", text, codes);
   };
 
   const afterCount = (results: Announcement[], call: ModelCall) => (input: StepInput, elapsedMs: number): Step => {
@@ -355,6 +371,8 @@ export interface AssistantDeps {
   contradiction?: ContradictionRule;
   /** v2 fix (b) echo_v1. Omitted or null: off. */
   echo?: EchoRule;
+  /** v2 fix (c) past_date_v1. Omitted or null: off. */
+  pastDate?: PastDateRule;
 }
 
 export interface AssistantResult extends Outcome {
@@ -390,6 +408,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
       stripNf: deps.stripNf === undefined ? PHONE_STRIP_NF : deps.stripNf,
       contradiction: deps.contradiction === undefined ? null : deps.contradiction,
       echo: deps.echo === undefined ? null : deps.echo,
+      pastDate: deps.pastDate === undefined ? null : deps.pastDate,
     });
     while (step.kind !== "done") {
       const started = clock();

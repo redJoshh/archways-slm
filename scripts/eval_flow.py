@@ -180,6 +180,7 @@ def run_case(
     window: str | None = None,
     contradiction: str | None = None,
     echo: str | None = None,
+    past_date: str | None = None,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -273,6 +274,7 @@ def run_case(
         strip_nf=strip_nf,
         contradiction=contradiction,
         echo=echo,
+        past_date=past_date,
     )
     results = search_reply if isinstance(search_reply, list) else []
     record.update(
@@ -655,7 +657,11 @@ def strip_nf_replay(run_path: Path, strip_nf: str) -> None:
 
 
 def post_replay(
-    run_path: Path, out: Path, contradiction: str | None, echo: str | None = None
+    run_path: Path,
+    out: Path,
+    contradiction: str | None,
+    echo: str | None = None,
+    past_date: str | None = None,
 ) -> None:
     """No model call: a saved run's replies through flow() again, rescored.
 
@@ -697,6 +703,7 @@ def post_replay(
             strip_nf=header.get("strip_nf"),
             contradiction=contradiction,
             echo=echo,
+            past_date=past_date,
         )
         if saved["query_reply"] is None or not isinstance(saved["arguments"], dict):
             outcome_path, text = saved["path"], saved["text"]
@@ -725,6 +732,7 @@ def post_replay(
             **header,
             "contradiction": contradiction,
             "echo": echo,
+            "past_date": past_date,
             "post_replay_of": [run_path.name, sha256(run_path)],
             "replay_commit": git_commit(),
             "replay_tree_dirty": tree_is_dirty(),
@@ -777,6 +785,7 @@ def main() -> None:
     parser.add_argument("--strip-nf-replay", type=Path, metavar="RUN")
     parser.add_argument("--contradiction", choices=["contradiction_v1"], default=None)
     parser.add_argument("--echo", choices=["echo_v1"], default=None)
+    parser.add_argument("--past-date", choices=["past_date_v1"], default=None)
     parser.add_argument("--post-replay", type=Path, metavar="RUN")
     parser.add_argument("--excerpt-replay", type=Path, metavar="RUN")
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
@@ -819,7 +828,9 @@ def main() -> None:
         out = args.out.resolve()
         if not out.is_relative_to(LOCAL.resolve()):
             sys.exit("--out must be inside data/local/ (gitignored)")
-        post_replay(args.post_replay, out, args.contradiction, args.echo)
+        post_replay(
+            args.post_replay, out, args.contradiction, args.echo, args.past_date
+        )
         return
     if args.strip_nf_replay:
         if args.strip_nf is None:
@@ -944,6 +955,7 @@ def main() -> None:
             "window": args.window,
             "contradiction": args.contradiction,
             "echo": args.echo,
+            "past_date": args.past_date,
             "now_override": args.now,
             "query_replies_from": None
             if args.reuse_queries is None
@@ -984,6 +996,7 @@ def main() -> None:
                     window=args.window,
                     contradiction=args.contradiction,
                     echo=args.echo,
+                    past_date=args.past_date,
                 )
                 score = score_case(
                     case,

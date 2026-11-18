@@ -146,6 +146,20 @@
    "reply": "Open from September 1 to September 30.",
    "results": [{"title": "Window", "excerpt": "Open every September 1 to September 30."}],
    "expected": "Open from September 1 to September 30."
+  },
+  {
+   "name": "P21: a range with a dated past start and a future end is left (added 2026-11-18 after the code: the TS mutation check showed no vector tested the range rule; hand-derived, rule unchanged)",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Open from October 30, 2026 to November 20, 2026.",
+   "results": [{"title": "Window", "excerpt": "Open from October 30, 2026 to November 20, 2026."}],
+   "expected": "Open from October 30, 2026 to November 20, 2026."
+  },
+  {
+   "name": "P22: a range with a dated past start and a past end gets one note, after the end (added with P21)",
+   "now": "2026-11-10T10:00:00+08:00",
+   "reply": "Open from October 1, 2026 to October 3, 2026.",
+   "results": [{"title": "Window", "excerpt": "Open from October 1, 2026 to October 3, 2026."}],
+   "expected": "Open from October 1, 2026 to October 3, 2026 (already passed)."
   }
  ]
 }

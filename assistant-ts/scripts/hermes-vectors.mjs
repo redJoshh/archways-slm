@@ -35,6 +35,7 @@ const stripNfVectorsPath = join(root, "..", "tests", "vectors", "strip_nf_vector
 const fallbackVectorsPath = join(root, "..", "tests", "vectors", "window_fallback_vectors.json");
 const contradictionVectorsPath = join(root, "..", "tests", "vectors", "contradiction_vectors.json");
 const echoVectorsPath = join(root, "..", "tests", "vectors", "echo_vectors.json");
+const pastDateVectorsPath = join(root, "..", "tests", "vectors", "past_date_vectors.json");
 
 const runner = `
 var log = typeof print === "function" ? print : console.log;
@@ -93,6 +94,11 @@ log("hermes echo vectors: " + echoReport.passed + "/" + echoReport.total + " pas
     echoReport.failed + " failed");
 for (var ev = 0; ev < echoReport.failures.length; ev++) log("FAIL " + echoReport.failures[ev]);
 if (echoReport.failed) { throw new Error("echo vectors failed"); }
+var pastDateReport = runPastDateVectors(PAST_DATE_VECTORS);
+log("hermes past_date vectors: " + pastDateReport.passed + "/" + pastDateReport.total + " passed, " +
+    pastDateReport.failed + " failed");
+for (var pv = 0; pv < pastDateReport.failures.length; pv++) log("FAIL " + pastDateReport.failures[pv]);
+if (pastDateReport.failed) { throw new Error("past_date vectors failed"); }
 
 var flowVector = VECTORS.flow[0];
 askAssistant(flowVector.question, {
@@ -212,6 +218,8 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "contradictionVectors.js"],
   ["assistant-ts", "src", "echo.js"],
   ["assistant-ts", "src", "echoVectors.js"],
+  ["assistant-ts", "src", "pastDate.js"],
+  ["assistant-ts", "src", "pastDateVectors.js"],
 ];
 const declared = {};
 for (const parts of BUNDLE_FILES) {
@@ -239,6 +247,7 @@ const bundle = [
   "var FALLBACK_VECTORS = " + readFileSync(fallbackVectorsPath, "utf8").trim() + ";",
   "var CONTRADICTION_VECTORS = " + readFileSync(contradictionVectorsPath, "utf8").trim() + ";",
   "var ECHO_VECTORS = " + readFileSync(echoVectorsPath, "utf8").trim() + ";",
+  "var PAST_DATE_VECTORS = " + readFileSync(pastDateVectorsPath, "utf8").trim() + ";",
   runner,
 ].join("\n");
 mkdirSync(join(root, "dist-hermes"), { recursive: true });
