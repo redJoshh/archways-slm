@@ -36,6 +36,7 @@
  */
 
 import { fallback, guard } from "../../guard-ts/src/guard.ts";
+import { CONTRADICTION_CODE, contradictionBlocks, type ContradictionRule } from "./contradiction.ts";
 import { decideBudget, type Budget, type Speed, type SpeedState } from "./budget.ts";
 import {
   ANSWER_LABEL,
@@ -142,6 +143,8 @@ export type StripNf = "strip_nf_v1" | null;
 
 export interface FlowOptions {
   stripNf?: StripNf;
+  /** v2 fix (a), contradiction.ts. Omitted or null: off. */
+  contradiction?: ContradictionRule;
 }
 
 /**
@@ -172,6 +175,10 @@ export function startQuestion(
   options?: FlowOptions,
 ): Step {
   const stripNf: StripNf = options && options.stripNf ? options.stripNf : null;
+  const contradiction: ContradictionRule = options && options.contradiction ? options.contradiction : null;
+  if (contradiction !== null && contradiction !== "contradiction_v1") {
+    throw new Error("unknown contradiction rule " + String(contradiction));
+  }
   if (stripNf !== null && stripNf !== "strip_nf_v1") throw new Error("unknown strip_nf rule " + String(stripNf));
   const trace: Trace = {
     arguments: null,
@@ -218,6 +225,9 @@ export function startQuestion(
     }
     // Unreachable for contract-checked results; never show the reply without its list.
     if (listed === null) return done("answer_error", LAST_RESORT_MESSAGE);
+    if (contradictionBlocks(contradiction, question, guarded.text, results)) {
+      return done("guard_fired", listed, guarded.codes.concat([CONTRADICTION_CODE]));
+    }
     const text = ANSWER_LABEL + ANSWER_LABEL_SEPARATOR + guarded.text + ANSWER_LIST_SEPARATOR + listed;
     return done("answer", text, guarded.codes.slice());
   };
@@ -333,6 +343,8 @@ export interface AssistantDeps {
    * null: off (the UAT baseline flow).
    */
   stripNf?: StripNf;
+  /** v2 fix (a) contradiction_v1. Omitted or null: off. */
+  contradiction?: ContradictionRule;
 }
 
 export interface AssistantResult extends Outcome {
@@ -366,6 +378,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
   try {
     let step = startQuestion(question, deps.nowMs(), deps.speed ? deps.speed.get() : null, {
       stripNf: deps.stripNf === undefined ? PHONE_STRIP_NF : deps.stripNf,
+      contradiction: deps.contradiction === undefined ? null : deps.contradiction,
     });
     while (step.kind !== "done") {
       const started = clock();

@@ -178,6 +178,7 @@ def run_case(
     excerpt: str | None = None,
     strip_nf: str | None = None,
     window: str | None = None,
+    contradiction: str | None = None,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -269,6 +270,7 @@ def run_case(
         answer_reply,
         budget="off",
         strip_nf=strip_nf,
+        contradiction=contradiction,
     )
     results = search_reply if isinstance(search_reply, list) else []
     record.update(
@@ -650,6 +652,84 @@ def strip_nf_replay(run_path: Path, strip_nf: str) -> None:
     print(f"changed {changed}")
 
 
+def post_replay(run_path: Path, out: Path, contradiction: str | None) -> None:
+    """No model call: a saved run's replies through flow() again, rescored.
+
+    For the v2 fixes that only post-process a reply (docs/plans/
+    v2-improvements.md, section 2, rule 5). The run's own strip_nf is kept,
+    and the given post-processing rules are added. Writes a run file with the
+    same cases (for --nothing-worse) and prints the ids whose path changed.
+    """
+    run = json.loads(run_path.read_text(encoding="utf-8"))
+    header = run["header"]
+    sources = load_sources()
+    known_ids = {name: {row["id"] for row in rows} for name, rows in sources.items()}
+    by_id = {name: {row["id"]: row for row in rows} for name, rows in sources.items()}
+    offices = {name: {row["office"] for row in rows} for name, rows in sources.items()}
+    names = list(dict.fromkeys(c["set"] for c in run["cases"]))
+    cases = {}
+    for name in names:
+        path, data = SETS[name]
+        for case in load_cases(path, known_ids, default_data=data):
+            cases[(name, case["id"])] = case
+    # The prompts shape only the calls, never the outcome of scripted replies.
+    prompts = {
+        "query": QUERY_PROMPT.read_text(encoding="utf-8"),
+        "answer": ANSWER_PROMPT.read_text(encoding="utf-8"),
+    }
+    print(f"post replay of {run_path.name} (commit {header['commit']})")
+    records, changed = [], 0
+    for saved in run["cases"]:
+        case = cases[(saved["set"], saved["id"])]
+        outcome, _, _ = assistant.flow(
+            saved["question"],
+            datetime.fromisoformat(saved["now"]),
+            prompts,
+            saved["query_reply"],
+            saved["results"] if isinstance(saved["arguments"], dict) else None,
+            saved["case_tokens"],
+            saved["answer_reply"],
+            budget="off",
+            strip_nf=header.get("strip_nf"),
+            contradiction=contradiction,
+        )
+        if saved["query_reply"] is None or not isinstance(saved["arguments"], dict):
+            outcome_path, text = saved["path"], saved["text"]
+        else:
+            outcome_path, text = outcome.path, outcome.text
+        score = score_case(
+            case,
+            outcome_path,
+            text,
+            saved["results"],
+            by_id[case["data"]],
+            offices[case["data"]],
+        )
+        if outcome_path != saved["path"] or text != saved["text"]:
+            changed += 1
+            print(
+                f"{saved['set']} {saved['id']}: {saved['path']} -> {outcome_path}"
+                f"  ({format_case(score)})"
+            )
+        records.append(
+            {**saved, "path": outcome_path, "text": text, "score": asdict(score)}
+        )
+    print(f"changed {changed}")
+    report = {
+        "header": {
+            **header,
+            "contradiction": contradiction,
+            "post_replay_of": [run_path.name, sha256(run_path)],
+            "replay_commit": git_commit(),
+            "replay_tree_dirty": tree_is_dirty(),
+        },
+        "cases": records,
+    }
+    out.write_text(
+        json.dumps(report, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
+    )
+
+
 def gate_apply(run_path: Path, p: int, q: int, out: Path) -> None:
     run = json.loads(run_path.read_text(encoding="utf-8"))
     records = gate_run(run, p, q)
@@ -689,6 +769,8 @@ def main() -> None:
         "--now", default=None, help="readiness only: replaces every case's now"
     )
     parser.add_argument("--strip-nf-replay", type=Path, metavar="RUN")
+    parser.add_argument("--contradiction", choices=["contradiction_v1"], default=None)
+    parser.add_argument("--post-replay", type=Path, metavar="RUN")
     parser.add_argument("--excerpt-replay", type=Path, metavar="RUN")
     parser.add_argument("--reuse-queries", type=Path, metavar="RUN")
     parser.add_argument("--replay", type=Path, metavar="RUN")
@@ -723,6 +805,14 @@ def main() -> None:
         if args.rank is None or args.excerpt is None:
             parser.error("--excerpt-replay needs --rank and --excerpt")
         excerpt_replay(args.excerpt_replay, args.rank, args.matcher, args.excerpt)
+        return
+    if args.post_replay:
+        if args.out is None:
+            parser.error("--post-replay needs --out")
+        out = args.out.resolve()
+        if not out.is_relative_to(LOCAL.resolve()):
+            sys.exit("--out must be inside data/local/ (gitignored)")
+        post_replay(args.post_replay, out, args.contradiction)
         return
     if args.strip_nf_replay:
         if args.strip_nf is None:
@@ -845,6 +935,7 @@ def main() -> None:
             "answer_prompt": args.answer_prompt,
             "strip_nf": args.strip_nf,
             "window": args.window,
+            "contradiction": args.contradiction,
             "now_override": args.now,
             "query_replies_from": None
             if args.reuse_queries is None
@@ -883,6 +974,7 @@ def main() -> None:
                     excerpt=args.excerpt,
                     strip_nf=args.strip_nf,
                     window=args.window,
+                    contradiction=args.contradiction,
                 )
                 score = score_case(
                     case,

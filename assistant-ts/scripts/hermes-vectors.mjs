@@ -33,6 +33,7 @@ const gateVectorsPath = join(root, "..", "tests", "vectors", "gate_vectors.json"
 const windowVectorsPath = join(root, "..", "tests", "vectors", "window_vectors.json");
 const stripNfVectorsPath = join(root, "..", "tests", "vectors", "strip_nf_vectors.json");
 const fallbackVectorsPath = join(root, "..", "tests", "vectors", "window_fallback_vectors.json");
+const contradictionVectorsPath = join(root, "..", "tests", "vectors", "contradiction_vectors.json");
 
 const runner = `
 var log = typeof print === "function" ? print : console.log;
@@ -81,6 +82,11 @@ log("hermes window_v1 fallback vectors: " + fallbackReport.passed + "/" + fallba
     fallbackReport.failed + " failed");
 for (var fb = 0; fb < fallbackReport.failures.length; fb++) log("FAIL " + fallbackReport.failures[fb]);
 if (fallbackReport.failed) { throw new Error("window_v1 fallback vectors failed"); }
+var contradictionReport = runContradictionVectors(CONTRADICTION_VECTORS);
+log("hermes contradiction vectors: " + contradictionReport.passed + "/" + contradictionReport.total + " passed, " +
+    contradictionReport.failed + " failed");
+for (var cv = 0; cv < contradictionReport.failures.length; cv++) log("FAIL " + contradictionReport.failures[cv]);
+if (contradictionReport.failed) { throw new Error("contradiction vectors failed"); }
 
 var flowVector = VECTORS.flow[0];
 askAssistant(flowVector.question, {
@@ -196,6 +202,8 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "stripNfVectors.js"],
   ["assistant-ts", "src", "fallback.js"],
   ["assistant-ts", "src", "fallbackVectors.js"],
+  ["assistant-ts", "src", "contradiction.js"],
+  ["assistant-ts", "src", "contradictionVectors.js"],
 ];
 const declared = {};
 for (const parts of BUNDLE_FILES) {
@@ -221,6 +229,7 @@ const bundle = [
   "var WINDOW_VECTORS = " + readFileSync(windowVectorsPath, "utf8").trim() + ";",
   "var STRIP_NF_VECTORS = " + readFileSync(stripNfVectorsPath, "utf8").trim() + ";",
   "var FALLBACK_VECTORS = " + readFileSync(fallbackVectorsPath, "utf8").trim() + ";",
+  "var CONTRADICTION_VECTORS = " + readFileSync(contradictionVectorsPath, "utf8").trim() + ";",
   runner,
 ].join("\n");
 mkdirSync(join(root, "dist-hermes"), { recursive: true });

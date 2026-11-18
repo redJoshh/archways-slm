@@ -606,6 +606,7 @@ def flow(
     *,
     budget: str = "on",
     strip_nf: str | None = None,
+    contradiction: str | None = None,
 ) -> tuple[Outcome, Calls | None, dict | None]:
     """One question through the UAT flow, with every step's result scripted.
 
@@ -620,6 +621,9 @@ def flow(
     The phone always runs "on"; assistant-ts has no such switch.
     strip_nf: None (the UAT flow) or STRIP_NF_V1 (fix (g), see
     answer_reply_text()).
+    contradiction: None (off) or "contradiction_v1" (v2 fix (a),
+    contradiction.py): a guard-passed reply it fires on takes the
+    guard_fired path with code "contradiction" (the list only).
     Returns the outcome, the prompts sent (None if no call was made) and the
     search arguments (None if no search was made).
     """
@@ -627,6 +631,10 @@ def flow(
         raise ValueError(f"budget must be 'on' or 'off', not {budget!r}")
     if strip_nf not in (None, STRIP_NF_V1):
         raise ValueError(f"unknown strip_nf rule {strip_nf!r}")
+    from archways_assistant import contradiction as contra
+
+    if contradiction not in (None, contra.CONTRADICTION_V1):
+        raise ValueError(f"unknown contradiction rule {contradiction!r}")
     try:
         check_question(question)
     except ContractError:
@@ -716,6 +724,9 @@ def flow(
         # Unreachable for contract-checked results; never show the reply
         # without its list.
         outcome = Outcome("answer_error", LAST_RESORT_MESSAGE, (), budget, count)
+    elif contradiction is not None and contra.fires(question, guarded.text, results):
+        codes = (*guarded.codes, contra.CODE)
+        outcome = Outcome("guard_fired", listed, codes, budget, count)
     else:
         text = (
             ANSWER_LABEL
