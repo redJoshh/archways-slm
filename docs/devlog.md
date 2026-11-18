@@ -19,6 +19,37 @@ Template:
 
 ---
 
+## 2026-11-18: v2 fix (a) contradiction_v1: pre-registered, built, replayed: KEPT (with a recorded human-judged loss)
+
+- **Date:** 2026-11-18 (+08:00)
+- **Decision (user):** build contradiction_v1 exactly as pre-registered, with no tuning after seeing `rules10`. Recorded with it:
+  - **Evidence:** `shipped` produced a real contradiction on `rules10` (r04), which (a) blocks.
+  - **Known false block:** r02, a person-correct Taglish answer that restates "Pwede…?" and then states the prohibition. By human judgment one correct AI answer is lost. The student still sees the list with the source, and the scorer doesn't see the loss.
+  - **Likely Taglish bias:** answers that echo a Taglish permission question ("pwede") are more likely to be falsely blocked.
+  - **Reach:** only snapshot rows 19 and 29 use (a)'s prohibition words.
+  - **Any refinement** (for example ignoring permission words that appear in the question) is a separately pre-registered contradiction_v2 after the v2 final, not in this phase.
+- **Pre-registered** (`1e1d482`, before any code):
+  - The exact rule is in `v2-improvements.md` ("contradiction_v1 rule, pre-registered"): tokens, apostrophes, phrase matching, and title + excerpt as the source text.
+  - Those details were written after the `rules10` run. They are the reading the earlier prediction used; no list or threshold changed.
+  - 20 hand-derived vectors (`tests/vectors/contradiction_vectors.json`).
+- **Built** (`0abb59e`, off by default):
+  - Python `contradiction.py` + `flow(..., contradiction=)`; TS `contradiction.ts` + `FlowOptions.contradiction` / `AssistantDeps.contradiction`.
+  - **When it fires:** path `guard_fired`, code `contradiction`, the results list.
+  - **eval_flow.py:** `--contradiction`, and `--post-replay RUN --out OUT`. The post replay re-runs a saved run's replies through `flow()`, keeps the run's own strip_nf, rescores, and writes a run file for `--nothing-worse`.
+- **Verified:**
+  - Python vectors 20/20 and flow tests; Node 314/314 (contradiction 20/20 and flow); Hermes contradiction 20/20, askAssistant as expected.
+  - **Mutation checks,** each restored from a copy: negation window 3 → 0 in Python (3 tests fail); apostrophe joining removed in TS (2 tests fail).
+  - `uv run pytest -q` → `1431 passed, 2 skipped`; ruff clean.
+  - **Identity check:** the post replay with the rule off changes 0 cases on `strip_nf-1.json` and `rules10-shipped.json`.
+- **Result** (post replay, no model call; `--nothing-worse --correct-case-by-case`):
+  - **e2e34, taglish10, flow13** (`strip_nf-1.json`): 0 changes. OK.
+  - **rules10:** r04 answer → guard_fired (helpful false → true); r02 answer → guard_fired (helpful stays true). Helpful 6 → 7; wrong answers 2 → 1; scored AI-correct lost: none. OK.
+  - **The keep rule passes, so (a) is KEPT.** The human-judged loss of r02 is recorded above. Exactly as the earlier prediction said.
+- **Commits:** `1e1d482`, `0abb59e`, this `docs:` commit. Not pushed.
+- **Open questions / next:** (b) echo_v1, pre-registered next (rule and vectors before code), on top of (a).
+
+---
+
 ## 2026-11-18: `shipped` on `rules10`: contradictions appear, so (a) is admissible; a predicted false block reported
 
 - **Date:** 2026-11-18 (+08:00)
