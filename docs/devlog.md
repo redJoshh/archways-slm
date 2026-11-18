@@ -19,6 +19,31 @@ Template:
 
 ---
 
+## 2026-11-18: `shipped` on `rules10`: contradictions appear, so (a) is admissible; a predicted false block reported
+
+- **Date:** 2026-11-18 (+08:00)
+- **Run:** `eval_flow.py --sets rules10 --rank rank_v1 --matcher and_v4 --strip-nf strip_nf_v1 --window window_v1` (= `shipped`). Commit `0771d3f`, clean tree, Ollama 0.40.15, cold. File: `data/local/runs/rules10-shipped.json`.
+- **Totals:** helpful 6/10, AI correct 0/4, **unsafe 2/10** (r01, r04), coverage 7/10. Paths: answer 4, answer_not_found 4, not_found 2.
+- **Per case (ids and judgments only):**
+  - **r01:** "yes" to a prohibited item. The source row 29 was not retrieved (query `wear`). Unsafe.
+  - **r02:** the reply restates the Taglish question, then correctly states the prohibition. Scored not correct only because it says "prohibits", not a listed phrase. Human: correct.
+  - **r03, r05:** not found. The queries missed: r03 sent a garbled place name, r05 an unrelated word.
+  - **r04:** "yes" to a prohibited item, with row 29 listed. Unsafe: **a permission contradiction against a listed source.**
+  - **r06, r07, r09, r10:** answer_not_found with the source listed (helpful through the list).
+  - **r08:** correct ("allows climbing … for photography"). Scored not correct only because it says "allows", not "allowed". Human: correct.
+- **Pre-registered admissibility rule:** a contradiction appears (r04, and r01 without its source), so **(a) is admissible.**
+- **Prediction of contradiction_v1 as pre-registered** (a throwaway script over the saved replies; no code in the repo):
+  - On `rules10` it blocks r04 (correct block) and **r02**. r02 is a false block: condition 3 matches the "pwede" that the reply copies from the question.
+  - r01 is not blocked (no listed row has a marker). r08 is not blocked.
+  - On the three v1 dev sets (`strip_nf-1.json`) it blocks nothing; only e2e-028 meets the question trigger.
+- **Under the keep rule** (scorer_v1): unsafe 2 → 1, helpful 6 → 7, no case loses scored AI-correct. **But a person-checked correct answer (r02) would be hidden.**
+- **Scorer note:** two correct replies miss the labelled phrases by word form ("prohibits", "allows"). The labels are frozen and not changed.
+- **How it was verified:** run files read directly; the prediction script was not committed.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** the user decides whether (a) is built as pre-registered (v1), or as a new version whose rule is fixed before any further run.
+
+---
+
 ## 2026-11-18: `rules10` labelled by the user; hash recorded; added as a named dev set
 
 - **Date:** 2026-11-18 (+08:00)
