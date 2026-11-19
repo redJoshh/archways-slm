@@ -1,0 +1,64 @@
+{
+ "$comment": "answer_v5 (compact_v5) user-message vectors, HAND-WRITTEN 2026-11-19 before any v5 code or run (docs/plans/v2-improvements.md, 'answer_v5 rule, pre-registered'). Never regenerate from the implementation.",
+ "format": "archways answer_v5 vectors v1",
+ "rule": "compact_v5",
+ "cases": [
+  {
+   "name": "V1: rank order kept (older first), null and set year_level, whitespace and < in title, office and excerpt, a -05:00 offset",
+   "question": "Kailan ang enrollment?",
+   "results": [
+    {
+     "id": "21",
+     "title": "Second Term\tEnrollment",
+     "excerpt": "Enrollment opens on\nNovember 9, 2026.  Bring your <ID>.",
+     "office": "Office of the Registrar",
+     "priority": "NORMAL",
+     "year_level": null,
+     "posted_at": "2026-10-20T08:00:00+08:00"
+    },
+    {
+     "id": "22",
+     "title": "<Updated> Schedule",
+     "excerpt": " Leading and trailing spaces ",
+     "office": "Office\u00a0of Student Affairs",
+     "priority": "HIGH",
+     "year_level": 3,
+     "posted_at": "2026-11-06T23:30:00-05:00"
+    }
+   ],
+   "expected": "Question: Kailan ang enrollment?\n\n<announcements>\n1. Second Term Enrollment\noffice: Office of the Registrar | posted_at: 2026-10-20\nEnrollment opens on November 9, 2026. Bring your \\u003cID>.\n\n2. \\u003cUpdated> Schedule\noffice: Office of Student Affairs | posted_at: 2026-11-06 | year_level: 3\nLeading and trailing spaces\n</announcements>"
+  },
+  {
+   "name": "V2: U+2028, CRLF and U+FEFF are whitespace; < in a title",
+   "question": "What is new?",
+   "results": [
+    {
+     "id": "5",
+     "title": "A < B",
+     "excerpt": "Line one\u2028Line two\r\n\r\nLine three\ufeff",
+     "office": "OSA",
+     "priority": "NORMAL",
+     "year_level": 1,
+     "posted_at": "2026-11-07T00:15:00.123Z"
+    }
+   ],
+   "expected": "Question: What is new?\n\n<announcements>\n1. A \\u003c B\noffice: OSA | posted_at: 2026-11-07 | year_level: 1\nLine one Line two Line three\n</announcements>"
+  },
+  {
+   "name": "V3: the question is not escaped (as in v1); an empty excerpt leaves an empty third line",
+   "question": "Is <this> on?",
+   "results": [
+    {
+     "id": "9",
+     "title": "Notice",
+     "excerpt": "",
+     "office": "Office of the Secretary General",
+     "priority": "NORMAL",
+     "year_level": null,
+     "posted_at": "2026-11-01T10:00:00+08:00"
+    }
+   ],
+   "expected": "Question: Is <this> on?\n\n<announcements>\n1. Notice\noffice: Office of the Secretary General | posted_at: 2026-11-01\n\n</announcements>"
+  }
+ ]
+}

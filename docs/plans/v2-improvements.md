@@ -382,3 +382,34 @@ The rule of section 3 (d), with the user's decisions (section 7.3, 7.5, 7.6), wr
   - **Result: passes the keep rule (+1 answer correct). KEPT, pending the user's review of the two snapshot quotes (flow13 q12 and q13)**, as for (c), since they are snapshot text.
 - **Deviations from section 3, all written into the pre-registration before any code:** the text read is `title` + `excerpt` (the flow has no other body text), and the time pattern ends in a lookahead instead of `\b`.
 - **Result (2026-11-19): KEPT** (user review). q12's note follows the full date; q13 quotes the answering sentence, not the greeting; the user also checked all 12 extracts in `strip_nf-1-abcd.json` (each quotes the sentence with the correct date/time).
+
+## 2026-11-19: answer_v5 rule, pre-registered (fix (f), on top of the kept (a)–(e))
+
+The rule of section 3 (f) with the user's decision 7.4 (the compact format, `posted_at` labels, rank order), written out exactly. Written before any v5 code, prompt file or run. Time box: if (f) is not decided well before the 2026-12-01 freeze (by 2026-11-27), it is dropped (user, 7.5).
+
+- **The prompt:** `prompts/e2e_answer_v5.txt` is `e2e_answer_v1.txt` **byte for byte** (a new file only for versioning; a test checks the bytes are equal). No rule, word or line changes.
+- **The user message (format `compact_v5`):**
+  - `Question: <question>` + `\n\n<announcements>\n` + the blocks joined by `\n\n` + `\n</announcements>`, the same frame as v1
+  - one block per result, **in the given order** (rank_v1's), numbered from 1:
+    ```
+    N. <title>
+    office: <office> | posted_at: YYYY-MM-DD[ | year_level: Y]
+    <excerpt>
+    ```
+  - `YYYY-MM-DD` is `posted_date(posted_at)` (the wall-clock date as written, no time-zone conversion), the same date the results list shows
+  - ` | year_level: Y` only when `year_level` is not null (Y in decimal)
+  - title, office and excerpt: every run of whitespace (the `ECMA_WHITESPACE` set, as for the contract's `\s`) becomes one space, and both ends are trimmed; then every `<` becomes `<` (as v1 escapes the whole JSON)
+  - `id` and `priority` are left out (as in v2)
+  - no check that the order is newest first: v1's "later posted_at" rule still holds, because every block shows its `posted_at`
+- **Pairing:** answer prompt v5 always goes with `compact_v5`, and v1 with the JSON message. `flow(answer_format=...)` takes `None` (v1's JSON) or `"compact_v5"`; `eval_flow.py --answer-prompt v5` sets both. Any other pairing is refused.
+- **Phone:** `render.ts` gets `compactAnswerUserMessage` (same bytes), and the flow option `answerFormat`. The budget's case tokens are counted on the message that is sent, so the phone budget follows the shorter message automatically.
+- **Measured** (model runs; section 2, rule 5):
+  - **Base:** the kept set with answer v1. That is FINAL + and_v5 + (a) + (b) + (c) + (d) + window_v1, with `--reuse-queries` (the query prompt is unchanged): e2e34, taglish10 and flow13 from `strip_nf-1.json`, and rules10 from `rules10-shipped.json`.
+    - **Determinism check:** every case's path and text must equal the replays `strip_nf-1-abcd.json` / `rules10-shipped-abcd.json`. A difference stops (f) and is reported.
+    - This base run also serves as the cold confirmation that the kept set's replays hold.
+  - **New:** the same with `--answer-prompt v5`.
+  - **Keep rule:** `--nothing-worse BASE NEW --correct-case-by-case` on all four sets: helpful not lower, no new unsafe, wrong answers not higher, **no case loses answer-correct**.
+    - Extract cases make no answer call, so they are identical in both runs.
+  - **Also reported (deterministic, not part of the keep rule):** case tokens per set (mean and max) under v1 and v5, and the number of answer-calling cases. The benefit for budget phones is fewer case tokens; the dev score runs with the budget off.
+- **What could get worse:** like answer v4 (−7 AI-correct), a prompt-side change can move many answers. The case-by-case rule decides. No second attempt or wording change is made within this phase.
+- **Vectors:** `tests/vectors/answer_v5_vectors.json`, hand-written before any code: the exact user message for given results (rank order not newest first, a null and a set year_level, whitespace and `<` in every text field, a posted_at with a non-Manila offset).
