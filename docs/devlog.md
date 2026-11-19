@@ -19,6 +19,39 @@ Template:
 
 ---
 
+## 2026-11-19: v2 fix (f) answer_v5 pre-registered, built and run: fails the keep rule (2 cases lose answer-correct); NOT KEPT
+
+- **Date:** 2026-11-19 (+08:00)
+- **Pre-registered** (`7651aa8`, before any code, prompt file or run):
+  - **Prompt:** `prompts/e2e_answer_v5.txt` = v1 byte for byte.
+  - **Message (`compact_v5`):** numbered blocks in rank order: `N. title`, then `office: … | posted_at: YYYY-MM-DD[ | year_level: Y]`, then the excerpt. Text is ECMA-whitespace collapsed and `<` is escaped; `id` and `priority` are dropped.
+  - **Pairing:** v5 ⇔ compact_v5.
+  - **Measurement:** a v1 base that must equal the (a)–(d) replays; the keep rule is `--nothing-worse --correct-case-by-case` on all four sets.
+  - **Vectors:** 3 hand-written message vectors.
+- **Built** (`48b82c8`):
+  - **Python:** `compact_answer_user_message`, `flow(answer_format=...)`.
+  - **TS:** `compactAnswerUserMessage`, `collapseEcmaWhitespace`, and the `answerFormat` option. The phone's prompt text is unchanged (v5 = v1 bytes).
+  - **Harness:** `eval_flow.py --answer-prompt v5` sets the format.
+- **How it was verified:**
+  - **Tests:** `uv run pytest -q` → `1603 passed, 2 skipped`; Node 336/336; Hermes answer_v5 3/3, assistant 254/254, extract 30/30; generators up to date.
+  - **Mutation checks:** 7 mutants (4 Python, 3 TS compiling), all caught.
+  - **Runs** (Ollama 0.40.15, qwen3:0.6b, `--reuse-queries`): the kept set (rank_v1, and_v5, strip_nf_v1, window_v1, contradiction, echo, past_date, extract). e2e34, taglish10 and flow13 reuse `strip_nf-1.json`; rules10 reuses `rules10-shipped.json`. Each with answer v1 and v5 → `kept-v1.json`, `kept-v5.json`, `rules10-kept-v1.json`, `rules10-kept-v5.json`.
+  - **Determinism:** both v1 base runs equal the (a)–(d) replays (`strip_nf-1-abcd.json`, `rules10-shipped-abcd.json`) case for case, 57 + 10 cases. **This is the cold confirmation that the kept set's replays hold.**
+  - **Kept set (v1 base), totals of the three v1 dev sets:** helpful 39/42, answer correct (AI + extract) 28/29, extract correct 12/12, unsafe 0/57, traps clean 14/14, unrelated lists 2/14. rules10: helpful 7/10, wrong answers 1.
+  - **Keep rule:** `--nothing-worse kept-v1.json kept-v5.json --correct-case-by-case` → `RESULT: something got worse`.
+    - e2e34: e2e-009 lost answer-correct; e2e-029 gained.
+    - flow13: q01 lost answer-correct. Its v5 reply was blocked by the guard for an unsupported date and number, likely a stated `posted_at` date (not verified). Answer correct 6 → 5.
+    - taglish10: unchanged.
+    - rules10: `nothing got worse`; wrong answers 1 → 0 and r06 gained.
+    - No new unsafe anywhere.
+  - **Case tokens (reported, not in the rule):** mean e2e34 207 → 129, taglish10 306 → 195, flow13 402 → 282, rules10 438 → 295 (about −35%); answer calls unchanged.
+- **Result: (f) NOT KEPT.** The pre-registered case-by-case rule decides; no second attempt in this phase. The token saving and the rules10 improvement are recorded, but they don't override the rule.
+- **Kept set for FINAL_V2 (proposed):** FINAL (rank_v1, strip_nf_v1, answer v1) + and_v5 + contradiction_v1 + echo_v1 + past_date_v1 + extract_v1, with phone fallback window_v1. Its cold dev run is `kept-v1.json` / `rules10-kept-v1.json`.
+- **Commits:** `7651aa8`, `48b82c8`, this `docs:` commit. Not pushed. The v5 code stays in the repo, off by default (like answer v4).
+- **Open questions / next:** the user's go-ahead to freeze FINAL_V2 (frozen config, `eval_heldout.py` config `final_v2`, VERIFY, then the user's v2 final run), re-vendor the test app, and amend the integration guide.
+
+---
+
 ## 2026-11-19: v2 fix (d) extract_v1 KEPT (user review)
 
 - **Date:** 2026-11-19 (+08:00)

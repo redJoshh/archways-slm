@@ -413,3 +413,13 @@ The rule of section 3 (f) with the user's decision 7.4 (the compact format, `pos
   - **Also reported (deterministic, not part of the keep rule):** case tokens per set (mean and max) under v1 and v5, and the number of answer-calling cases. The benefit for budget phones is fewer case tokens; the dev score runs with the budget off.
 - **What could get worse:** like answer v4 (−7 AI-correct), a prompt-side change can move many answers. The case-by-case rule decides. No second attempt or wording change is made within this phase.
 - **Vectors:** `tests/vectors/answer_v5_vectors.json`, hand-written before any code: the exact user message for given results (rank order not newest first, a null and a set year_level, whitespace and `<` in every text field, a posted_at with a non-Manila offset).
+- **Built** (`48b82c8`) and **run** (2026-11-19, `--reuse-queries`, kept set + window_v1; `kept-v1`/`kept-v5`, `rules10-kept-v1`/`rules10-kept-v5`):
+  - **Determinism check passed:** the v1 base equals the (a)–(d) replays case for case (57 + 10). This is also the cold confirmation of the kept set's replays.
+  - **Keep rule: FAILED** ("something got worse"), case by case:
+    - e2e34: e2e-009 loses answer-correct (answer → answer_not_found); e2e-029 gains (answer_not_found → correct answer). Totals unchanged.
+    - flow13: q01 loses answer-correct. Its v5 reply was blocked by the guard (`unsupported_date:11-06`, `unsupported_number:2026`). That is likely a `posted_at` date stated as a fact, but this is not verified. Answer correct 6 → 5.
+    - taglish10: unchanged.
+    - rules10: OK, and better (wrong answers 1 → 0; r06 gains answer-correct).
+    - No new unsafe on any set; helpful unchanged everywhere.
+  - **Reported (not part of the rule):** answer calls are unchanged. Mean case tokens: e2e34 207 → 129, taglish10 306 → 195, flow13 402 → 282, rules10 438 → 295 (about −35%). Max flow13 876 → 608.
+  - **Result: NOT KEPT** (dropped). No second attempt or wording change in this phase. A compact format that avoids exposing a bare `posted_at` date could be a separately pre-registered v6 after the v2 final.
