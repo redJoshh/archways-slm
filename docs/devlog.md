@@ -19,6 +19,19 @@ Template:
 
 ---
 
+## 2026-11-19: v2 fix (d) extract_v1 KEPT (user review)
+
+- **Date:** 2026-11-19 (+08:00)
+- **Decision (user):** (d) is kept.
+  - flow13 q12 and q13 quotes are correct: q12's note comes after the full date, and q13 picks the answering sentence, not the greeting.
+  - The user also checked all 12 extracts in `strip_nf-1-abcd.json`: each quotes the sentence with the correct date/time.
+- **Kept set so far:** FINAL (rank_v1, strip_nf_v1, answer v1) + and_v5 (e) + contradiction_v1 (a) + echo_v1 (b) + past_date_v1 (c) + extract_v1 (d); phone fallback window_v1.
+- **How it was verified:** the user's review; the replay evidence is in the entry below.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** (f) answer prompt v5, pre-registered first; dropped if not done well before the 2026-12-01 freeze.
+
+---
+
 ## 2026-11-18: v2 fix (d) extract_v1 pre-registered, built and replayed: 12 dev extracts, all correct; nothing gets worse (+1 answer correct)
 
 - **Date:** 2026-11-18 (+08:00)

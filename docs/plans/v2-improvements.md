@@ -381,3 +381,4 @@ The rule of section 3 (d), with the user's decisions (section 7.3, 7.5, 7.6), wr
   - Read case by case (the recorded wrong-date risk): every quote has the same date (and time) as the earlier AI answer, or for taglish-01 the right window. No quote picked another date of a several-date row.
   - **Result: passes the keep rule (+1 answer correct). KEPT, pending the user's review of the two snapshot quotes (flow13 q12 and q13)**, as for (c), since they are snapshot text.
 - **Deviations from section 3, all written into the pre-registration before any code:** the text read is `title` + `excerpt` (the flow has no other body text), and the time pattern ends in a lookahead instead of `\b`.
+- **Result (2026-11-19): KEPT** (user review). q12's note follows the full date; q13 quotes the answering sentence, not the greeting; the user also checked all 12 extracts in `strip_nf-1-abcd.json` (each quotes the sentence with the correct date/time).
