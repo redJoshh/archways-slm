@@ -96,7 +96,11 @@ ANSWER_PROMPT = ROOT / "prompts" / "e2e_answer_v1.txt"
 ANSWER_PROMPTS = {
     "v1": ANSWER_PROMPT,
     "v4": ROOT / "prompts" / "e2e_answer_v4.txt",
+    "v5": ROOT / "prompts" / "e2e_answer_v5.txt",
 }
+# v2 fix (f): answer prompt v5 always goes with the compact_v5 message, and
+# every other prompt with v1's JSON message (v2-improvements.md, answer_v5).
+ANSWER_FORMATS = {"v1": None, "v4": None, "v5": assistant.COMPACT_V5}
 SETS = {
     "e2e34": (ROOT / "evals" / "e2e_cases.jsonl", "seed"),
     "taglish10": (ROOT / "evals" / "taglish_cases.jsonl", "seed"),
@@ -222,6 +226,7 @@ def run_case(
     echo: str | None = None,
     past_date: str | None = None,
     extract: str | None = None,
+    answer_format: str | None = None,
 ) -> dict:
     """One case through the full flow; returns the replies and the outcome.
 
@@ -292,7 +297,13 @@ def run_case(
                 record["search"] = "invalid_arguments"
             # With extract_v1, a case that extracts makes no count or answer call.
             _, calls, _ = assistant.flow(
-                question, now, prompts, query_reply, search_reply, extract=extract
+                question,
+                now,
+                prompts,
+                query_reply,
+                search_reply,
+                extract=extract,
+                answer_format=answer_format,
             )
             if calls.answer_case_part is not None:
                 case_tokens = generate(client, model, calls.answer_case_part, 1)[
@@ -318,6 +329,7 @@ def run_case(
         echo=echo,
         past_date=past_date,
         extract=extract,
+        answer_format=answer_format,
     )
     results = search_reply if isinstance(search_reply, list) else []
     record.update(
@@ -1009,6 +1021,7 @@ def main() -> None:
             "retry": args.retry,
             "excerpt": args.excerpt,
             "answer_prompt": args.answer_prompt,
+            "answer_format": ANSWER_FORMATS[args.answer_prompt],
             "strip_nf": args.strip_nf,
             "window": args.window,
             "contradiction": args.contradiction,
@@ -1057,6 +1070,7 @@ def main() -> None:
                     echo=args.echo,
                     past_date=args.past_date,
                     extract=args.extract,
+                    answer_format=ANSWER_FORMATS[args.answer_prompt],
                 )
                 score = score_outcome(
                     case,

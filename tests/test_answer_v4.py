@@ -73,7 +73,10 @@ def test_v4_system_turn_is_only_the_sentence_longer_than_v1():
 
 def test_eval_flow_defaults_to_v1_and_offers_v4():
     module = load_eval_flow()
-    assert module.ANSWER_PROMPTS == {"v1": V1, "v4": V4}
+    v5 = V1.parent / "e2e_answer_v5.txt"
+    assert module.ANSWER_PROMPTS == {"v1": V1, "v4": V4, "v5": v5}
+    # v2 fix (f): only v5 goes with the compact_v5 message.
+    assert module.ANSWER_FORMATS == {"v1": None, "v4": None, "v5": "compact_v5"}
     assert module.ANSWER_PROMPT == V1
 
 

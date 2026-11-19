@@ -38,6 +38,7 @@ const contradictionVectorsPath = join(root, "..", "tests", "vectors", "contradic
 const echoVectorsPath = join(root, "..", "tests", "vectors", "echo_vectors.json");
 const pastDateVectorsPath = join(root, "..", "tests", "vectors", "past_date_vectors.json");
 const extractVectorsPath = join(root, "..", "tests", "vectors", "extract_vectors.json");
+const answerV5VectorsPath = join(root, "..", "tests", "vectors", "answer_v5_vectors.json");
 
 const runner = `
 var log = typeof print === "function" ? print : console.log;
@@ -111,6 +112,11 @@ log("hermes extract vectors: " + extractReport.passed + "/" + extractReport.tota
     extractReport.failed + " failed");
 for (var xv = 0; xv < extractReport.failures.length; xv++) log("FAIL " + extractReport.failures[xv]);
 if (extractReport.failed) { throw new Error("extract vectors failed"); }
+var answerV5Report = runAnswerV5Vectors(ANSWER_V5_VECTORS);
+log("hermes answer_v5 vectors: " + answerV5Report.passed + "/" + answerV5Report.total + " passed, " +
+    answerV5Report.failed + " failed");
+for (var a5v = 0; a5v < answerV5Report.failures.length; a5v++) log("FAIL " + answerV5Report.failures[a5v]);
+if (answerV5Report.failed) { throw new Error("answer_v5 vectors failed"); }
 
 var flowVector = VECTORS.flow[0];
 askAssistant(flowVector.question, {
@@ -235,6 +241,7 @@ const BUNDLE_FILES = [
   ["assistant-ts", "src", "pastDateVectors.js"],
   ["assistant-ts", "src", "extract.js"],
   ["assistant-ts", "src", "extractVectors.js"],
+  ["assistant-ts", "src", "answerV5Vectors.js"],
 ];
 const declared = {};
 for (const parts of BUNDLE_FILES) {
@@ -265,6 +272,7 @@ const bundle = [
   "var ECHO_VECTORS = " + readFileSync(echoVectorsPath, "utf8").trim() + ";",
   "var PAST_DATE_VECTORS = " + readFileSync(pastDateVectorsPath, "utf8").trim() + ";",
   "var EXTRACT_VECTORS = " + readFileSync(extractVectorsPath, "utf8").trim() + ";",
+  "var ANSWER_V5_VECTORS = " + readFileSync(answerV5VectorsPath, "utf8").trim() + ";",
   runner,
 ].join("\n");
 mkdirSync(join(root, "dist-hermes"), { recursive: true });

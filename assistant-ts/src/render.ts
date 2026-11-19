@@ -20,7 +20,8 @@ import {
   RESULT_KEYS,
   WEEKDAYS,
 } from "./generated.ts";
-import { replaceAll } from "./text.ts";
+import { postedDate } from "../../guard-ts/src/guard.ts";
+import { collapseEcmaWhitespace, replaceAll } from "./text.ts";
 
 export const QWEN3_STOP: readonly string[] = ["<|im_end|>", "<|im_start|>"];
 const NO_THINK = " /no_think";
@@ -132,4 +133,28 @@ export function resultsJson(results: readonly Announcement[]): string {
 export function answerUserMessage(question: string, results: readonly Announcement[]): string {
   const data = replaceAll(resultsJson(results), "<", "\\u003c");
   return "Question: " + question + "\n\n<announcements>\n" + data + "\n</announcements>";
+}
+
+/** v2 fix (f): the answer call's user message format. null is v1's JSON. */
+export type AnswerFormat = "compact_v5" | null;
+
+function compactText(text: string): string {
+  return replaceAll(collapseEcmaWhitespace(text), "<", "\\u003c");
+}
+
+/**
+ * compact_v5 (a port of compact_answer_user_message): numbered blocks in
+ * the given (rank) order: "N. title", "office: O | posted_at: YYYY-MM-DD
+ * [| year_level: Y]", the excerpt. Text fields collapsed and < escaped.
+ */
+export function compactAnswerUserMessage(question: string, results: readonly Announcement[]): string {
+  const blocks: string[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const d = postedDate(r.posted_at);
+    let meta = "office: " + compactText(r.office) + " | posted_at: " + pad(d.year, 4) + "-" + pad(d.month, 2) + "-" + pad(d.day, 2);
+    if (r.year_level !== null) meta += " | year_level: " + String(r.year_level);
+    blocks.push(String(i + 1) + ". " + compactText(r.title) + "\n" + meta + "\n" + compactText(r.excerpt));
+  }
+  return "Question: " + question + "\n\n<announcements>\n" + blocks.join("\n\n") + "\n</announcements>";
 }

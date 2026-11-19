@@ -67,9 +67,11 @@ import {
   answerSystem,
   answerUserMessage,
   casePart,
+  compactAnswerUserMessage,
   querySystem,
   systemTurn,
   type Announcement,
+  type AnswerFormat,
 } from "./render.ts";
 import { replaceAll, trimAscii } from "./text.ts";
 
@@ -162,6 +164,8 @@ export interface FlowOptions {
   pastDate?: PastDateRule;
   /** v2 fix (d), extract.ts: a quote instead of the answer call. Omitted or null: off. */
   extract?: ExtractRule;
+  /** v2 fix (f): compact_v5 with answer prompt v5 (= v1's text). Omitted or null: v1's JSON. */
+  answerFormat?: AnswerFormat;
 }
 
 /**
@@ -204,6 +208,10 @@ export function startQuestion(
   }
   const extract: ExtractRule = options && options.extract ? options.extract : null;
   if (extract !== null && extract !== "extract_v1") throw new Error("unknown extract rule " + String(extract));
+  const answerFormat: AnswerFormat = options && options.answerFormat ? options.answerFormat : null;
+  if (answerFormat !== null && answerFormat !== "compact_v5") {
+    throw new Error("unknown answer format " + String(answerFormat));
+  }
   if (stripNf !== null && stripNf !== "strip_nf_v1") throw new Error("unknown strip_nf rule " + String(stripNf));
   const trace: Trace = {
     arguments: null,
@@ -304,7 +312,11 @@ export function startQuestion(
       }
     }
     const aPrefix = systemTurn(answerSystem(nowMs));
-    const aCase = casePart(answerUserMessage(question, results));
+    const aUser =
+      answerFormat === "compact_v5"
+        ? compactAnswerUserMessage(question, results)
+        : answerUserMessage(question, results);
+    const aCase = casePart(aUser);
     trace.answerCasePart = aCase;
     trace.answerPrompt = aPrefix + aCase;
     const call: ModelCall = { kind: "answer", prefix: aPrefix, prompt: aPrefix + aCase, nowMs: nowMs };
@@ -404,6 +416,8 @@ export interface AssistantDeps {
   pastDate?: PastDateRule;
   /** v2 fix (d) extract_v1. Omitted or null: off. */
   extract?: ExtractRule;
+  /** v2 fix (f) compact_v5. Omitted or null: v1's JSON message. */
+  answerFormat?: AnswerFormat;
 }
 
 export interface AssistantResult extends Outcome {
@@ -441,6 +455,7 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
       echo: deps.echo === undefined ? null : deps.echo,
       pastDate: deps.pastDate === undefined ? null : deps.pastDate,
       extract: deps.extract === undefined ? null : deps.extract,
+      answerFormat: deps.answerFormat === undefined ? null : deps.answerFormat,
     });
     while (step.kind !== "done") {
       const started = clock();

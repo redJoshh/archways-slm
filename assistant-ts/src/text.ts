@@ -49,6 +49,20 @@ export function hasLoneSurrogate(text: string): boolean {
   return false;
 }
 
+/** Runs of ECMA-262 WhiteSpace/LineTerminator as one space, ends trimmed. */
+export function collapseEcmaWhitespace(text: string): string {
+  const words: string[] = [];
+  let current = "";
+  for (let i = 0; i < text.length; i++) {
+    if (ECMA_SPACE[text.charCodeAt(i)]) {
+      if (current !== "") words.push(current);
+      current = "";
+    } else current += text.charAt(i);
+  }
+  if (current !== "") words.push(current);
+  return words.join(" ");
+}
+
 /** True if every character is ECMA-262 WhiteSpace or LineTerminator ("" too). */
 export function isAllEcmaWhitespace(text: string): boolean {
   for (let i = 0; i < text.length; i++) {

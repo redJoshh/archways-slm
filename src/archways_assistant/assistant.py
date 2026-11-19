@@ -224,6 +224,46 @@ def answer_user_message(question: str, results: list[dict]) -> str:
     return f"Question: {question}\n\n<announcements>\n{data}\n</announcements>"
 
 
+# v2 fix (f) (docs/plans/v2-improvements.md, "answer_v5 rule, pre-registered"):
+# the compact message that goes with answer prompt v5. None is v1's JSON.
+COMPACT_V5 = "compact_v5"
+ANSWER_FORMATS = (None, COMPACT_V5)
+
+
+def compact_text(text: str) -> str:
+    """Runs of ECMA_WHITESPACE as one space, ends trimmed, then < escaped."""
+    words, current = [], []
+    for char in text:
+        if char in ECMA_WHITESPACE:
+            if current:
+                words.append("".join(current))
+                current = []
+        else:
+            current.append(char)
+    if current:
+        words.append("".join(current))
+    return " ".join(words).replace("<", "\\u003c")
+
+
+def compact_answer_user_message(question: str, results: list[dict]) -> str:
+    """compact_v5: numbered blocks in the given (rank) order (vectors:
+    tests/vectors/answer_v5_vectors.json)."""
+    blocks = []
+    for number, result in enumerate(results, start=1):
+        meta = (
+            f"office: {compact_text(result['office'])} | "
+            f"posted_at: {posted_date(result['posted_at']).isoformat()}"
+        )
+        if result["year_level"] is not None:
+            meta += f" | year_level: {int(result['year_level'])}"
+        blocks.append(
+            f"{number}. {compact_text(result['title'])}\n{meta}\n"
+            f"{compact_text(result['excerpt'])}"
+        )
+    data = "\n\n".join(blocks)
+    return f"Question: {question}\n\n<announcements>\n{data}\n</announcements>"
+
+
 def code_points(text: str) -> int:
     return len(text)
 
@@ -611,6 +651,7 @@ def flow(
     echo: str | None = None,
     past_date: str | None = None,
     extract: str | None = None,
+    answer_format: str | None = None,
 ) -> tuple[Outcome, Calls | None, dict | None]:
     """One question through the UAT flow, with every step's result scripted.
 
@@ -638,6 +679,8 @@ def flow(
     after a search with results, a when/what-time question may take the
     "extract" path (a quote from the top result, then the list) with no
     token count, budget or answer call; past_date also notes the quote.
+    answer_format: None (v1's JSON message) or COMPACT_V5 (v2 fix (f), with
+    answer prompt v5): the answer call's user message.
     Returns the outcome, the prompts sent (None if no call was made) and the
     search arguments (None if no search was made).
     """
@@ -661,6 +704,8 @@ def flow(
 
     if extract not in (None, extract_rule.EXTRACT_V1):
         raise ValueError(f"unknown extract rule {extract!r}")
+    if answer_format not in ANSWER_FORMATS:
+        raise ValueError(f"unknown answer format {answer_format!r}")
     try:
         check_question(question)
     except ContractError:
@@ -711,7 +756,10 @@ def flow(
             return outcome, calls, arguments
 
     answer_system = fill_prompt(prompts["answer"], now)
-    user = answer_user_message(question, results)
+    if answer_format == COMPACT_V5:
+        user = compact_answer_user_message(question, results)
+    else:
+        user = answer_user_message(question, results)
     answer_prompt = render_qwen3(
         [
             {"role": "system", "content": answer_system},
