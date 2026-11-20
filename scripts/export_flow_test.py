@@ -12,11 +12,12 @@ gitignored JSON list of {id, category, question, expected}):
    to show whether the two differ.
 2. parse_query_reply() (the phone's parser) on the no-format reply, then
    the on-device-equivalent search, feedindex.search_feed(), with the frozen
-   FINAL configuration (archways_assistant.frozen: rank_v1 with the
-   question, and_v4, the first-500 excerpt, no retry; the phone defaults
-   since the 2026-11-16 freeze) on the snapshot at the same instant. An
+   FINAL_V2 configuration (archways_assistant.frozen: rank_v1 with the
+   question, and_v5, the first-500 excerpt, no retry; the phone defaults
+   since the 2026-11-20 v2 freeze) on the snapshot at the same instant. An
    invalid reply gets results null (the phone never searches then).
-   The test app's askAssistant() then applies strip_nf_v1 by default.
+   The test app's askAssistant() then applies strip_nf_v1 and the v2
+   rules (contradiction, echo, past_date, extract) by default.
 
 Writes one JSON file for the test app's fake search (--out, which must be
 in a gitignored folder: it holds announcement text). Prints ids and
@@ -42,7 +43,7 @@ from archways_assistant.assistant import (
     parse_query_reply,
 )
 from archways_assistant.feedindex import search_feed
-from archways_assistant.frozen import FINAL
+from archways_assistant.frozen import FINAL_V2
 from archways_assistant.render import render_qwen3
 from archways_assistant.snapshot import load_snapshot
 
@@ -50,7 +51,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SNAPSHOT = ROOT / "data" / "local" / "announcements_snapshot.json"
 DEFAULT_QUESTIONS = ROOT / "data" / "local" / "flow_test_questions.json"
 QUERY_N_PREDICT = 64  # assistant-ts N_PREDICT.query
-if FINAL.retry is not None:
+if FINAL_V2.retry is not None:
     sys.exit("export_flow_test.py has no retry path")
 OPTIONS = {
     **SAMPLING_OPTIONS,
@@ -103,7 +104,7 @@ def main() -> None:
         version = ollama_version(client)
         print(
             f"ollama {version}  commit {git_commit()}  model {args.model}  "
-            f"config {FINAL}  snapshot rows {len(rows)}  questions {len(questions)}"
+            f"config {FINAL_V2}  snapshot rows {len(rows)}  questions {len(questions)}"
         )
         cases = []
         for item in questions:
@@ -122,9 +123,9 @@ def main() -> None:
                     now,
                     contract,
                     question=item["question"],
-                    rank=FINAL.rank,
-                    matcher=FINAL.matcher,
-                    excerpt=FINAL.excerpt,
+                    rank=FINAL_V2.rank,
+                    matcher=FINAL_V2.matcher,
+                    excerpt=FINAL_V2.excerpt,
                 )
             )
             cases.append(
@@ -149,10 +150,10 @@ def main() -> None:
         "ollama": version,
         "commit": git_commit(),
         "model": args.model,
-        "matcher": FINAL.matcher,
-        "rank": FINAL.rank,
-        "excerpt": FINAL.excerpt,
-        "strip_nf": FINAL.strip_nf,
+        "matcher": FINAL_V2.matcher,
+        "rank": FINAL_V2.rank,
+        "excerpt": FINAL_V2.excerpt,
+        "strip_nf": FINAL_V2.strip_nf,
         "rows": len(rows),
         "cases": cases,
     }
