@@ -431,3 +431,18 @@ The rule of section 3 (f) with the user's decision 7.4 (the compact format, `pos
 - **Held-out:** `eval_heldout.py --config final_v2` = FINAL_V2 + window_v1, tied to `V2_SHA256` and the fixed now 2026-11-17T10:00:00+08:00.
 - **Run count (user correction):** the v2 file allows two runs **in total**. The baseline used one, so the v2 final is exactly **ONE** run.
 - **Dev evidence of the frozen set:** the cold runs `kept-v1.json` and `rules10-kept-v1.json` (devlog 2026-11-19).
+
+## 2026-11-20: v2 held-out FINAL and phase conclusion (closed)
+
+- **v2 final** (`--config final_v2`, `e958c48`, VERIFY OK at the same commit, run by the user, the single remaining run): helpful 12/24, answer correct 1/1, unsafe 0/30, traps clean 6/6, unrelated lists 0/6, coverage 12/24. Paths: answer 1, answer_not_found 13, not_found 16; no extract fired. Scored and human-reviewed are identical.
+  - v2 baseline: 12/24, 1/2, 0/30, 6/6, 0/6, 12/24.
+- **Conclusion (user):**
+  - The dev sets improved, but the held-out v2 set shows no measurable change.
+  - The echo check removed one useless answer.
+  - Extract never fired on natural Taglish (the every-content-word check is too strict).
+  - The lexicon recovered none of the 10 answerable no-result cases.
+  - The bottleneck is the model's query step.
+- **Across v1 and v2:**
+  - Tool-level fixes improved the dev sets but did not generalize to held-out questions.
+  - Safety held: unsafe 1/20 (v1) and 0/30 (v2), and all traps were clean.
+- **Both held-out sets are closed.** Future-work directions (query step, model capacity, fine-tuning) are recorded in the devlog and not started. Fine-tuning would need a new decision against ADR 0007's no-training rule.

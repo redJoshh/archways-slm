@@ -55,6 +55,7 @@ The three metrics of `accuracy-phase.md` section 0 (Helpfulness, AI answer accur
   - **Drift check:** `VERIFY OK` at the run commit with a clean tree, as before.
   - **What ships from the freeze:** the app = FINAL_V2 + window_v1. The phone defaults (`PHONE_*`) come from FINAL_V2; FINAL stays the v1 record and the base of `--config shipped`.
   - Any later change (for example a compact format without bare `posted_at` dates) is a v3 on a new held-out set.
+- **v2 closed (2026-11-20):** the v2 final ran once at `e958c48` (VERIFY OK, clean tree): helpful 12/24, the same as the v2 baseline; unsafe 0/30; traps clean 6/6. The v2 held-out file is closed, like the v1 file. Any further measurement needs a new held-out set. Fine-tuning, a recorded future-work direction, would need a new decision that changes this ADR's no-training rule.
 - **No pass/fail thresholds** are set in this ADR. The held-out run reports the baseline and final counts side by side. With so few cases it is a check that the dev-set gains carry over, not an error rate.
 
 ## Consequences

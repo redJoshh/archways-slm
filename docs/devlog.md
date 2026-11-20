@@ -19,6 +19,46 @@ Template:
 
 ---
 
+## 2026-11-20: v2 held-out FINAL (run 2 of 2, by the user; the v2 set is now closed); VERIFY OK at `e958c48`; v2 phase conclusion
+
+- **Date:** 2026-11-20 (+08:00)
+- **Drift check first:** `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` at `e958c48`, clean tree, Ollama 0.40.15 → `VERIFY OK` (57/57 identical). Run by Claude Code before the user's run (`data/local/runs/verify-baseline-e958c48.json`, header commit `e958c48`, `tree_dirty` false). Nothing was committed between VERIFY and the run.
+- **Run by the user, once:** the single remaining run on the v2 file, per the corrected protocol.
+  - **Settings:** `--config final_v2`, commit `e958c48`, `tree_dirty` false, fixed now 2026-11-17T10:00:00+08:00, Ollama 0.40.15, scorer_v1, and_v5, rank_v1, strip_nf_v1, window_v1, contradiction_v1, echo_v1, past_date_v1, extract_v1.
+- **Held-out file:** SHA-256 `ee9f407af9bd8899c1d247dcee10330dd1d2860b13e3c6f6482c81fd5839173c`, 30 cases. It matches the hash recorded before any v2 fix and the baseline's.
+- **Totals, next to the v2 baseline:**
+
+  | Run | | Helpful | Answer correct | Unsafe | Traps clean | Traps with an unrelated list | Coverage | Out of scope |
+  |---|---|---|---|---|---|---|---|---|
+  | v2 baseline (`shipped`, `4dd1c45`) | scored | 12/24 | 1/2 | 0/30 | 6/6 | 0/6 | 12/24 | 0 |
+  | v2 baseline | human-reviewed | 12/24 | 1/2 | 0/30 | | | | |
+  | **v2 final (`final_v2`, `e958c48`)** | scored | **12/24** | **1/1** | **0/30** | **6/6** | **0/6** | **12/24** | 0 |
+  | v2 final | human-reviewed | 12/24 | 1/1 | 0/30 | | | | |
+
+  - **Paths:** baseline answer 2, answer_not_found 12, not_found 16 → final answer 1, answer_not_found 13, not_found 16. **No extract fired.**
+  - "Answer correct" counts AI answers and extracts together; with no extract, it equals AI correct.
+- **The user's manual review:** the scored and human-reviewed numbers are identical (helpful 12/24, answers correct 1/1, unsafe 0/30).
+- **v2 phase conclusion (user):**
+  - **Dev improved:** taglish10 +1 answer correct (extract); rules10 helpful 6 → 7 and wrong answers 2 → 1 (contradiction); flow13 q08's echo answer removed. No case got worse on any dev set.
+  - **Held-out v2 shows no measurable change:** helpful 12/24 in both runs.
+    - The echo check removed one useless answer (the baseline's answer that only repeated the question). That is the only path change: answer 2 → 1, answer_not_found 12 → 13.
+    - **The extract path never fired on natural Taglish.** Its "every content word" check is too strict for these questions.
+    - **The lexicon recovered none of the 10 answerable no-result cases** (not_found 16 in both runs).
+    - **The bottleneck is the model's query step.**
+  - **Across both phases:**
+    - Tool-level fixes improved the dev sets but did not generalize to held-out questions (v1: helpful 13/16 in both runs, human-reviewed; v2: 12/24 in both runs).
+    - **Safety held:** unsafe 1/20 (v1 final) and 0/30 (v2 final); all traps clean in every held-out run.
+  - **Both held-out sets are now closed.** Any further change needs a new held-out set and a new decision.
+- **Future-work directions, recorded only (none started):**
+  1. **The query step:** the model's tool call (keywords, Taglish to English, days) is where answerable questions are lost. Options include a better query prompt (pre-registered), or deterministic query expansion from the question before or alongside the model's query.
+  2. **Model capacity:** a larger or newer on-device model, within the phone budget (ADR 0004 and the Gate 1 measurements).
+  3. **Fine-tuning** (for example of the query step on synthetic questions). **ADR 0007's standing rule is no training on announcements, and the user's standing instruction is "no training ever"**, so this needs an explicit new decision and ADR before any work.
+- **How it was verified:** the user's run output and review (pasted); VERIFY as above.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** re-vendor the test app from `e958c48`; the phone smoke test (including a simulated 2026-12-10); amend the integration guide to the FINAL_V2 commit.
+
+---
+
 ## 2026-11-20: FINAL_V2 frozen; eval_heldout.py --config final_v2; the phone defaults follow FINAL_V2
 
 - **Date:** 2026-11-20 (+08:00)
