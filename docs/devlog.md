@@ -19,6 +19,32 @@ Template:
 
 ---
 
+## 2026-11-20: Test app re-vendored from FINAL_V2 (`e958c48`); integration guide amended to FINAL_V2
+
+- **Date:** 2026-11-20 (+08:00)
+- **Test app** (`C:	hrow-away-app\gate1-llm`, `8003038`, not pushed):
+  - **Re-vendored** from `e958c48` with `git show`: every `assistant-ts/src/*.ts` and `guard-ts/src/*.ts`, plus the three vector files. The vendored file set equals the source set exactly.
+    - New: `contradiction.ts`, `echo.ts`, `pastDate.ts`, `extract.ts` and their vector runners; `andV5Vectors.ts`, `answerV5Vectors.ts`.
+    - Changed: `flow.ts`, `generated.ts` (FINAL_V2 `PHONE_*`), `render.ts`, `search.ts`, `searchData.ts`, `text.ts`, `feedIndex.ts`, `vectors.ts`; two vector JSONs.
+    - `VENDORED.md` records the full hash.
+  - **App code** (`questionRun.ts`, not vendored): `category()` shows the new `extract` path as "quote" (it would have fallen to "last resort"), and the path line now shows the outcome codes (`contradiction`, `echo`, `past_date`).
+  - `tsc --noEmit` clean.
+  - **`flow_test.json`** (gitignored, real announcement text): re-exported with `export_flow_test.py`, now searching with FINAL_V2 (`c97a65f`). Its 13 query replies and result ids are identical to the previous file (and_v5 changes no dev search).
+- **Integration guide** (`docs/integration/INTEGRATION.md`), amended (the user's request):
+  - **Vendor source:** `e958c48` (was `830dcfd`).
+  - **Section 1:** the shipped assistant = FINAL_V2 + window_v1, with table rows for and_v5, contradiction, echo, the past-date note and extract; answer v5 / compact_v5 is listed as off.
+  - **Section 3:** the flow diagram, and what the student sees on `extract` (the label "From the announcement below:", the quote, then the list).
+  - **M1:** the vendor commit. **M5:** the search defaults and the extract label check.
+  - **Section 6:** tester notes for quotes and "(already passed)".
+  - **Section 7:** v2 held-out numbers; the contradiction check's reach and its known false block; extract rarely firing on natural Taglish; the 10/24 no-result answerables (query step).
+  - Everything else is unchanged.
+- **`assistant-ts/README.md`:** the path table adds `extract`, and the v2 reasons for `guard_fired` (`contradiction`), `answer_not_found` (`echo`) and the `past_date` note.
+- **How it was verified:** `tsc --noEmit` in the test app; `uv run pytest -q` → `1607 passed, 2 skipped` after the exporter change; flow_test ids compared as above.
+- **Commits:** `c97a65f`, this `docs:` commit; test app `8003038`. Not pushed.
+- **Open questions / next:** the user's phone smoke test (real date and a simulated 2026-12-10).
+
+---
+
 ## 2026-11-20: v2 held-out FINAL (run 2 of 2, by the user; the v2 set is now closed); VERIFY OK at `e958c48`; v2 phase conclusion
 
 - **Date:** 2026-11-20 (+08:00)

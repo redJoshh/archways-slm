@@ -83,9 +83,10 @@ const result = await runtime.ask(question, { nowMs: Date.now, search: makeFeedSe
 
 | `path` | When | Text shown |
 |---|---|---|
-| `answer` | The guard passed the reply | `ANSWER_LABEL` ("AI answer, please check the announcements below."), a line break, the reply (ASCII whitespace trimmed), a blank line, then the results list |
-| `answer_not_found` | The reply is exactly `NOT_FOUND_MESSAGE` (after the ASCII trim) although results exist | The results list |
-| `guard_fired` | The guard rejected the reply | The results list |
+| `answer` | The guard passed the reply (and, by default since FINAL_V2, contradiction_v1 and echo_v1 didn't fire) | `ANSWER_LABEL` ("AI answer, please check the announcements below."), a line break, the reply (ASCII whitespace trimmed; with past_date_v1, " (already passed)" after past dates, code `past_date`), a blank line, then the results list |
+| `extract` | FINAL_V2 default (extract_v1): a when/what-time question whose top result has every question word and a dated sentence; **no token count, budget or answer call** | `EXTRACT_LABEL` ("From the announcement below:"), a line break, the quoted sentence (with past_date_v1's note), a blank line, then the results list |
+| `answer_not_found` | The reply is exactly `NOT_FOUND_MESSAGE` (after the ASCII trim) although results exist; or echo_v1: the reply only restates the question (code `echo`) | The results list |
+| `guard_fired` | The guard rejected the reply; or contradiction_v1: a permission question, a prohibition in a listed result, and a reply asserting permission (code `contradiction`) | The results list |
 | `budget_fallback` | Over budget (below): **no answer call** | The results list |
 | `answer_error` | Token counting, the answer call or the guard threw | The results list |
 | `not_found` | Valid search, no results: no answer call | `NOT_FOUND_MESSAGE` |

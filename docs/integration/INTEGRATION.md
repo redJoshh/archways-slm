@@ -2,7 +2,8 @@
 
 - **Status:** FROZEN 2026-11-17. It replaces the 2026-11-10 draft, which lived in a chat reply, not a file. Its 7 milestones are kept and updated below.
   - **Amended 2026-11-17 (user's request):** MD5 on the SDK 57 `File` API is confirmed supported, not deprecated (section 4, M2).
-- **Vendor source:** archways-assistant `830dcfd` (`830dcfd` and later docs-only commits have the same `assistant-ts/` and `guard-ts/`). Record the full hash in `vendor/archways/VENDORED.md`.
+  - **Amended 2026-11-20 (user's request): FINAL_V2.** The shipped assistant is now the frozen FINAL_V2 configuration + window_v1 (sections 1, 3, 5, 6, 7), vendored from `e958c48`. Everything else in this guide is unchanged.
+- **Vendor source:** archways-assistant **`e958c48`** (`e958c48cb0bb0787b90ff6d905e31e78818a590f`, the FINAL_V2 freeze; the v2 held-out final ran at this commit). Later docs-only commits have the same `assistant-ts/src` and `guard-ts/src`. Record the full hash in `vendor/archways/VENDORED.md`. (Was `830dcfd`, FINAL + window_v1.)
 - **Backend checked against:** `archways-backend` `origin/main` `a823988` (read-only, 2026-11-17).
 - **Mobile app checked against:** `archways-mobile` `origin/main` `b43ffdc` (expo `~57.0.30`, react-native `0.86.3`, expo-router, axios).
 - **Decisions behind it:** [ADR 0004](../decisions/0004-model-choice-qwen.md), [0005](../decisions/0005-gate-1-cold-definition.md), [0006](../decisions/0006-on-device-search-over-the-feed.md), [0007](../decisions/0007-no-training-and-held-out-protocol.md); the parts and their API: [`assistant-ts/README.md`](../../assistant-ts/README.md).
@@ -13,18 +14,22 @@ If this guide and the README disagree, this guide wins. The README's first examp
 
 ## 1. What ships
 
-**The shipped assistant = the evaluated FINAL configuration + window_v1** (ADR 0006 and ADR 0007 amendments, 2026-11-17).
+**The shipped assistant = the frozen FINAL_V2 configuration + window_v1** (ADR 0007 amendment, 2026-11-20; it replaces FINAL + window_v1 of 2026-11-17). FINAL_V2 is FINAL plus the v2 rules below, evaluated on the v2 held-out set at `e958c48`.
 
 | Part | Value | Where it's set |
 |---|---|---|
 | Model | qwen3:0.6b, Q4_K_M GGUF, untuned (no training, ADR 0007) | the model file (section 4) |
 | Query prompt | v1 | `generated.ts` (`QUERY_PROMPT_*`) |
 | Answer prompt | v1 | `generated.ts` (`ANSWER_PROMPT_*`) |
-| Search matcher | and_v4 | `PHONE_MATCHER` → `makeFeedSearch()` default |
+| Search matcher | and_v5 (and_v3's rules with synonym map v3 = v2's map + the Taglish lexicon v1, 98 Filipino/Taglish → English terms) | `PHONE_MATCHER` → `makeFeedSearch()` default |
 | Ranking | rank_v1 (by the raw question) | `PHONE_RANK` |
 | Not-found stripping | strip_nf_v1 | `PHONE_STRIP_NF` → `askAssistant()` default |
+| Contradiction check | contradiction_v1: a permission question, a prohibition in a listed result and a reply asserting permission → the list only (`guard_fired`, code `contradiction`) | `PHONE_CONTRADICTION` → `askAssistant()` default |
+| Echo check | echo_v1: a reply that only restates the question → the list only (`answer_not_found`, code `echo`) | `PHONE_ECHO` → `askAssistant()` default |
+| Past-date note | past_date_v1: " (already passed)" after past dates in the AI answer or the quote, never in the list (code `past_date`) | `PHONE_PAST_DATE` → `askAssistant()` default |
+| Quote for when-questions | extract_v1: a when/what-time question whose top result has every question word quotes its dated sentence, **with no answer call** (path `extract`) | `PHONE_EXTRACT` → `askAssistant()` default |
 | Window fallback | window_v1: after 0 results at `days` 30, the same search over 365 days | `PHONE_FALLBACK` (outside FINAL, `archways_assistant/phone.py`) |
-| Off | retry_v1, gate_v1, excerpt_v2_centred, answer prompt v4 | `PHONE_RETRY` / `PHONE_EXCERPT` = null |
+| Off | retry_v1, gate_v1, excerpt_v2_centred, answer prompt v4, answer prompt v5 / compact_v5 (dropped) | `PHONE_RETRY` / `PHONE_EXCERPT` = null; `answerFormat` omitted |
 
 - **Use the defaults:** call `makeFeedSearch(index)` and `runtime.ask(...)` with no configuration arguments. Every value above is a generated default. Never pass other values in the app.
 - **window_v1** can't change any dev or held-out result at the evaluation dates. It changes behaviour from about 2026-12-07, when the 2026-11-06/07 snapshot rows leave the 30-day window; that is its purpose. Checked on the Nothing Phone at a simulated 2026-12-10: 13/13 result ids as at the real date (devlog 2026-11-17).
@@ -64,8 +69,10 @@ The assistant uses only the student's own feed through the existing API. **Sprin
 ## 3. How the assistant behaves (what the app wires, not re-implements)
 
 ```
-question → [wait while "getting ready"] → query call → feed search (index, rank_v1, and_v4, window_v1)
-        → budget check → answer call → guard → strip_nf_v1 → label + reply + results list
+question → [wait while "getting ready"] → query call → feed search (index, rank_v1, and_v5, window_v1)
+        → [when-question and an admissible top result: extract label + quote + past-date note + results list; no answer call]
+        → budget check → answer call → guard → strip_nf_v1 → contradiction_v1 → echo_v1
+        → past-date note → label + reply + results list
 ```
 
 - **One serial model queue** (`queue.ts`, through `createAssistantRuntime`): every model call and token count goes through it. llama.rn runs one completion at a time; a query during priming failed on the Redmi 10C (118 ms).
@@ -80,8 +87,9 @@ question → [wait while "getting ready"] → query call → feed search (index,
   - Don't add an app timeout under 15 s around a question.
 - **Re-measure:** after priming and after each question, if the answer generation rate is unknown or below 0.6 × the query's, one exclusive measuring call runs, at most 2 per Manila day.
 - **What the student sees** (`result.text` only, never anything else):
-  - **`answer`:** the label "AI answer, please check the announcements below.", the model's reply (after the guard and strip_nf_v1), then the **results list**.
-  - **Every other path with results** (not found by the model, guard fired, over budget, answer error): the results list only.
+  - **`answer`:** the label "AI answer, please check the announcements below.", the model's reply (after the guard, strip_nf_v1, contradiction_v1 and echo_v1, with " (already passed)" after past dates), then the **results list**.
+  - **`extract`** (FINAL_V2): the label "From the announcement below:", one sentence quoted from the top result (with " (already passed)" after past dates), then the **results list**. No model text: the quote is the announcement's own words.
+  - **Every other path with results** (not found by the model, the model only restated the question, guard or contradiction fired, over budget, answer error): the results list only.
   - **No results:** "No official announcement was found for your question."
   - **Errors before a search:** the last-resort message.
   - The list is "These announcements may help:", then one line per result with its title and posted date.
@@ -135,7 +143,7 @@ question → [wait while "getting ready"] → query call → feed search (index,
   - the `eas-build-post-install` script (`node ./node_modules/llama.rn/install/download-native-artifacts.js`)
   - `arm64-v8a` in `eas.json`
 - **TypeScript and lint:** `allowImportingTsExtensions`; ignore `vendor/**` in lint.
-- **Vendor:** copy `assistant-ts/src/*.ts` and `guard-ts/src/*.ts` from **`830dcfd`** into `vendor/archways/`, in the same layout, with `git show` (the committed bytes). Record the hash in `VENDORED.md`. **Never edit vendored files**; re-vendor instead.
+- **Vendor:** copy `assistant-ts/src/*.ts` and `guard-ts/src/*.ts` from **`e958c48`** into `vendor/archways/`, in the same layout, with `git show` (the committed bytes). Record the hash in `VENDORED.md`. **Never edit vendored files**; re-vendor instead.
 - **Vector screen:** a dev-only screen runs the guard, assistant, feed and window_v1 vectors. The vector JSON files and `*Vectors.ts` runners stay out of preview builds.
 - **Rebuild:** `eas build --profile development`.
 - **Note:** on Windows, run `npm ci` / `npm install` from PowerShell. Under Git Bash, GNU tar fails on llama.rn's native-artifact download (`C:` read as a host; devlog 2026-11-17).
@@ -204,13 +212,14 @@ question → [wait while "getting ready"] → query call → feed search (index,
 - **Behaviour:**
   - input of at most 500 code points
   - show **only `result.text`**
-  - **search:** `makeFeedSearch(index)` with its defaults (FINAL + window_v1); `nowMs: Date.now`
+  - **search:** `makeFeedSearch(index)` with its defaults (FINAL_V2 + window_v1); `nowMs: Date.now`
   - no app timeout under 15 s
 - **UI:** theme tokens and shared UI components. States for loading, getting ready (`runtime.state()`), error and empty.
 - **Privacy line** on the screen: "Your questions are processed on this phone and never sent to the server."
 - **Accept:**
   - every README path shows the right text
   - the AI label appears only on `answer`, above the reply, with the list below
+  - the label "From the announcement below:" appears only on `extract`, above the quote, with the list below
   - list items open `/announcement/[id]`
   - tap targets ≥ 44 with accessibility labels
 
@@ -245,16 +254,23 @@ question → [wait while "getting ready"] → query call → feed search (index,
 - **Battery and heat:** the first download (523 MB), priming and every question run the CPU hard. Phones get warm, and battery drains faster during a session. Test on a charger where possible, and report heat or throttling with the phone model.
 - **Getting ready:** after sign-in, and on the first use of each day, the assistant primes for up to ~30 s on budget phones (~5 s on mid-range). Questions asked meanwhile wait; they don't fail.
 - **Every AI answer is labelled.** Testers should check it against the listed announcements, which are the source.
+- **Quotes are labelled too** ("From the announcement below:"): for some when/what-time questions the app quotes the top announcement's sentence instead of asking the model. It is faster, and the words are the announcement's own.
+- **"(already passed)"** after a date means that date is before today. It does not mean the announcement is withdrawn.
 
-## 7. Known limitations (from the held-out final, 2026-11-17, and phone runs)
+## 7. Known limitations (from the held-out finals, v1 2026-11-17 and v2 2026-11-20, and phone runs)
 
 - **False "not found":** the largest failure. The model says it found nothing although a matching announcement is in the results (held-out: 8 of 16 answerable questions on that path). It is a model-capacity limit, so prompt changes didn't fix it. **Mitigation:** the results list is shown on every path with results.
-- **Contradiction on yes/no questions:** one held-out AI answer said something is allowed where its source prohibits it. Same type as at the baseline, unchanged by any fix. The automatic scorer can't detect it.
-- **Past-date framing:** a past event can be stated in the present tense (for example "is held" for an August date). The date itself is correct.
+- **Contradiction on yes/no questions:** in v1, one held-out AI answer said something is allowed where its source prohibits it. **FINAL_V2's contradiction check** blocks such an answer (the list is shown instead) when the source uses a listed prohibition word. Its reach is narrow (it only fires on such wording), and it can also block a correct Taglish answer that repeats "pwede" before stating the prohibition (the student still sees the list).
+- **Past-date framing:** a past event can still be stated in the present tense (for example "is held" for an August date). **FINAL_V2** adds " (already passed)" after a past date whose year is known.
+- **The quote path rarely fires on natural Taglish:** its "every question word in the top announcement" check is strict. On the v2 held-out set it never fired; on dev it fired on 12 of 57 questions.
+- **Answerable questions with no results:** on the v2 held-out set, 10 of 24 answerable questions got no search results. The bottleneck is the model's query step (its keywords), not the lexicon.
 - **Budget phones mostly show lists:** on slow phones the time budget skips the answer call more often (Redmi 10C replay, README: e2e-004 predicted 13.9 s and answers; e2e-009 predicted 21.7 s and falls back). The student sees the results list instead of an AI answer.
 - **Phone vs laptop runtime:** llama.rn on the phone and Ollama on the laptop can differ on the same prompt. At a simulated 2026-12-10, one flow question gave an AI answer on the phone and the list on Ollama. Evaluation numbers come from Ollama.
 - **window_v1 can surface old rows** when nothing in the last 30 days matches. The list shows each row's posted date.
-- **Held-out numbers** (human-reviewed): helpful 13/16, AI correct 3/6, unsafe 1/20. That set is closed; any later change is a v2 on a new held-out set (ADR 0007).
+- **Held-out numbers** (human-reviewed):
+  - v1 set (FINAL): helpful 13/16, AI correct 3/6, unsafe 1/20.
+  - **v2 set (FINAL_V2, `e958c48`): helpful 12/24, answers correct 1/1, unsafe 0/30, traps clean 6/6**, the same helpful as the v2 baseline (12/24). The dev-set gains did not show on the held-out questions; safety held.
+  - Both sets are closed. Any later change needs a new held-out set (ADR 0007).
 
 ## 8. Never
 
