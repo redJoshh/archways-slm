@@ -19,6 +19,32 @@ Template:
 
 ---
 
+## 2026-11-20: Phone smoke test of FINAL_V2 (by the user): real date and a simulated 2026-12-10
+
+- **Date:** 2026-11-20 (+08:00)
+- **Readiness check, not scored.** Not compared as a result, and not used to change anything.
+- **Setup:** Nothing Phone 3a Pro; test app live mode, `8003038` (vendored from FINAL_V2 `e958c48`); local dev-profile Spring; the real local feed, 53 rows. Phone defaults: FINAL_V2 + window_v1.
+- **Run 1, real date (2026-11-20):** index 53 rows (fetch 4,105 ms); 13 flow questions.
+  - **Paths:** answer 5 (q01–q04, q06), answer_not_found 5 (q05, q07, q08, q09, q11), not_found 1 (q10, the trap, clean), extract ("quote") 2 (q12, q13).
+  - **Quotes:** q12 has code `past_date` (the note follows the past date); q13 has no note (a future date). Both made no answer call and took ~0.9–1.0 s.
+  - **Echo:** q08 → `answer_not_found` with code `echo`, as in the dev runs.
+  - **Contradiction:** the typed question "Can I wear a crop top?" → `guard_fired` with code `contradiction`: the list only, no "yes".
+  - **Whole-question times:** 0.9–10.2 s.
+  - **Same paths as the Ollama dev run of the frozen set** (`kept-v1.json`, flow13 at 2026-11-10: answer 5, answer_not_found 5, extract 2, not_found 1), at another prompt date. The case-by-case match was not compared.
+- **Run 2, simulated now 2026-12-10T10:00:00+08:00 (DEV ONLY field):**
+  - **Result ids are identical to run 1 for all 13 questions** (window_v1, with no row within 30 days).
+  - q12 and q13 still quote: q12 with the note, q13 without.
+  - q05 took the answer path with a vague reply; the list shows both sources. This is phone runtime variance, as at the 2026-11-17 check, where q05 also answered at this date on the phone.
+  - **Whole-question times:** 0.9–13.1 s (the slowest is q01, the first question after the re-prime at the new date).
+- **Conclusion:**
+  - FINAL_V2 runs on the device as evaluated: the quote path (with and without the past-date note), echo and contradiction all fire on the phone; window_v1 still works at the simulated date; the trap is clean.
+  - Quotes answer in about 1 s, with no answer call.
+- **How it was verified:** docs only. The values are copied from the user's paste; no announcement text is recorded.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** none from this check. The v2 phase is closed; future-work directions are recorded (entry "v2 held-out FINAL").
+
+---
+
 ## 2026-11-20: Correction to the re-vendor entry (test app path)
 
 - **Date:** 2026-11-20 (+08:00)
