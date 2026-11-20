@@ -19,6 +19,16 @@ Template:
 
 ---
 
+## 2026-11-20: Correction to the re-vendor entry (test app path)
+
+- **Date:** 2026-11-20 (+08:00)
+- **Correction:** in the entry "Test app re-vendored from FINAL_V2", the test app path was written with a tab in place of `\t`. The path is `C:\throw-away-app\gate1-llm`, as in earlier entries.
+- **How it was verified:** read back the entry.
+- **Commits:** this `docs:` commit. Not pushed.
+- **Open questions / next:** none.
+
+---
+
 ## 2026-11-20: Test app re-vendored from FINAL_V2 (`e958c48`); integration guide amended to FINAL_V2
 
 - **Date:** 2026-11-20 (+08:00)
