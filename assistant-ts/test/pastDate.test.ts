@@ -42,6 +42,8 @@ function ask(reply: string, pastDate?: "past_date_v1" | null) {
       Promise.resolve({ text: call.kind === "query" ? '{"query": "Misa de Apertura", "days": 30}' : reply }),
     search: () => Promise.resolve([RESULT]),
     countTokens: () => Promise.resolve(150),
+    // The answer path: extract_v1 (on by default) would quote instead.
+    extract: null,
     ...(pastDate === undefined ? {} : { pastDate: pastDate }),
   });
 }
@@ -56,8 +58,10 @@ test("askAssistant with past_date_v1 notes the answer, never the list", async ()
   assert.equal(result.text.slice(at).indexOf(PAST_DATE_NOTE), -1);
 });
 
-test("askAssistant default is off; a future date gets no note", async () => {
-  const off = await ask("It is held on August 7, 2026.");
+test("askAssistant default is on (FINAL_V2), null is off; a future date gets no note", async () => {
+  const on = await ask("It is held on August 7, 2026.");
+  assert.ok(on.text.indexOf(PAST_DATE_NOTE) !== -1);
+  const off = await ask("It is held on August 7, 2026.", null);
   assert.equal(off.text.indexOf(PAST_DATE_NOTE), -1);
   const future = await ask("It is on January 15, 2027.", "past_date_v1");
   assert.equal(future.text.indexOf(PAST_DATE_NOTE), -1);

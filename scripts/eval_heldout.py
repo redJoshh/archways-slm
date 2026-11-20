@@ -4,6 +4,7 @@ Usage (the user runs this; Claude Code never does):
     uv run python scripts/eval_heldout.py PATH --config baseline
     uv run python scripts/eval_heldout.py PATH --config final
     uv run python scripts/eval_heldout.py PATH_V2 --config shipped   (v2 baseline)
+    uv run python scripts/eval_heldout.py PATH_V2 --config final_v2  (v2 final)
 
 docs/plans/accuracy-phase.md, section 2 (frozen 2026-11-14), and ADR 0007:
 
@@ -46,10 +47,16 @@ belongs to one protocol, so the date can't be mixed up:
 - v1 configs: baseline, final (fixed now 2026-11-14T10:00:00+08:00).
 - v2 configs: shipped = frozen.FINAL + window_v1 (archways_assistant.phone,
   what the app ships; the v2 BASELINE), fixed now 2026-11-17T10:00:00+08:00.
-  The v2 FINAL config is added at the v2 freeze.
+- final_v2 = frozen.FINAL_V2 + window_v1 (added at the v2 freeze,
+  2026-11-20): rank_v1, and_v5, strip_nf_v1, answer v1, contradiction_v1,
+  echo_v1, past_date_v1, extract_v1 (an extract is scored as an answer and
+  "extract correct" is printed after the totals); fixed now
+  2026-11-17T10:00:00+08:00.
 - A v2 config refuses any file but the recorded one, and a v1 config
   refuses the v2 file, before any model call (hash only; no value printed).
-At most two v2 runs, by the user, same manual review.
+Two v2 runs IN TOTAL (user correction, 2026-11-20): the baseline (shipped,
+run 2026-11-17) used one, so the v2 final (final_v2) is exactly ONE run, by
+the user, same manual review. Never again on this file.
 
 A malformed file stops the run with the line number and the field name,
 never a value.
@@ -99,15 +106,15 @@ from archways_assistant.evalflow import (
     load_cases,
     totals,
 )
-from archways_assistant.frozen import FINAL
+from archways_assistant.frozen import FINAL, FINAL_V2
 
 FIXED_NOW = datetime.fromisoformat("2026-11-14T10:00:00+08:00")
 FIXED_NOW_V2 = datetime.fromisoformat("2026-11-17T10:00:00+08:00")
 # The v2 held-out file's SHA-256, recorded by the user with Get-FileHash on
 # 2026-11-17, before any v2 fix was built.
 V2_SHA256 = "ee9f407af9bd8899c1d247dcee10330dd1d2860b13e3c6f6482c81fd5839173c"
-CONFIGS = ("baseline", "final", "shipped")
-V2_CONFIGS = ("shipped",)
+CONFIGS = ("baseline", "final", "shipped", "final_v2")
+V2_CONFIGS = ("shipped", "final_v2")
 MODEL = "qwen3:0.6b"
 REPO = Path(__file__).resolve().parents[1]
 
@@ -116,6 +123,19 @@ def config_run(name: str) -> tuple[Path, dict]:
     """(answer prompt, run_case keyword arguments) of a config."""
     if name == "baseline":
         return ANSWER_PROMPT, {}
+    if name == "final_v2":
+        return REPO / FINAL_V2.answer_prompt, {
+            "rank": FINAL_V2.rank,
+            "matcher": FINAL_V2.matcher,
+            "retry": FINAL_V2.retry,
+            "excerpt": FINAL_V2.excerpt,
+            "strip_nf": FINAL_V2.strip_nf,
+            "window": phone.FALLBACK,
+            "contradiction": FINAL_V2.contradiction,
+            "echo": FINAL_V2.echo,
+            "past_date": FINAL_V2.past_date,
+            "extract": FINAL_V2.extract,
+        }
     options = {
         "rank": FINAL.rank,
         "matcher": FINAL.matcher,

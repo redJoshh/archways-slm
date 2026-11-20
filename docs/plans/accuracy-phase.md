@@ -735,6 +735,7 @@ Plan: [`v2-improvements.md`](v2-improvements.md), approved 2026-11-17. ADR 0007,
   - The **v2 FINAL** is the v2 kept set (a new frozen config, added at the v2 freeze).
   - The v1 configs `baseline` and `final` refuse the v2 file.
 - **Runs:** at most two runs, by the user, each with the same manual review of the private report. Scored and human-reviewed numbers side by side.
+  - **Correction (user, 2026-11-20):** two runs **in total** on the v2 file. The baseline used one, so the v2 final (`--config final_v2`) is exactly **one** run (ADR 0007 amendment).
 - **Drift check:** before the v2 baseline, `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` prints `VERIFY OK` at the run commit, with a clean tree.
 - **Order:** the v2 baseline runs before any v2 fix is built.
 - **v2 fixes:** the rules of section 3 apply, plus "no case loses AI-correct" (case by case). They are scored on the dev sets only, in the order a → b → c → e → d → f (time box 2026-12-01).

@@ -50,7 +50,9 @@ test("askAssistant with echo_v1: answer_not_found, the list and the code", async
   assert.equal(result.path, "answer_not_found");
   assert.ok(result.codes.indexOf("echo") !== -1);
   assert.ok(result.text.startsWith("These announcements may help:"));
-  assert.equal((await ask(q, "The campus ban on plastics includes items.", {})).path, "answer");
+  // Default on (FINAL_V2); null is off.
+  assert.equal((await ask(q, "The campus ban on plastics includes items.", {})).path, "answer_not_found");
+  assert.equal((await ask(q, "The campus ban on plastics includes items.", { echo: null })).path, "answer");
   assert.equal((await ask(q, "It covers straws, stirrers and plastic bags.", { echo: "echo_v1" })).path, "answer");
 });
 

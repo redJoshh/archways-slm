@@ -126,6 +126,8 @@ askAssistant(flowVector.question, {
   },
   search: function () { return Promise.resolve(flowVector.search_reply); },
   countTokens: function () { return Promise.resolve(flowVector.case_tokens); },
+  // The UAT rule set: the v2 rules (on by default since FINAL_V2) off, to match the UAT vectors.
+  contradiction: null, echo: null, pastDate: null, extract: null,
 }).then(function (result) {
   var ok = result.path === flowVector.expected.path && result.text === flowVector.expected.text;
   log("hermes askAssistant " + flowVector.id + ": " + result.path + (ok ? " (as expected)" : " (WRONG)"));
@@ -177,6 +179,8 @@ var priming = runtime.prime(answerVector.now_ms);
 var asked = runtime.ask(answerVector.question, {
   nowMs: function () { return answerVector.now_ms; },
   search: function () { return Promise.resolve(answerVector.search_reply); },
+  // The UAT rule set: the v2 rules (on by default since FINAL_V2) off, to match the UAT vectors.
+  contradiction: null, echo: null, pastDate: null, extract: null,
 });
 var stateDuring = runtime.state();
 function settle(n) {

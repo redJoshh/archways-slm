@@ -45,6 +45,10 @@ function ask(reply: string, contradiction?: "contradiction_v1" | null) {
       Promise.resolve({ text: call.kind === "query" ? '{"query": "crop top", "days": 30}' : reply }),
     search: () => Promise.resolve([RESULT]),
     countTokens: () => Promise.resolve(150),
+    // Only contradiction_v1 under test: the other v2 rules off.
+    echo: null,
+    pastDate: null,
+    extract: null,
     ...(contradiction === undefined ? {} : { contradiction: contradiction }),
   });
 }
@@ -56,7 +60,8 @@ test("askAssistant with contradiction_v1 blocks with the list and the code", asy
   assert.ok(result.text.startsWith("These announcements may help:"));
 });
 
-test("askAssistant default is off; a correct no passes with the rule on", async () => {
-  assert.equal((await ask("Yes, you can wear a crop top.")).path, "answer");
+test("askAssistant default is on (FINAL_V2), null is off; a correct no passes", async () => {
+  assert.equal((await ask("Yes, you can wear a crop top.")).path, "guard_fired");
+  assert.equal((await ask("Yes, you can wear a crop top.", null)).path, "answer");
   assert.equal((await ask("No, crop tops are not allowed.", "contradiction_v1")).path, "answer");
 });

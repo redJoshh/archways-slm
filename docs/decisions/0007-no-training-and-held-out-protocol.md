@@ -48,6 +48,13 @@ The three metrics of `accuracy-phase.md` section 0 (Helpfulness, AI answer accur
   - **Runs:** at most two, by the user, with the same manual review and scored and human-reviewed numbers side by side.
   - **Drift check:** `VERIFY OK` at the run commit, clean tree, before the baseline.
   - **Rules for v2 changes:** the same no-training rule. Each change is pre-registered, with parity and dev-only scoring, plus "no case loses AI-correct". The kept set is frozen by 2026-12-01.
+- **v2 freeze and the run count (user, 2026-11-20):**
+  - **Correction:** the v2 held-out file allows **two runs in total**. The baseline (`--config shipped`, 2026-11-17) used one, so **the v2 final is exactly ONE run** (`--config final_v2`). After it, the v2 file is closed like the v1 file.
+  - **Final:** `--config final_v2` = `frozen.FINAL_V2` + window_v1, at the same fixed now 2026-11-17T10:00:00+08:00. FINAL_V2 is rank_v1, and_v5 (the Taglish lexicon), strip_nf_v1, answer v1, contradiction_v1, echo_v1, past_date_v1 and extract_v1. Answer prompt v5, fix (f), was dropped.
+  - **Scoring:** an extract is scored as an answer by scorer_v1 (unchanged), and "extract correct" is printed after the totals.
+  - **Drift check:** `VERIFY OK` at the run commit with a clean tree, as before.
+  - **What ships from the freeze:** the app = FINAL_V2 + window_v1. The phone defaults (`PHONE_*`) come from FINAL_V2; FINAL stays the v1 record and the base of `--config shipped`.
+  - Any later change (for example a compact format without bare `posted_at` dates) is a v3 on a new held-out set.
 - **No pass/fail thresholds** are set in this ADR. The held-out run reports the baseline and final counts side by side. With so few cases it is a check that the dev-set gains carry over, not an error rate.
 
 ## Consequences

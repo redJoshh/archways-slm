@@ -54,6 +54,10 @@ import {
   FALLBACK_HEADER,
   LAST_RESORT_MESSAGE,
   NOT_FOUND_MESSAGE,
+  PHONE_CONTRADICTION,
+  PHONE_ECHO,
+  PHONE_EXTRACT,
+  PHONE_PAST_DATE,
   PHONE_STRIP_NF,
   RESULTS_HEADER,
 } from "./generated.ts";
@@ -408,13 +412,13 @@ export interface AssistantDeps {
    * null: off (the UAT baseline flow).
    */
   stripNf?: StripNf;
-  /** v2 fix (a) contradiction_v1. Omitted or null: off. */
+  /** v2 fix (a) contradiction_v1. Omitted: on (FINAL_V2, PHONE_*); null: off. */
   contradiction?: ContradictionRule;
-  /** v2 fix (b) echo_v1. Omitted or null: off. */
+  /** v2 fix (b) echo_v1. Omitted: on (FINAL_V2, PHONE_*); null: off. */
   echo?: EchoRule;
-  /** v2 fix (c) past_date_v1. Omitted or null: off. */
+  /** v2 fix (c) past_date_v1. Omitted: on (FINAL_V2, PHONE_*); null: off. */
   pastDate?: PastDateRule;
-  /** v2 fix (d) extract_v1. Omitted or null: off. */
+  /** v2 fix (d) extract_v1. Omitted: on (FINAL_V2, PHONE_*); null: off. */
   extract?: ExtractRule;
   /** v2 fix (f) compact_v5. Omitted or null: v1's JSON message. */
   answerFormat?: AnswerFormat;
@@ -451,10 +455,11 @@ export async function askAssistant(question: string, deps: AssistantDeps): Promi
   try {
     let step = startQuestion(question, deps.nowMs(), deps.speed ? deps.speed.get() : null, {
       stripNf: deps.stripNf === undefined ? PHONE_STRIP_NF : deps.stripNf,
-      contradiction: deps.contradiction === undefined ? null : deps.contradiction,
-      echo: deps.echo === undefined ? null : deps.echo,
-      pastDate: deps.pastDate === undefined ? null : deps.pastDate,
-      extract: deps.extract === undefined ? null : deps.extract,
+      // Omitted: the frozen FINAL_V2 defaults (generated PHONE_*).
+      contradiction: deps.contradiction === undefined ? PHONE_CONTRADICTION : deps.contradiction,
+      echo: deps.echo === undefined ? PHONE_ECHO : deps.echo,
+      pastDate: deps.pastDate === undefined ? PHONE_PAST_DATE : deps.pastDate,
+      extract: deps.extract === undefined ? PHONE_EXTRACT : deps.extract,
       answerFormat: deps.answerFormat === undefined ? null : deps.answerFormat,
     });
     while (step.kind !== "done") {

@@ -141,10 +141,10 @@ def test_a_failing_case_prints_no_value_and_no_totals(tmp_path, monkeypatch, cap
     assert "case number 1 failed (ValueError)" in str(stop.value.code)
 
 
-def test_the_configs_are_baseline_final_and_shipped():
+def test_the_configs_are_baseline_final_shipped_and_final_v2():
     module = load_script()
-    assert module.CONFIGS == ("baseline", "final", "shipped")
-    assert module.V2_CONFIGS == ("shipped",)
+    assert module.CONFIGS == ("baseline", "final", "shipped", "final_v2")
+    assert module.V2_CONFIGS == ("shipped", "final_v2")
     assert module.FIXED_NOW_V2.isoformat() == "2026-11-17T10:00:00+08:00"
     assert module.V2_SHA256 == (
         "ee9f407af9bd8899c1d247dcee10330dd1d2860b13e3c6f6482c81fd5839173c"
@@ -451,7 +451,7 @@ def test_shipped_is_final_plus_window_v1_at_the_v2_date(tmp_path, monkeypatch, c
     assert {k: settings[k] for k in shipped} == shipped
 
 
-@pytest.mark.parametrize("config", ["shipped"])
+@pytest.mark.parametrize("config", ["shipped", "final_v2"])
 def test_a_v2_config_refuses_any_other_file_before_any_run(
     tmp_path, monkeypatch, config
 ):
@@ -478,3 +478,66 @@ def test_a_v1_config_refuses_the_v2_file(tmp_path, monkeypatch, config):
         module.main()
     assert "v1 set is closed" in str(stop.value.code)
     assert calls == []
+
+
+FINAL_V2_OPTIONS = {
+    "rank": "rank_v1",
+    "matcher": "and_v5",
+    "retry": None,
+    "excerpt": None,
+    "strip_nf": "strip_nf_v1",
+    "window": "window_v1",
+    "contradiction": "contradiction_v1",
+    "echo": "echo_v1",
+    "past_date": "past_date_v1",
+    "extract": "extract_v1",
+}
+
+
+def test_final_v2_is_the_kept_set_plus_window_v1_at_the_v2_date(
+    tmp_path, monkeypatch, capsys
+):
+    module = load_script()
+    as_v2_file(module, monkeypatch, tmp_path)
+    seen = []
+
+    def fake_run_case(client, model, case, prompts, rows, contract, **options):
+        seen.append((case["now"], prompts["answer"], options))
+        return {
+            "path": "not_found",
+            "text": NOT_FOUND_MESSAGE,
+            "results": [],
+            "answer_reply": SECRET_REPLY,
+            "query_reply": SECRET_REPLY,
+            "arguments": None,
+        }
+
+    patch(module, monkeypatch, fake_run_case)
+    path = held_out_file(tmp_path)
+    monkeypatch.setattr(
+        sys, "argv", ["eval_heldout.py", str(path), "--config", "final_v2"]
+    )
+    module.main()
+    out, err = capsys.readouterr()
+    v1 = (ROOT / "prompts" / "e2e_answer_v1.txt").read_text(encoding="utf-8")
+    assert seen == [(module.FIXED_NOW_V2, v1, FINAL_V2_OPTIONS)] * 2
+    for secret in (SECRET_ID, SECRET_QUESTION, SECRET_REPLY):
+        assert secret not in out + err
+    lines = out.splitlines()
+    assert len(lines) == 4  # no extract: no extract line
+    settings = json.loads(lines[0].removeprefix("settings: "))
+    assert settings["config"] == "final_v2"
+    assert settings["fixed_now"] == "2026-11-17T10:00:00+08:00"
+    assert {k: settings[k] for k in FINAL_V2_OPTIONS} == FINAL_V2_OPTIONS
+
+
+def test_final_v2_options_are_frozen_final_v2():
+    from archways_assistant import frozen, phone
+
+    module = load_script()
+    prompt, options = module.config_run("final_v2")
+    assert prompt == ROOT / frozen.FINAL_V2.answer_prompt
+    assert options == FINAL_V2_OPTIONS
+    assert phone.FALLBACK == "window_v1"
+    # FINAL (the v1 record and the shipped baseline) is unchanged.
+    assert module.config_run("shipped")[1]["matcher"] == "and_v4"

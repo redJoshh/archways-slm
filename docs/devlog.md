@@ -19,6 +19,33 @@ Template:
 
 ---
 
+## 2026-11-20: FINAL_V2 frozen; eval_heldout.py --config final_v2; the phone defaults follow FINAL_V2
+
+- **Date:** 2026-11-20 (+08:00)
+- **Decision (user):** freeze FINAL_V2 now.
+  - **FINAL_V2:** rank_v1, strip_nf_v1, answer v1, the Taglish lexicon (e) via and_v5, contradiction (a), echo (b), the past-date note (c) and extract (d).
+  - **Phone fallback:** window_v1.
+  - **(f):** dropped, and the v5 code stays off. A compact format without bare `posted_at` dates may be a separate v6 after the v2 final.
+- **Correction (user), recorded:** the v2 held-out set allows **two runs in total**. The baseline (`--config shipped`, 2026-11-17) used one, so **the v2 final is exactly ONE run**. Recorded in ADR 0007 (amendment), `accuracy-phase.md` and `v2-improvements.md`.
+- **What changed:**
+  - **Frozen config:** `frozen.FINAL_V2` (a new `ConfigV2` with the four v2 rules). `frozen.FINAL` is unchanged: it is the v1 record and the base of `--config shipped`.
+  - **Held-out script:** `eval_heldout.py` adds config `final_v2` = FINAL_V2 + window_v1, a v2 config tied to `V2_SHA256` with fixed now 2026-11-17T10:00:00+08:00. An extract is scored as an answer; an "extract correct" line follows the totals when an extract occurs.
+  - **Phone defaults:**
+    - `export_assistant_ts.py` now generates `PHONE_*` from FINAL_V2: `PHONE_MATCHER` and_v5, plus the new `PHONE_CONTRADICTION`, `PHONE_ECHO`, `PHONE_PAST_DATE` and `PHONE_EXTRACT`.
+    - `askAssistant()` applies these four rules when they are omitted; null turns a rule off. `startQuestion()` stays explicit (omitted = off).
+  - **TS tests:** the tests of runtime and budget mechanics and the UAT vectors now pin the UAT rule set (every v2 rule null), and so do the two Hermes driver checks. Each rule's "default" test now checks "on by default, null is off".
+- **How it was verified:**
+  - **Tests:** `uv run pytest -q` → `1607 passed, 2 skipped`; ruff clean; `export_assistant_ts.py`, `export_assistant_vectors.py` and `export_search_ts.py` `--check` up to date; Node 336/336; Hermes all vector sets pass, plus the askAssistant and runtime checks.
+  - **New tests:** `final_v2` passes exactly the FINAL_V2 + window_v1 options at the v2 fixed now, prints only the settings, hash and totals, and refuses any file but the v2 one; `FINAL_V2` equals the kept set; the generated `PHONE_*` equal FINAL_V2.
+  - **Dev evidence of the frozen set:** the cold runs `kept-v1.json` / `rules10-kept-v1.json` (entry below), which equal the (a)–(d) replays case for case.
+  - **Drift check:** `eval_flow.py --verify-baseline data/local/runs/baseline-1.json` runs at this commit with a clean tree, before the user's run. The result is recorded in the next entry, so that this commit stays the run commit.
+- **Commits:** this `feat:` commit. Not pushed.
+- **Open questions / next:**
+  - the user's ONE `--config final_v2` run, with its manual review
+  - then re-vendor the test app, a phone smoke test (including a simulated 2026-12-10), and amend the integration guide to this commit
+
+---
+
 ## 2026-11-19: v2 fix (f) answer_v5 pre-registered, built and run: fails the keep rule (2 cases lose answer-correct); NOT KEPT
 
 - **Date:** 2026-11-19 (+08:00)

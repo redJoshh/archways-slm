@@ -11,6 +11,10 @@ import { askAssistant, startQuestion, type QuestionLog, type Step, type StepInpu
 import { answerSystem, answerUserMessage, casePart, querySystem, systemTurn, todayText } from "../src/render.ts";
 import { runVectors, type VectorFile } from "../src/vectors.ts";
 
+// The UAT rule set (every v2 rule off): these tests check the flow's
+// mechanics, not the v2 rules, which are on by default since FINAL_V2.
+const UAT_RULES = { contradiction: null, echo: null, pastDate: null, extract: null } as const;
+
 const path =
   process.env.ASSISTANT_VECTORS ??
   fileURLToPath(new URL("../../../../tests/vectors/assistant_vectors.json", import.meta.url));
@@ -121,6 +125,7 @@ for (const vector of file.flow) {
     const logs: QuestionLog[] = [];
     const seed = vector.speed === null ? null : { promptTps: vector.speed.prompt_tps, genTps: vector.speed.gen_tps };
     const result = await askAssistant(vector.question, {
+    ...UAT_RULES,
       nowMs: () => vector.now_ms,
       clockMs: () => now,
       complete: (call) =>
@@ -162,6 +167,7 @@ test("answer-call timings update the speed; query-call timings do not", async ()
   const speed = speedState({ promptTps: 60, genTps: 20 });
   const timings = { prompt_n: 394, prompt_per_second: 30, predicted_n: 39, predicted_per_second: 11 };
   const result = await askAssistant(vector.question, {
+    ...UAT_RULES,
     nowMs: () => vector.now_ms,
     complete: (call) =>
       Promise.resolve(
@@ -182,6 +188,7 @@ test("query-call timings alone never change the speed", async () => {
   const speed = speedState({ promptTps: 60, genTps: 20 });
   const timings = { prompt_n: 500, prompt_per_second: 99, predicted_n: 40, predicted_per_second: 99 };
   await askAssistant(vector.question, {
+    ...UAT_RULES,
     nowMs: () => vector.now_ms,
     complete: (call) =>
       Promise.resolve(
@@ -200,6 +207,7 @@ test("no speed: the 200-token rule decides, and the log says so", async () => {
   const vector = file.flow.find((v) => v.id === "time-fast-e2e-009")!;
   const logs: QuestionLog[] = [];
   const result = await askAssistant(vector.question, {
+    ...UAT_RULES,
     nowMs: () => vector.now_ms,
     complete: (call) =>
       Promise.resolve({ text: (call.kind === "query" ? vector.query_reply : vector.answer_reply) as string }),
@@ -215,6 +223,7 @@ test("no speed: the 200-token rule decides, and the log says so", async () => {
 
 test("a throwing log never changes the result", async () => {
   const result = await askAssistant("", {
+    ...UAT_RULES,
     nowMs: () => 0,
     complete: () => Promise.resolve({ text: "" }),
     search: () => Promise.resolve([]),
@@ -236,6 +245,7 @@ test("non-finite rates are ignored (not expressible in the JSON vectors)", () =>
 
 test("the driver never rejects, even if a dependency throws synchronously", async () => {
   const result = await askAssistant("When is the fair?", {
+    ...UAT_RULES,
     nowMs: () => 0,
     complete: () => {
       throw new Error("sync");
@@ -253,6 +263,7 @@ test("Redmi 2026-11-07: short not-found replies add up until the speed is known"
   for (const ms of [625, 630, 630]) {
     const timings = { prompt_n: 177, prompt_per_second: 25, predicted_n: 8, predicted_ms: ms, predicted_per_second: 8000 / ms };
     const result = await askAssistant(vector.question, {
+    ...UAT_RULES,
       nowMs: () => vector.now_ms,
       complete: (call) =>
         Promise.resolve(
@@ -290,6 +301,7 @@ test("non-finite predicted_ms is ignored (not expressible in the JSON vectors)",
 test("the answer path shows the UAT label, then the guarded reply above the results list", async () => {
   const vector = file.flow.find((v) => v.id === "answer")!;
   const result = await askAssistant(vector.question, {
+    ...UAT_RULES,
     nowMs: () => vector.now_ms,
     complete: (call) =>
       Promise.resolve({ text: (call.kind === "query" ? vector.query_reply : vector.answer_reply) as string }),
@@ -321,6 +333,7 @@ test("each call kind updates only its own speed", async () => {
   const queryTimings = { prompt_n: 300, prompt_per_second: 25, predicted_n: 15, predicted_per_second: 15 };
   const answerTimings = { prompt_n: 394, prompt_per_second: 30, predicted_n: 39, predicted_per_second: 11 };
   await askAssistant(vector.question, {
+    ...UAT_RULES,
     nowMs: () => vector.now_ms,
     complete: (call) =>
       Promise.resolve(

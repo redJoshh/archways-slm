@@ -423,3 +423,11 @@ The rule of section 3 (f) with the user's decision 7.4 (the compact format, `pos
     - No new unsafe on any set; helpful unchanged everywhere.
   - **Reported (not part of the rule):** answer calls are unchanged. Mean case tokens: e2e34 207 → 129, taglish10 306 → 195, flow13 402 → 282, rules10 438 → 295 (about −35%). Max flow13 876 → 608.
   - **Result: NOT KEPT** (dropped). No second attempt or wording change in this phase. A compact format that avoids exposing a bare `posted_at` date could be a separately pre-registered v6 after the v2 final.
+
+## 2026-11-20: FINAL_V2 frozen (user approval)
+
+- **FINAL_V2** (`archways_assistant.frozen`): rank_v1, and_v5 (e), strip_nf_v1, answer v1, contradiction_v1 (a), echo_v1 (b), past_date_v1 (c), extract_v1 (d). Retry and the excerpt window are off. (f) was dropped; its v5 code stays off. A compact format without bare `posted_at` dates may be a separate v6 after the v2 final.
+- **Phone fallback:** window_v1 (`archways_assistant.phone`), outside FINAL_V2. The shipped app = FINAL_V2 + window_v1, and the phone defaults (`PHONE_*`) are generated from FINAL_V2.
+- **Held-out:** `eval_heldout.py --config final_v2` = FINAL_V2 + window_v1, tied to `V2_SHA256` and the fixed now 2026-11-17T10:00:00+08:00.
+- **Run count (user correction):** the v2 file allows two runs **in total**. The baseline used one, so the v2 final is exactly **ONE** run.
+- **Dev evidence of the frozen set:** the cold runs `kept-v1.json` and `rules10-kept-v1.json` (devlog 2026-11-19).

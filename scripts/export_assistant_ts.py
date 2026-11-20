@@ -26,7 +26,7 @@ from archways_assistant.e2escore import (
     LAST_RESORT_MESSAGE,
     NOT_FOUND_MESSAGE,
 )
-from archways_assistant.frozen import FINAL
+from archways_assistant.frozen import FINAL_V2
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assistant-ts" / "src" / "generated.ts"
@@ -51,8 +51,8 @@ def render() -> str:
     if arguments["query"].get("pattern") != "\\S":
         sys.exit("contract query pattern changed")
 
-    if f"prompts/{ANSWER_PROMPT.name}" != FINAL.answer_prompt:
-        sys.exit("the answer prompt differs from frozen.FINAL")
+    if f"prompts/{ANSWER_PROMPT.name}" != FINAL_V2.answer_prompt:
+        sys.exit("the answer prompt differs from frozen.FINAL_V2")
     prompts = {}
     for name, path in (("QUERY", QUERY_PROMPT), ("ANSWER", ANSWER_PROMPT)):
         data = path.read_bytes()
@@ -94,14 +94,19 @@ def render() -> str:
         ("RESULTS_MAX", result["maxItems"]),
         ("TITLE_MAX_CHARS", announcement["properties"]["title"]["maxLength"]),
         ("EXCERPT_MAX_CHARS", announcement["properties"]["excerpt"]["maxLength"]),
-        # The frozen FINAL configuration (archways_assistant.frozen): the
-        # defaults of makeFeedSearch() and askAssistant() on the phone.
-        ("PHONE_RANK", FINAL.rank),
-        ("PHONE_MATCHER", FINAL.matcher),
-        ("PHONE_RETRY", FINAL.retry),
-        ("PHONE_EXCERPT", FINAL.excerpt),
-        ("PHONE_STRIP_NF", FINAL.strip_nf),
-        # A phone-only setting outside FINAL (archways_assistant.phone).
+        # The frozen FINAL_V2 configuration (archways_assistant.frozen, v2
+        # freeze 2026-11-20): the defaults of makeFeedSearch() and
+        # askAssistant() on the phone.
+        ("PHONE_RANK", FINAL_V2.rank),
+        ("PHONE_MATCHER", FINAL_V2.matcher),
+        ("PHONE_RETRY", FINAL_V2.retry),
+        ("PHONE_EXCERPT", FINAL_V2.excerpt),
+        ("PHONE_STRIP_NF", FINAL_V2.strip_nf),
+        ("PHONE_CONTRADICTION", FINAL_V2.contradiction),
+        ("PHONE_ECHO", FINAL_V2.echo),
+        ("PHONE_PAST_DATE", FINAL_V2.past_date),
+        ("PHONE_EXTRACT", FINAL_V2.extract),
+        # A phone-only setting outside FINAL_V2 (archways_assistant.phone).
         ("PHONE_FALLBACK", phone.FALLBACK),
     ]
     lines = [

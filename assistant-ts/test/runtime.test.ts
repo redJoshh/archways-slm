@@ -15,6 +15,10 @@ import { createFeedIndex } from "../src/feedIndex.ts";
 import { MEASURE_TOKENS, type LlamaAdapter, type SessionSettings } from "../src/session.ts";
 import type { VectorFile } from "../src/vectors.ts";
 
+// The UAT rule set (every v2 rule off): these tests check the flow's
+// mechanics, not the v2 rules, which are on by default since FINAL_V2.
+const UAT_RULES = { contradiction: null, echo: null, pastDate: null, extract: null } as const;
+
 const path =
   process.env.ASSISTANT_VECTORS ??
   fileURLToPath(new URL("../../../../tests/vectors/assistant_vectors.json", import.meta.url));
@@ -211,7 +215,8 @@ test("a question asked during priming waits for it, instead of a query_error", a
   assert.equal(runtime.state(), "priming");
 
   const logs: QuestionLog[] = [];
-  const asked = runtime.ask(VECTOR.question, { nowMs: () => VECTOR.now_ms, search, log: (e) => logs.push(e) });
+  const asked = runtime.ask(VECTOR.question, {
+    ...UAT_RULES, nowMs: () => VECTOR.now_ms, search, log: (e) => logs.push(e) });
   await settle();
   // No query call has started: only the answer priming call so far.
   assert.deepEqual(llama.calls, ["answer 1"]);
@@ -241,8 +246,10 @@ test("a question asked during priming is budgeted with the speed priming measure
   const logs: QuestionLog[] = [];
   // Like the test app: the dependencies are taken before priming finishes.
   const deps = runtime.deps();
-  const asked = runtime.ask(VECTOR.question, { nowMs: () => VECTOR.now_ms, search, log: (e) => logs.push(e) });
-  const direct = askAssistant(VECTOR.question, { ...deps, nowMs: () => VECTOR.now_ms, search });
+  const asked = runtime.ask(VECTOR.question, {
+    ...UAT_RULES, nowMs: () => VECTOR.now_ms, search, log: (e) => logs.push(e) });
+  const direct = askAssistant(VECTOR.question, {
+    ...UAT_RULES, ...deps, nowMs: () => VECTOR.now_ms, search });
   await settle();
   gates[0].resolve();
   gates[1].resolve();
@@ -263,7 +270,8 @@ test("the wait is logged and kept out of the question's time", async () => {
   const runtime = createAssistantRuntime({ llama, settings: SETTINGS, clockMs: () => now });
   const priming = runtime.prime(VECTOR.now_ms);
   const logs: QuestionLog[] = [];
-  const asked = runtime.ask(VECTOR.question, { nowMs: () => VECTOR.now_ms, search, log: (e) => logs.push(e) });
+  const asked = runtime.ask(VECTOR.question, {
+    ...UAT_RULES, nowMs: () => VECTOR.now_ms, search, log: (e) => logs.push(e) });
   await settle();
   now = 9000; // priming took 8 s
   gates[0].resolve();
@@ -289,7 +297,7 @@ test("two questions at once through the runtime never overlap model calls", asyn
   const llama = fakeLlama();
   const runtime = createAssistantRuntime({ llama, settings: SETTINGS });
   await runtime.prime(VECTOR.now_ms);
-  const extra = { nowMs: () => VECTOR.now_ms, search };
+  const extra = { ...UAT_RULES, nowMs: () => VECTOR.now_ms, search };
   const [a, b] = await Promise.all([runtime.ask(VECTOR.question, extra), runtime.ask(VECTOR.question, extra)]);
   assert.equal(llama.concurrent, 0);
   assert.equal(a.path, "answer");
@@ -344,6 +352,7 @@ test("an overlapped answer call does not update the speed", async () => {
   const querySpeed = querySpeedState({ promptTps: 50, genTps: 14 });
   const timings = { prompt_n: 394, prompt_per_second: 30, predicted_n: 39, predicted_per_second: 3 };
   await askAssistant(VECTOR.question, {
+    ...UAT_RULES,
     nowMs: () => VECTOR.now_ms,
     complete: (call) =>
       Promise.resolve({
@@ -383,7 +392,8 @@ test("a suspect answer speed is re-measured once, and the clean measurement repl
   assert.equal(runtime.speed().get()!.genTps, 6.7);
   assert.equal(runtime.state(), "ready");
   phase = "questions";
-  const first = await runtime.ask(VECTOR.question, { nowMs: () => VECTOR.now_ms, search });
+  const first = await runtime.ask(VECTOR.question, {
+    ...UAT_RULES, nowMs: () => VECTOR.now_ms, search });
   assert.equal(first.path, "budget_fallback");
   assert.equal(llama.calls.filter((c) => c === "answer 200").length, 0);
   // The query call measured 13.6: 6.7 < 0.6 * 13.6, so a re-measure is queued.
@@ -436,7 +446,8 @@ test("a re-measure is exclusive: an index build asked for meanwhile waits, and a
     activityBegun = true;
     return end;
   });
-  const asked = runtime.ask(VECTOR.question, { nowMs: () => VECTOR.now_ms, search });
+  const asked = runtime.ask(VECTOR.question, {
+    ...UAT_RULES, nowMs: () => VECTOR.now_ms, search });
   await settle();
   assert.equal(activityBegun, false);
   assert.equal(llama.calls.filter((c) => c.startsWith("query 64")).length, 0);

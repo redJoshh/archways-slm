@@ -39,6 +39,10 @@ function ask(extract?: "extract_v1" | null) {
       kinds.push("count");
       return Promise.resolve(150);
     },
+    // Only extract_v1 under test: the other v2 rules off.
+    contradiction: null,
+    echo: null,
+    pastDate: null,
     ...(extract === undefined ? {} : { extract: extract }),
   });
   return result.then((r) => ({ result: r, kinds: kinds }));
@@ -59,8 +63,9 @@ test("askAssistant with extract_v1: the quote, no count and no answer call", asy
   );
 });
 
-test("askAssistant default is off: the answer path with the model call", async () => {
-  const { result, kinds } = await ask();
+test("askAssistant default is on (FINAL_V2); null is the answer path with the model call", async () => {
+  assert.equal((await ask()).result.path, "extract");
+  const { result, kinds } = await ask(null);
   assert.equal(result.path, "answer");
   assert.deepEqual(kinds, ["query", "count", "answer"]);
 });
